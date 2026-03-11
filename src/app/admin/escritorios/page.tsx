@@ -21,13 +21,11 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { Building2, LayoutGrid, List, Plus } from "lucide-react";
 
 interface EscritoriosPageProps {
-  searchParams?: {
-    aba?: string;
-    visualizacao?: string;
-  };
+  searchParams?: Promise<{ aba?: string; visualizacao?: string }>;
 }
 
-export default async function EscritoriosPage({ searchParams }: EscritoriosPageProps) {
+export default async function EscritoriosPage({ searchParams: searchParamsPromise }: EscritoriosPageProps) {
+  const searchParams: { aba?: string; visualizacao?: string } = await (searchParamsPromise ?? Promise.resolve({}));
   const supabase = await createClient();
 
   const { data: offices, error } = await supabase

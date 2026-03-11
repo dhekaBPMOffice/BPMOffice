@@ -21,13 +21,11 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { CreditCard, LayoutGrid, List, Plus } from "lucide-react";
 
 interface PlanosPageProps {
-  searchParams?: {
-    aba?: string;
-    visualizacao?: string;
-  };
+  searchParams?: Promise<{ aba?: string; visualizacao?: string }>;
 }
 
-export default async function PlanosPage({ searchParams }: PlanosPageProps) {
+export default async function PlanosPage({ searchParams: searchParamsPromise }: PlanosPageProps) {
+  const searchParams: { aba?: string; visualizacao?: string } = await (searchParamsPromise ?? Promise.resolve({}));
   const supabase = await createServiceClient();
 
   const { data: plans, error } = await supabase

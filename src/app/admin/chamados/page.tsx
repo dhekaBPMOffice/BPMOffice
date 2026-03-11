@@ -21,13 +21,11 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { Headphones, LayoutGrid, List } from "lucide-react";
 
 interface ChamadosPageProps {
-  searchParams?: {
-    aba?: string;
-    visualizacao?: string;
-  };
+  searchParams?: Promise<{ aba?: string; visualizacao?: string }>;
 }
 
-export default async function ChamadosPage({ searchParams }: ChamadosPageProps) {
+export default async function ChamadosPage({ searchParams: searchParamsPromise }: ChamadosPageProps) {
+  const searchParams: { aba?: string; visualizacao?: string } = await (searchParamsPromise ?? Promise.resolve({}));
   const supabase = await createServiceClient();
 
   const { data: tickets, error } = await supabase

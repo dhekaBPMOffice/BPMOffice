@@ -21,13 +21,11 @@ import { Badge } from "@/components/ui/badge";
 import { LayoutGrid, List, Plus, Users } from "lucide-react";
 
 interface UsuariosPageProps {
-  searchParams?: {
-    aba?: string;
-    visualizacao?: string;
-  };
+  searchParams?: Promise<{ aba?: string; visualizacao?: string }>;
 }
 
-export default async function UsuariosPage({ searchParams }: UsuariosPageProps) {
+export default async function UsuariosPage({ searchParams: searchParamsPromise }: UsuariosPageProps) {
+  const searchParams: { aba?: string; visualizacao?: string } = await (searchParamsPromise ?? Promise.resolve({}));
   const profile = await requireRole(["leader"]);
   const supabase = await createClient();
 

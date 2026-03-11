@@ -23,13 +23,11 @@ import { ClipboardList, LayoutGrid, List, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DemandasPageProps {
-  searchParams?: {
-    aba?: string;
-    visualizacao?: string;
-  };
+  searchParams?: Promise<{ aba?: string; visualizacao?: string }>;
 }
 
-export default async function DemandasPage({ searchParams }: DemandasPageProps) {
+export default async function DemandasPage({ searchParams: searchParamsPromise }: DemandasPageProps) {
+  const searchParams: { aba?: string; visualizacao?: string } = await (searchParamsPromise ?? Promise.resolve({}));
   const profile = await requireRole(["leader", "user"]);
   const supabase = await createClient();
 

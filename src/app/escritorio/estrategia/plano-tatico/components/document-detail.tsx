@@ -554,7 +554,7 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
                 <Label>Horizonte</Label>
                 <Select
                   value={settingsForm.horizon}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, horizon: e.target.value })}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, horizon: e.target.value as TacticalHorizon })}
                 >
                   <option value="trimestral">Trimestral</option>
                   <option value="semestral">Semestral</option>
