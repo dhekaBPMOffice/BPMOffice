@@ -565,7 +565,7 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
                 <Label>Status</Label>
                 <Select
                   value={settingsForm.status}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, status: e.target.value })}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, status: e.target.value as TacticalDocumentStatus })}
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s.value} value={s.value}>{s.label}</option>
