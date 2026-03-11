@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { DashboardContent } from "./dashboard-content";
+import { DashboardClientWrapper } from "./dashboard-client-wrapper";
 
 export default async function LeaderDashboardPage() {
   const supabase = await createClient();
@@ -73,5 +73,5 @@ export default async function LeaderDashboardPage() {
     }));
   }
 
-  return <DashboardContent metrics={metrics} activityItems={activityItems} />;
+  return <DashboardClientWrapper metrics={metrics} activityItems={activityItems} />;
 }
