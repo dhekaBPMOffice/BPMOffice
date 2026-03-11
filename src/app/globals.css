@@ -1,0 +1,277 @@
+@import "tailwindcss";
+
+/* Variante dark por classe para toggle de tema */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ===== Paleta dheka - Tema claro ===== */
+@theme {
+  --color-surface: #ffffff;
+  --color-surface-elevated: #f8f9fb;
+  --color-background: #f5f6f8;
+  --color-foreground: #1a1a2e;
+  --color-ink: #1a1a2e;
+  --color-ink-muted: #5c6370;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a1a2e;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1a1a2e;
+  --color-primary: #0097a7;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f0f1f5;
+  --color-secondary-foreground: #1a1a2e;
+  --color-muted: #f0f1f5;
+  --color-muted-foreground: #6b7280;
+  --color-accent: #eef0f6;
+  --color-accent-foreground: #1a1a2e;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #eaecf0;
+  --color-edge: #eaecf0;
+  --color-input: #e3e5ec;
+  --color-ring: #0097a7;
+  --color-divider: #f0f1f4;
+  --radius: 0.625rem;
+}
+
+/* Layout e identidade */
+:root {
+  --spacing-page: 2rem;
+  --spacing-block: 1.25rem;
+  --spacing-tight: 0.75rem;
+  --spacing-relaxed: 1.5rem;
+  --radius-block: 0.625rem;
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-card-hover: 0 4px 12px 0 rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-sidebar: 1px 0 0 0 #eaecf0;
+  --identity-primary: #0097a7;
+  --identity-primary-foreground: #ffffff;
+  --identity-secondary: #7b1fa2;
+  --identity-accent: #c2185b;
+  --identity-status-success: #4caf50;
+  --identity-status-warning: #ffd600;
+  --identity-status-error: #ef4444;
+  /* Paleta de módulos dheka */
+  --dheka-teal: #0097a7;
+  --dheka-navy: #283593;
+  --dheka-purple: #7b1fa2;
+  --dheka-magenta: #c2185b;
+  --dheka-green: #4caf50;
+  --dheka-lime: #8bc34a;
+  --dheka-yellow: #ffd600;
+  --dheka-cyan: #00bcd4;
+  /* Criticidade - tons suaves (tema claro) */
+  --criticality-low: #81c784;
+  --criticality-medium: #fff59d;
+  --criticality-high: #f48fb1;
+  --criticality-critical: #ef9a9a;
+}
+
+/* Tema escuro: controlado pela classe .dark (toggle + detecção de sistema via JS) */
+html.dark,
+.dark {
+  --color-surface: #0f1729;
+  --color-surface-elevated: #151d36;
+  --color-background: #0b1120;
+  --color-foreground: #e8eaf0;
+  --color-ink: #e8eaf0;
+  --color-ink-muted: #8b95a8;
+  --color-card: #131b35;
+  --color-card-foreground: #e8eaf0;
+  --color-popover: #131b35;
+  --color-popover-foreground: #e8eaf0;
+  --color-primary: #26c6da;
+  --color-primary-foreground: #0b1120;
+  --color-secondary: #1e2a4a;
+  --color-secondary-foreground: #c8cedd;
+  --color-muted: #1a2540;
+  --color-muted-foreground: #8b95a8;
+  --color-accent: #1e2a4a;
+  --color-accent-foreground: #c8cedd;
+  --color-destructive: #f87171;
+  --color-destructive-foreground: #0b1120;
+  --color-border: #1e2a4a;
+  --color-edge: #1e2a4a;
+  --color-input: #1e2a4a;
+  --color-ring: #26c6da;
+  --color-divider: #161e38;
+  --spacing-page: 2rem;
+  --spacing-block: 1.25rem;
+  --spacing-tight: 0.75rem;
+  --spacing-relaxed: 1.5rem;
+  --radius-block: 0.625rem;
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.15);
+  --shadow-card-hover: 0 4px 12px 0 rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
+  --shadow-sidebar: 1px 0 0 0 #1e2a4a;
+  --identity-primary: #26c6da;
+  --identity-primary-foreground: #0b1120;
+  --identity-secondary: #ce93d8;
+  --identity-accent: #f48fb1;
+  --identity-status-success: #66bb6a;
+  --identity-status-warning: #ffee58;
+  --identity-status-error: #f87171;
+  --dheka-teal: #26c6da;
+  --dheka-navy: #5c6bc0;
+  --dheka-purple: #ce93d8;
+  --dheka-magenta: #f48fb1;
+  --dheka-green: #66bb6a;
+  --dheka-lime: #aed581;
+  --dheka-yellow: #ffee58;
+  --dheka-cyan: #4dd0e1;
+  /* Criticidade - tons suaves (tema escuro) */
+  --criticality-low: #4caf50;
+  --criticality-medium: #fbc02d;
+  --criticality-high: #f06292;
+  --criticality-critical: #e57373;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: inherit;
+}
+
+/* Scrollbar customizada */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(0 0 0 / 0.12);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(0 0 0 / 0.2);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.18);
+}
+
+/* Seleção de texto */
+::selection {
+  background: rgb(0 151 167 / 0.15);
+}
+
+.dark ::selection {
+  background: rgb(38 198 218 / 0.2);
+}
+
+/* Utilitário separador */
+.divider {
+  height: 1px;
+  background: var(--color-divider);
+  border: none;
+  margin: 0;
+}
+
+/* ===== Identidade visual dheka ===== */
+
+/* Gradientes reutilizáveis */
+.dheka-gradient-teal {
+  background: linear-gradient(135deg, var(--dheka-teal), var(--dheka-cyan));
+}
+.dheka-gradient-purple {
+  background: linear-gradient(135deg, var(--dheka-navy), var(--dheka-purple));
+}
+.dheka-gradient-warm {
+  background: linear-gradient(135deg, var(--dheka-magenta), var(--dheka-purple));
+}
+.dheka-gradient-mixed {
+  background: linear-gradient(135deg, var(--dheka-teal), var(--dheka-purple));
+}
+
+/* Chips de ícone com degradê (padrão dheka) */
+.icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+}
+
+.icon-chip-sm {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.icon-chip-md {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.icon-chip-lg {
+  width: 3rem;
+  height: 3rem;
+}
+
+.icon-chip-teal {
+  background: linear-gradient(135deg, var(--dheka-teal), var(--dheka-cyan));
+}
+
+.icon-chip-purple {
+  background: linear-gradient(135deg, var(--dheka-navy), var(--dheka-purple));
+}
+
+.icon-chip-warm {
+  background: linear-gradient(135deg, var(--dheka-magenta), var(--dheka-purple));
+}
+
+.icon-chip-mixed {
+  background: linear-gradient(135deg, var(--dheka-teal), var(--dheka-purple));
+}
+
+/* Linha de acento da marca */
+.accent-line {
+  height: 2px;
+  background: linear-gradient(90deg, var(--dheka-teal), var(--dheka-cyan), var(--dheka-purple), var(--dheka-magenta));
+  background-size: 200% 100%;
+}
+
+/* Background decorativo sutil (marca dheka) */
+.bg-dheka-pattern {
+  background-image:
+    radial-gradient(circle at 20% 80%, rgb(0 151 167 / 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgb(123 31 162 / 0.02) 0%, transparent 50%);
+}
+
+.dark .bg-dheka-pattern {
+  background-image:
+    radial-gradient(circle at 20% 80%, rgb(38 198 218 / 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgb(206 147 216 / 0.03) 0%, transparent 50%);
+}
+
+/* Links de ação padronizados */
+.link-action {
+  color: var(--identity-primary);
+  transition: color 0.15s, opacity 0.15s;
+}
+.link-action:hover {
+  color: var(--identity-primary);
+  opacity: 0.85;
+  text-decoration: underline;
+}
+
+/* Feedback ao clicar em botões (evita hydration mismatch com Tailwind) */
+.btn-active-feedback:active {
+  transform: scale(0.98);
+}
+
+/* Hover de sombra para cards (compatível com Server Components) */
+.card-hover-shadow {
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.card-hover-shadow:hover {
+  box-shadow: var(--shadow-card-hover);
+}
