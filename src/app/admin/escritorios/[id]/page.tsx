@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -232,6 +232,23 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
             </ul>
           )}
           <LiderEscritorioCardClient officeId={id} hasLeaders={(leaders?.length ?? 0) > 0} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Onboarding e processos</CardTitle>
+          <CardDescription>
+            Consulte as respostas do questionário inicial e a lista de processos gerada para este escritório.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href={`/admin/escritorios/${id}/processos`}
+            className={buttonVariants()}
+          >
+            Ver questionário e processos
+          </Link>
         </CardContent>
       </Card>
 

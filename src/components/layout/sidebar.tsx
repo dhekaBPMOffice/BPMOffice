@@ -52,8 +52,9 @@ const adminNavGroups: NavGroup[] = [
       { label: "Configuração IA", href: "/admin/ia", icon: Bot },
       { label: "Frameworks", href: "/admin/frameworks", icon: Network },
       { label: "Serviços Base", href: "/admin/servicos", icon: FileText },
+      { label: "Processos", href: "/admin/processos", icon: ClipboardList },
+      { label: "Formulários", href: "/admin/formularios", icon: BookOpen },
       { label: "Objetivos Escritório", href: "/admin/objetivos-escritorio", icon: Target },
-      { label: "Formulários", href: "/admin/formularios", icon: ClipboardList },
     ],
   },
   {
@@ -61,6 +62,7 @@ const adminNavGroups: NavGroup[] = [
       { label: "Notificações", href: "/admin/notificacoes", icon: Bell },
       { label: "Chamados", href: "/admin/chamados", icon: LifeBuoy },
       { label: "Backup", href: "/admin/backup", icon: DatabaseBackup },
+      { label: "Manual", href: "/admin/manual", icon: HelpCircle },
       { label: "Configurações", href: "/admin/configuracoes", icon: Settings },
     ],
   },
@@ -71,6 +73,7 @@ const leaderNavGroups: NavGroup[] = [
     items: [
       { label: "Dashboard", href: "/escritorio/dashboard", icon: LayoutDashboard },
       { label: "Estratégia", href: "/escritorio/estrategia", icon: Target },
+      { label: "Processos", href: "/escritorio/processos", icon: FileText },
       { label: "Demandas", href: "/escritorio/demandas", icon: ClipboardList },
     ],
   },
@@ -99,6 +102,11 @@ const userNavGroups: NavGroup[] = [
       { label: "Demandas", href: "/escritorio/demandas", icon: ClipboardList },
       { label: "Conhecimento", href: "/escritorio/conhecimento", icon: BookOpen },
       { label: "Capacitação", href: "/escritorio/capacitacao", icon: GraduationCap },
+    ],
+  },
+  {
+    items: [
+      { label: "Manual", href: "/escritorio/manual", icon: HelpCircle },
     ],
   },
 ];

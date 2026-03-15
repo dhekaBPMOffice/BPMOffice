@@ -2,40 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import type { FormQuestionType, ProcessQuestionType } from "@/types/database";
+import type { ProcessQuestionType } from "@/types/database";
 
-/** Normaliza question_type: text -> short_text para compatibilidade */
-function normalizeQuestionType(
-  type: ProcessQuestionType | FormQuestionType
-): string {
-  if (type === "text") return "short_text";
-  return type;
-}
-
-export type CreateFormInput = {
-  title: string;
-  description?: string;
-  enableProcessLinking: boolean;
-  isProcessActivationForm: boolean;
-};
-
-export async function createForm(input: CreateFormInput) {
-  if (!input.title?.trim()) {
-    return { error: "Título do formulário é obrigatório." };
+export async function createQuestionnaire(title: string, description: string) {
+  if (!title?.trim()) {
+    return { error: "Título do questionário é obrigatório." };
   }
 
   const supabase = await createServiceClient();
-
-  if (input.isProcessActivationForm) {
-    const { data: existing } = await supabase
-      .from("process_questionnaires")
-      .select("id")
-      .eq("is_process_activation_form", true)
-      .maybeSingle();
-    if (existing) {
-      return { error: "Já existe um formulário de ativação. Desative-o antes de criar outro." };
-    }
-  }
 
   const { data: latest } = await supabase
     .from("process_questionnaires")
@@ -47,61 +21,42 @@ export async function createForm(input: CreateFormInput) {
   const { data, error } = await supabase
     .from("process_questionnaires")
     .insert({
-      title: input.title.trim(),
-      description: input.description?.trim() || null,
+      title: title.trim(),
+      description: description?.trim() || null,
       version: (latest?.version ?? 0) + 1,
       is_active: false,
-      is_required_first_access: input.isProcessActivationForm,
-      enable_process_linking: input.enableProcessLinking,
-      is_process_activation_form: input.isProcessActivationForm,
+      is_required_first_access: true,
     })
     .select("id")
     .single();
 
   if (error || !data) {
-    return { error: error?.message ?? "Não foi possível criar o formulário." };
+    return { error: error?.message ?? "Não foi possível criar o questionário." };
   }
 
-  revalidatePath("/admin/formularios");
+  revalidatePath("/admin/questionario-processos");
   return { success: true, id: data.id };
 }
 
-export async function updateForm(
+export async function updateQuestionnaire(
   id: string,
   input: {
     title: string;
     description?: string;
     isRequiredFirstAccess: boolean;
-    enableProcessLinking: boolean;
-    isProcessActivationForm: boolean;
   }
 ) {
   if (!input.title?.trim()) {
-    return { error: "Título do formulário é obrigatório." };
+    return { error: "Título do questionário é obrigatório." };
   }
 
   const supabase = await createServiceClient();
-
-  if (input.isProcessActivationForm) {
-    const { data: existing } = await supabase
-      .from("process_questionnaires")
-      .select("id")
-      .eq("is_process_activation_form", true)
-      .neq("id", id)
-      .maybeSingle();
-    if (existing) {
-      return { error: "Já existe um formulário de ativação. Desative-o antes." };
-    }
-  }
-
   const { error } = await supabase
     .from("process_questionnaires")
     .update({
       title: input.title.trim(),
       description: input.description?.trim() || null,
       is_required_first_access: input.isRequiredFirstAccess,
-      enable_process_linking: input.enableProcessLinking,
-      is_process_activation_form: input.isProcessActivationForm,
     })
     .eq("id", id);
 
@@ -109,12 +64,12 @@ export async function updateForm(
     return { error: error.message };
   }
 
-  revalidatePath("/admin/formularios");
-  revalidatePath(`/admin/formularios/${id}`);
+  revalidatePath("/admin/questionario-processos");
+  revalidatePath(`/admin/questionario-processos/${id}`);
   return { success: true };
 }
 
-export async function setActiveForm(id: string) {
+export async function setActiveQuestionnaire(id: string) {
   const supabase = await createServiceClient();
 
   const { error: deactivateError } = await supabase
@@ -135,12 +90,12 @@ export async function setActiveForm(id: string) {
     return { error: error.message };
   }
 
-  revalidatePath("/admin/formularios");
-  revalidatePath(`/admin/formularios/${id}`);
+  revalidatePath("/admin/questionario-processos");
+  revalidatePath(`/admin/questionario-processos/${id}`);
   return { success: true };
 }
 
-export async function deleteForm(id: string) {
+export async function deleteQuestionnaire(id: string) {
   const supabase = await createServiceClient();
   const { error } = await supabase
     .from("process_questionnaires")
@@ -151,16 +106,16 @@ export async function deleteForm(id: string) {
     return { error: error.message };
   }
 
-  revalidatePath("/admin/formularios");
+  revalidatePath("/admin/questionario-processos");
   return { success: true };
 }
 
 export async function addQuestion(
-  formId: string,
+  questionnaireId: string,
   input: {
     prompt: string;
     helperText?: string;
-    questionType: FormQuestionType;
+    questionType: ProcessQuestionType;
     isRequired: boolean;
     enableProcessLinking: boolean;
     linkedProcessIds: string[];
@@ -174,20 +129,18 @@ export async function addQuestion(
   const { data: latestOrder } = await supabase
     .from("process_questionnaire_questions")
     .select("sort_order")
-    .eq("questionnaire_id", formId)
+    .eq("questionnaire_id", questionnaireId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const qType = normalizeQuestionType(input.questionType);
-
   const { data, error } = await supabase
     .from("process_questionnaire_questions")
     .insert({
-      questionnaire_id: formId,
+      questionnaire_id: questionnaireId,
       prompt: input.prompt.trim(),
       helper_text: input.helperText?.trim() || null,
-      question_type: qType,
+      question_type: input.questionType,
       is_required: input.isRequired,
       enable_process_linking: input.enableProcessLinking,
       sort_order: (latestOrder?.sort_order ?? -1) + 1,
@@ -214,17 +167,17 @@ export async function addQuestion(
     }
   }
 
-  revalidatePath(`/admin/formularios/${formId}`);
+  revalidatePath(`/admin/questionario-processos/${questionnaireId}`);
   return { success: true, id: data.id };
 }
 
 export async function updateQuestion(
   questionId: string,
-  formId: string,
+  questionnaireId: string,
   input: {
     prompt: string;
     helperText?: string;
-    questionType: FormQuestionType;
+    questionType: ProcessQuestionType;
     isRequired: boolean;
     enableProcessLinking: boolean;
     linkedProcessIds: string[];
@@ -235,14 +188,12 @@ export async function updateQuestion(
   }
 
   const supabase = await createServiceClient();
-  const qType = normalizeQuestionType(input.questionType);
-
   const { error } = await supabase
     .from("process_questionnaire_questions")
     .update({
       prompt: input.prompt.trim(),
       helper_text: input.helperText?.trim() || null,
-      question_type: qType,
+      question_type: input.questionType,
       is_required: input.isRequired,
       enable_process_linking: input.enableProcessLinking,
     })
@@ -272,11 +223,11 @@ export async function updateQuestion(
     }
   }
 
-  revalidatePath(`/admin/formularios/${formId}`);
+  revalidatePath(`/admin/questionario-processos/${questionnaireId}`);
   return { success: true };
 }
 
-export async function deleteQuestion(questionId: string, formId: string) {
+export async function deleteQuestion(questionId: string, questionnaireId: string) {
   const supabase = await createServiceClient();
   const { error } = await supabase
     .from("process_questionnaire_questions")
@@ -287,130 +238,17 @@ export async function deleteQuestion(questionId: string, formId: string) {
     return { error: error.message };
   }
 
-  revalidatePath(`/admin/formularios/${formId}`);
+  revalidatePath(`/admin/questionario-processos/${questionnaireId}`);
   return { success: true };
-}
-
-export async function reorderQuestions(formId: string, questionIds: string[]) {
-  const supabase = await createServiceClient();
-
-  for (let i = 0; i < questionIds.length; i++) {
-    const { error } = await supabase
-      .from("process_questionnaire_questions")
-      .update({ sort_order: i })
-      .eq("id", questionIds[i])
-      .eq("questionnaire_id", formId);
-
-    if (error) {
-      return { error: error.message };
-    }
-  }
-
-  revalidatePath(`/admin/formularios/${formId}`);
-  return { success: true };
-}
-
-export async function duplicateQuestion(questionId: string, formId: string) {
-  const supabase = await createServiceClient();
-
-  const { data: question, error: qError } = await supabase
-    .from("process_questionnaire_questions")
-    .select("prompt, helper_text, question_type, is_required, enable_process_linking")
-    .eq("id", questionId)
-    .single();
-
-  if (qError || !question) {
-    return { error: qError?.message ?? "Pergunta não encontrada." };
-  }
-
-  const { data: links } = await supabase
-    .from("process_questionnaire_question_processes")
-    .select("base_process_id")
-    .eq("question_id", questionId);
-
-  const { data: latestOrder } = await supabase
-    .from("process_questionnaire_questions")
-    .select("sort_order")
-    .eq("questionnaire_id", formId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { data: newQuestion, error: insertError } = await supabase
-    .from("process_questionnaire_questions")
-    .insert({
-      questionnaire_id: formId,
-      prompt: `${question.prompt} (cópia)`,
-      helper_text: question.helper_text,
-      question_type: question.question_type,
-      is_required: question.is_required,
-      enable_process_linking: question.enable_process_linking,
-      sort_order: (latestOrder?.sort_order ?? -1) + 1,
-    })
-    .select("id")
-    .single();
-
-  if (insertError || !newQuestion) {
-    return { error: insertError?.message ?? "Não foi possível duplicar." };
-  }
-
-  if (question.enable_process_linking && (links?.length ?? 0) > 0) {
-    await supabase.from("process_questionnaire_question_processes").insert(
-      (links ?? []).map((l) => ({
-        question_id: newQuestion.id,
-        base_process_id: l.base_process_id,
-      }))
-    );
-  }
-
-  const { data: options } = await supabase
-    .from("process_questionnaire_options")
-    .select("id, label, value, sort_order, is_active, enable_process_linking")
-    .eq("question_id", questionId)
-    .order("sort_order", { ascending: true });
-
-  if (options?.length) {
-    for (const opt of options) {
-      const { data: newOpt } = await supabase
-        .from("process_questionnaire_options")
-        .insert({
-          question_id: newQuestion.id,
-          label: opt.label,
-          value: opt.value || opt.label,
-          sort_order: opt.sort_order,
-          is_active: opt.is_active,
-          enable_process_linking: opt.enable_process_linking,
-        })
-        .select("id")
-        .single();
-
-      if (newOpt && opt.enable_process_linking) {
-        const { data: optLinks } = await supabase
-          .from("process_questionnaire_option_processes")
-          .select("base_process_id")
-          .eq("option_id", opt.id);
-        if (optLinks?.length) {
-          await supabase.from("process_questionnaire_option_processes").insert(
-            optLinks.map((l) => ({
-              option_id: newOpt.id,
-              base_process_id: l.base_process_id,
-            }))
-          );
-        }
-      }
-    }
-  }
-
-  revalidatePath(`/admin/formularios/${formId}`);
-  return { success: true, id: newQuestion.id };
 }
 
 export async function addOption(
   questionId: string,
-  formId: string,
+  questionnaireId: string,
   input: {
     label: string;
     value?: string;
+    helperText?: string;
     enableProcessLinking: boolean;
     linkedProcessIds: string[];
   }
@@ -434,6 +272,7 @@ export async function addOption(
       question_id: questionId,
       label: input.label.trim(),
       value: input.value?.trim() || input.label.trim(),
+      helper_text: input.helperText?.trim() || null,
       sort_order: (latestOrder?.sort_order ?? -1) + 1,
       is_active: true,
       enable_process_linking: input.enableProcessLinking,
@@ -460,16 +299,17 @@ export async function addOption(
     }
   }
 
-  revalidatePath(`/admin/formularios/${formId}`);
-  return { success: true, id: data.id };
+  revalidatePath(`/admin/questionario-processos/${questionnaireId}`);
+  return { success: true };
 }
 
 export async function updateOption(
   optionId: string,
-  formId: string,
+  questionnaireId: string,
   input: {
     label: string;
     value?: string;
+    helperText?: string;
     enableProcessLinking: boolean;
     linkedProcessIds: string[];
     isActive: boolean;
@@ -485,6 +325,7 @@ export async function updateOption(
     .update({
       label: input.label.trim(),
       value: input.value?.trim() || input.label.trim(),
+      helper_text: input.helperText?.trim() || null,
       is_active: input.isActive,
       enable_process_linking: input.enableProcessLinking,
     })
@@ -514,11 +355,11 @@ export async function updateOption(
     }
   }
 
-  revalidatePath(`/admin/formularios/${formId}`);
+  revalidatePath(`/admin/questionario-processos/${questionnaireId}`);
   return { success: true };
 }
 
-export async function deleteOption(optionId: string, formId: string) {
+export async function deleteOption(optionId: string, questionnaireId: string) {
   const supabase = await createServiceClient();
   const { error } = await supabase
     .from("process_questionnaire_options")
@@ -529,6 +370,6 @@ export async function deleteOption(optionId: string, formId: string) {
     return { error: error.message };
   }
 
-  revalidatePath(`/admin/formularios/${formId}`);
+  revalidatePath(`/admin/questionario-processos/${questionnaireId}`);
   return { success: true };
 }

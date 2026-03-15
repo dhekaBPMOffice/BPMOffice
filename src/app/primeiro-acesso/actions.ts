@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export type ConfirmarPrimeiroAcessoResult =
-  | { success: true; role: string }
+  | { success: true; role: string; redirectTo: string }
   | { success: false; error: string };
 
 export async function confirmarPrimeiroAcesso(): Promise<ConfirmarPrimeiroAcessoResult> {
@@ -26,7 +26,7 @@ export async function confirmarPrimeiroAcesso(): Promise<ConfirmarPrimeiroAcesso
     .from("profiles")
     .update({ must_change_password: false })
     .eq("auth_user_id", user.id)
-    .select("role")
+    .select("role, office_id")
     .single();
 
   if (error || !data) {
@@ -37,5 +37,23 @@ export async function confirmarPrimeiroAcesso(): Promise<ConfirmarPrimeiroAcesso
     return { success: false, error: message };
   }
 
-  return { success: true, role: data.role };
+  let redirectTo = data.role === "admin_master" ? "/admin" : "/escritorio/trabalho";
+
+  if (data.role === "leader") {
+    if (data.office_id) {
+      const { data: office } = await supabaseAdmin
+        .from("offices")
+        .select("processes_initialized_at")
+        .eq("id", data.office_id)
+        .single();
+
+      redirectTo = office?.processes_initialized_at
+        ? "/escritorio/processos"
+        : "/escritorio/onboarding/processos";
+    } else {
+      redirectTo = "/escritorio/dashboard";
+    }
+  }
+
+  return { success: true, role: data.role, redirectTo };
 }

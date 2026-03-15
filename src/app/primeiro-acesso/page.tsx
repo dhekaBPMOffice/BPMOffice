@@ -18,17 +18,6 @@ function getPasswordErrorMessage(error: { message?: string }): string {
   return msg || "Erro ao alterar senha. Tente novamente.";
 }
 
-function getRedirectPathByRole(role: string): string {
-  switch (role) {
-    case "admin_master":
-      return "/admin";
-    case "leader":
-      return "/escritorio/dashboard";
-    default:
-      return "/escritorio/trabalho";
-  }
-}
-
 export default function FirstAccessPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -95,8 +84,7 @@ export default function FirstAccessPage() {
       return;
     }
 
-    const path = getRedirectPathByRole(result.role);
-    router.push(path);
+    router.push(result.redirectTo);
     router.refresh();
   }
 

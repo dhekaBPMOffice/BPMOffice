@@ -51,17 +51,39 @@ export async function updateSession(request: NextRequest) {
     if (supabaseAdmin) {
       const { data } = await supabaseAdmin
         .from("profiles")
-        .select("role, must_change_password")
+        .select("role, must_change_password, office_id")
         .eq("auth_user_id", authUserId)
         .single();
       return data;
     }
     const { data } = await supabase
       .from("profiles")
-      .select("role, must_change_password")
+      .select("role, must_change_password, office_id")
       .eq("auth_user_id", authUserId)
       .single();
     return data;
+  }
+
+  async function isLeaderOnboardingPending(officeId: string | null | undefined) {
+    if (!officeId) return false;
+
+    if (supabaseAdmin) {
+      const { data } = await supabaseAdmin
+        .from("offices")
+        .select("processes_initialized_at")
+        .eq("id", officeId)
+        .single();
+
+      return !data?.processes_initialized_at;
+    }
+
+    const { data } = await supabase
+      .from("offices")
+      .select("processes_initialized_at")
+      .eq("id", officeId)
+      .single();
+
+    return !data?.processes_initialized_at;
   }
 
   if (user && isAuthRoute) {
@@ -81,12 +103,22 @@ export async function updateSession(request: NextRequest) {
 
     if (profile && !profile.must_change_password) {
       const url = request.nextUrl.clone();
+      const onboardingPending =
+        profile.role === "leader"
+          ? await isLeaderOnboardingPending(profile.office_id)
+          : false;
+
+      if (onboardingPending) {
+        url.pathname = "/escritorio/onboarding/processos";
+        return NextResponse.redirect(url);
+      }
+
       switch (profile.role) {
         case "admin_master":
           url.pathname = "/admin";
           break;
         case "leader":
-          url.pathname = "/escritorio/dashboard";
+          url.pathname = "/escritorio/processos";
           break;
         default:
           url.pathname = "/escritorio/trabalho";
@@ -105,18 +137,29 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (profile) {
+      const onboardingPending =
+        profile.role === "leader"
+          ? await isLeaderOnboardingPending(profile.office_id)
+          : false;
       const isAdminRoute = pathname.startsWith("/admin");
       const isOfficeRoute = pathname.startsWith("/escritorio");
+      const isOnboardingRoute = pathname.startsWith("/escritorio/onboarding/processos");
 
       if (profile.role !== "admin_master" && isAdminRoute) {
         const url = request.nextUrl.clone();
-        url.pathname = "/escritorio/dashboard";
+        url.pathname = "/escritorio/processos";
         return NextResponse.redirect(url);
       }
 
       if (profile.role === "admin_master" && isOfficeRoute) {
         const url = request.nextUrl.clone();
         url.pathname = "/admin";
+        return NextResponse.redirect(url);
+      }
+
+      if (onboardingPending && !isOnboardingRoute) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/escritorio/onboarding/processos";
         return NextResponse.redirect(url);
       }
     }

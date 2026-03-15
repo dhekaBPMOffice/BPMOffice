@@ -6,6 +6,7 @@ export interface Office {
   slug: string;
   plan_id: string | null;
   is_active: boolean;
+  processes_initialized_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -106,5 +107,187 @@ export interface AuditLog {
   resource_type: string;
   resource_id: string | null;
   details: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export type ProcessQuestionType = "text" | "single_select" | "multi_select";
+
+/** Tipos de pergunta suportados no builder de formulários (inclui text como short_text) */
+export type FormQuestionType =
+  | "short_text"
+  | "long_text"
+  | "single_select"
+  | "multi_select";
+
+export const FORM_QUESTION_TYPES: FormQuestionType[] = [
+  "short_text",
+  "long_text",
+  "single_select",
+  "multi_select",
+];
+export type OfficeProcessOrigin = "questionnaire" | "manual";
+export type OfficeProcessStatus =
+  | "not_started"
+  | "in_progress"
+  | "completed"
+  | "archived";
+export type OfficeProcessAttachmentType =
+  | "template"
+  | "flowchart"
+  | "support"
+  | "other";
+
+export interface ProcessTemplateFile {
+  url: string;
+  label?: string;
+}
+
+export interface ProcessFlowchartFile {
+  url: string;
+}
+
+export interface BaseProcess {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  category: string | null;
+  template_url: string | null;
+  template_label: string | null;
+  flowchart_image_url: string | null;
+  template_files: ProcessTemplateFile[];
+  flowchart_files: ProcessFlowchartFile[];
+  management_checklist: string[];
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProcessQuestionnaire {
+  id: string;
+  title: string;
+  description: string | null;
+  version: number;
+  is_active: boolean;
+  is_required_first_access: boolean;
+  enable_process_linking: boolean;
+  is_process_activation_form: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProcessQuestionnaireQuestion {
+  id: string;
+  questionnaire_id: string;
+  prompt: string;
+  helper_text: string | null;
+  question_type: ProcessQuestionType | FormQuestionType;
+  is_required: boolean;
+  enable_process_linking: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface ProcessQuestionnaireOption {
+  id: string;
+  question_id: string;
+  label: string;
+  value: string | null;
+  helper_text: string | null;
+  sort_order: number;
+  is_active: boolean;
+  enable_process_linking: boolean;
+  created_at: string;
+}
+
+export interface ProcessQuestionnaireQuestionProcess {
+  id: string;
+  question_id: string;
+  base_process_id: string;
+  created_at: string;
+}
+
+export interface ProcessQuestionnaireOptionProcess {
+  id: string;
+  option_id: string;
+  base_process_id: string;
+  created_at: string;
+}
+
+export interface OfficeQuestionnaireSubmission {
+  id: string;
+  questionnaire_id: string;
+  office_id: string;
+  leader_profile_id: string | null;
+  generated_process_ids: string[];
+  created_at: string;
+  submitted_at: string;
+}
+
+export interface OfficeQuestionnaireAnswer {
+  id: string;
+  submission_id: string;
+  question_id: string;
+  answer_text: string | null;
+  selected_option_ids: string[];
+  created_at: string;
+}
+
+export interface OfficeProcess {
+  id: string;
+  office_id: string;
+  base_process_id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  template_url: string | null;
+  template_label: string | null;
+  flowchart_image_url: string | null;
+  template_files: ProcessTemplateFile[];
+  flowchart_files: ProcessFlowchartFile[];
+  origin: OfficeProcessOrigin;
+  status: OfficeProcessStatus;
+  owner_profile_id: string | null;
+  notes: string | null;
+  added_by_profile_id: string | null;
+  selected_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OfficeProcessChecklistItem {
+  id: string;
+  office_process_id: string;
+  title: string;
+  description: string | null;
+  is_completed: boolean;
+  sort_order: number;
+  completed_at: string | null;
+  created_by_profile_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OfficeProcessAttachment {
+  id: string;
+  office_process_id: string;
+  title: string;
+  attachment_url: string;
+  attachment_type: OfficeProcessAttachmentType;
+  created_by_profile_id: string | null;
+  created_at: string;
+}
+
+export interface OfficeProcessHistory {
+  id: string;
+  office_process_id: string;
+  office_id: string;
+  actor_profile_id: string | null;
+  event_type: string;
+  description: string;
+  metadata: Record<string, unknown>;
   created_at: string;
 }

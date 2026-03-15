@@ -1,0 +1,163 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+const PROCESS_FILES_BUCKET = "process-files";
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+
+const TEMPLATE_BLOCKED_EXTENSIONS = new Set([
+  "exe", "bat", "cmd", "sh", "ps1", "vbs", "js", "jar", "dll", "msi",
+  "php", "py", "rb", "pl", "cgi", "asp", "aspx", "jsp", "htaccess",
+]);
+
+const FLOWCHART_EXTENSIONS = new Set(["png", "bpm", "bpmn", "bpms"]);
+
+const COMMON_MIME_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  bmp: "image/bmp",
+  svg: "image/svg+xml",
+  bpm: "application/xml",
+  bpmn: "application/xml",
+  bpms: "application/xml",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  txt: "text/plain",
+  csv: "text/csv",
+  xml: "application/xml",
+  odt: "application/vnd.oasis.opendocument.text",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+};
+
+function getExtension(filename: string): string {
+  const lastDot = filename.lastIndexOf(".");
+  return lastDot >= 0 ? filename.slice(lastDot + 1).toLowerCase() : "";
+}
+
+function isBucketAlreadyExistsError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { code?: string; message?: string };
+  return (
+    e.code === "BucketAlreadyExists" ||
+    e.code === "409" ||
+    e.message?.toLowerCase()?.includes("already exists") === true
+  );
+}
+
+async function ensureProcessFilesBucket(supabase: SupabaseClient) {
+  const allowedMimeTypes = [
+    "application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp",
+    "image/bmp", "image/svg+xml", "application/xml", "text/xml",
+    "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "text/plain", "text/csv", "application/octet-stream",
+    "application/vnd.oasis.opendocument.text", "application/vnd.oasis.opendocument.spreadsheet",
+  ];
+  const { error } = await supabase.storage.createBucket(PROCESS_FILES_BUCKET, {
+    public: true,
+    fileSizeLimit: MAX_FILE_SIZE_BYTES,
+    allowedMimeTypes,
+  });
+  if (error && !isBucketAlreadyExistsError(error)) {
+    return { error: error.message };
+  }
+  return null;
+}
+
+export type ProcessFileUploadScope =
+  | { type: "base_process"; baseProcessId: string }
+  | { type: "office_attachment"; officeProcessId: string };
+
+export type ProcessFileKind = "template" | "flowchart" | "attachment";
+
+export type ProcessFileUploadResult =
+  | { url: string; filename: string }
+  | { error: string };
+
+function validateFileForKind(
+  file: File,
+  kind: ProcessFileKind
+): { ok: true } | { error: string } {
+  const ext = getExtension(file.name);
+
+  if (kind === "template") {
+    if (TEMPLATE_BLOCKED_EXTENSIONS.has(ext)) {
+      return { error: `Formato não permitido por segurança: .${ext}` };
+    }
+    return { ok: true };
+  }
+
+  if (kind === "flowchart") {
+    if (!FLOWCHART_EXTENSIONS.has(ext)) {
+      return {
+        error: `Fluxograma deve ser PNG ou BPM (.png, .bpm, .bpmn, .bpms). Recebido: ${ext || "desconhecido"}`,
+      };
+    }
+    return { ok: true };
+  }
+
+  if (kind === "attachment") {
+    if (TEMPLATE_BLOCKED_EXTENSIONS.has(ext)) {
+      return { error: `Formato não permitido por segurança: .${ext}` };
+    }
+    return { ok: true };
+  }
+
+  return { error: "Tipo de arquivo inválido." };
+}
+
+/**
+ * Faz upload de arquivo para o bucket de processos.
+ * - template: aceita qualquer formato (exceto executáveis e scripts).
+ * - flowchart: apenas PNG ou BPM (.png, .bpm, .bpmn, .bpms).
+ * - attachment: aceita qualquer formato (exceto executáveis e scripts).
+ */
+export async function uploadProcessFile(
+  supabase: SupabaseClient,
+  file: File,
+  scope: ProcessFileUploadScope,
+  kind: ProcessFileKind = "attachment"
+): Promise<ProcessFileUploadResult> {
+  const validation = validateFileForKind(file, kind);
+  if (!("ok" in validation)) {
+    return validation;
+  }
+
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return { error: `Arquivo muito grande. Máximo: ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB` };
+  }
+
+  const ensured = await ensureProcessFilesBucket(supabase);
+  if (ensured?.error) return { error: ensured.error };
+
+  const scopePath =
+    scope.type === "base_process"
+      ? `base/${scope.baseProcessId}`
+      : `office/${scope.officeProcessId}`;
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const filePath = `${scopePath}/${Date.now()}-${safeName}`;
+
+  const ext = getExtension(file.name);
+  const mimeType = COMMON_MIME_TYPES[ext] ?? (file.type || "application/octet-stream");
+
+  const { error: uploadError } = await supabase.storage
+    .from(PROCESS_FILES_BUCKET)
+    .upload(filePath, file, {
+      contentType: mimeType,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    return { error: uploadError.message };
+  }
+
+  const { data } = supabase.storage.from(PROCESS_FILES_BUCKET).getPublicUrl(filePath);
+  return { url: data.publicUrl, filename: file.name };
+}
