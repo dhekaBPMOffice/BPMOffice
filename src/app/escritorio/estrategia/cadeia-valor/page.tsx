@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import React, { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,8 +32,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Download,
   ExternalLink,
   FileImage,
@@ -46,6 +48,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { PageLayout } from "@/components/layout/page-layout";
+import { cn } from "@/lib/utils";
 
 type ProcessType = "Primário" | "Apoio" | "Gerencial";
 type Priority = "Alta" | "Média" | "Baixa";
@@ -120,25 +123,27 @@ interface UIState {
   currentPage: number;
 }
 
-interface HierarchyNodeL3 {
-  nome: string;
-  processos: ProcessItem[];
+interface CategoryGroup {
+  label: string;
+  tipo: ProcessType;
+  macros: Array<{
+    nome: string;
+    processos: ProcessItem[];
+  }>;
 }
 
-interface HierarchyNodeL2 {
-  nome: string;
-  filhos: HierarchyNodeL3[];
+interface ProcessTreeNode {
+  label: string;
+  processes: ProcessItem[];
+  children: ProcessTreeNode[];
 }
 
-interface HierarchyNodeL1 {
-  nome: string;
-  filhos: HierarchyNodeL2[];
-}
-
-interface HierarchyNodeMacro {
-  nome: string;
-  filhos: HierarchyNodeL1[];
-}
+const CATEGORY_ORDER: ProcessType[] = ["Primário", "Gerencial", "Apoio"];
+const CATEGORY_LABELS: Record<ProcessType, string> = {
+  Primário: "Processos de Negócio",
+  Gerencial: "Processos de Gestão",
+  Apoio: "Processos de Apoio",
+};
 
 const STORAGE_KEY_PROCESSES = "cadeia-valor-processos";
 const STORAGE_KEY_UPLOADS = "cadeia-valor-anexos";
@@ -260,6 +265,57 @@ function getGeneralStatusVariant(status: GeneralStatus): "outline" | "warning" |
   return "outline";
 }
 
+function formatProcessPath(process: ProcessItem, macroNome: string): string {
+  const parts = [
+    normalizeLevel(process.nivel1, ""),
+    normalizeLevel(process.nivel2, ""),
+    normalizeLevel(process.nivel3, ""),
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" › ") : macroNome;
+}
+
+function buildProcessTree(processes: ProcessItem[]): ProcessTreeNode[] {
+  const roots: ProcessTreeNode[] = [];
+  const rootByLabel = new Map<string, ProcessTreeNode>();
+
+  for (const process of processes) {
+    const path = [
+      normalizeLevel(process.nivel1, ""),
+      normalizeLevel(process.nivel2, ""),
+      normalizeLevel(process.nivel3, ""),
+    ].filter(Boolean);
+    if (path.length === 0) continue;
+
+    let parent: ProcessTreeNode | null = null;
+    for (let i = 0; i < path.length; i++) {
+      const label = path[i];
+      let node: ProcessTreeNode | null = null;
+
+      if (i === 0) {
+        node = rootByLabel.get(label) ?? null;
+        if (!node) {
+          node = { label, processes: [], children: [] };
+          rootByLabel.set(label, node);
+          roots.push(node);
+        }
+      } else {
+        node = parent!.children.find((c) => c.label === label) ?? null;
+        if (!node) {
+          node = { label, processes: [], children: [] };
+          parent!.children.push(node);
+          parent!.children.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+        }
+      }
+      if (i === path.length - 1) {
+        node!.processes.push(process);
+      }
+      parent = node;
+    }
+  }
+
+  return roots.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+}
+
 function getBpmSummary(etapas: Record<BPMStage, StageStatus>) {
   let naoIniciado = 0;
   let emAndamento = 0;
@@ -366,45 +422,117 @@ function buildAISuggestions(answers: Record<AIQuestionId, string>): ProcessFormD
   }));
 }
 
-function buildHierarchy(processes: ProcessItem[]): HierarchyNodeMacro[] {
-  const map = new Map<string, Map<string, Map<string, Map<string, ProcessItem[]>>>>();
+function buildHierarchyByCategory(processes: ProcessItem[]): CategoryGroup[] {
+  const tipoFallback: ProcessType = "Apoio";
+  const byTipo = new Map<ProcessType, Map<string, ProcessItem[]>>();
 
   for (const process of processes) {
+    const tipo = PROCESS_TYPES.includes(process.tipo) ? process.tipo : tipoFallback;
     const macro = normalizeLevel(process.macroprocesso, "Sem Macroprocesso");
-    const n1 = normalizeLevel(process.nivel1, "Sem Nível 1");
-    const n2 = normalizeLevel(process.nivel2, "Sem Nível 2");
-    const n3 = normalizeLevel(process.nivel3, "Sem Nível 3");
 
-    if (!map.has(macro)) map.set(macro, new Map());
-    const mapN1 = map.get(macro);
-    if (!mapN1) continue;
-    if (!mapN1.has(n1)) mapN1.set(n1, new Map());
-    const mapN2 = mapN1.get(n1);
-    if (!mapN2) continue;
-    if (!mapN2.has(n2)) mapN2.set(n2, new Map());
-    const mapN3 = mapN2.get(n2);
-    if (!mapN3) continue;
-    if (!mapN3.has(n3)) mapN3.set(n3, []);
-    mapN3.get(n3)?.push(process);
+    if (!byTipo.has(tipo)) byTipo.set(tipo, new Map());
+    const mapMacro = byTipo.get(tipo)!;
+    if (!mapMacro.has(macro)) mapMacro.set(macro, []);
+    mapMacro.get(macro)!.push(process);
   }
 
-  const result: HierarchyNodeMacro[] = [];
-  for (const [macro, mapN1] of map) {
-    const nodeMacro: HierarchyNodeMacro = { nome: macro, filhos: [] };
-    for (const [n1, mapN2] of mapN1) {
-      const nodeN1: HierarchyNodeL1 = { nome: n1, filhos: [] };
-      for (const [n2, mapN3] of mapN2) {
-        const nodeN2: HierarchyNodeL2 = { nome: n2, filhos: [] };
-        for (const [n3, list] of mapN3) {
-          nodeN2.filhos.push({ nome: n3, processos: list });
-        }
-        nodeN1.filhos.push(nodeN2);
-      }
-      nodeMacro.filhos.push(nodeN1);
-    }
-    result.push(nodeMacro);
+  const result: CategoryGroup[] = [];
+  for (const tipo of CATEGORY_ORDER) {
+    const mapMacro = byTipo.get(tipo);
+    if (!mapMacro || mapMacro.size === 0) continue;
+
+    const macros = [...mapMacro.entries()]
+      .map(([nome, processos]) => ({ nome, processos }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
+    result.push({
+      label: CATEGORY_LABELS[tipo],
+      tipo,
+      macros,
+    });
   }
-  return result.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  return result;
+}
+
+function FlowchartArrowDown({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex justify-center", className)}>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+        <line x1="12" y1="4" x2="12" y2="16" />
+        <polyline points="8 12 12 16 16 12" />
+      </svg>
+    </div>
+  );
+}
+
+function ProcessFlowchartNode({
+  node,
+  macroNome,
+  onEdit,
+}: {
+  node: ProcessTreeNode;
+  macroNome: string;
+  onEdit: (process: ProcessItem) => void;
+  isRoot?: boolean;
+}) {
+  const hasChildren = node.children.length > 0;
+  const hasProcesses = node.processes.length > 0;
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="rounded-lg border-2 border-muted bg-background p-3 min-w-[180px] max-w-[280px] hover:border-[var(--identity-primary)]/40 transition-colors">
+        <div className="flex items-center justify-between gap-2">
+          {hasProcesses ? (
+            <Link
+              href={`/escritorio/demandas?processo=${node.processes[0].id}`}
+              className="flex-1 min-w-0 font-semibold text-sm text-[var(--identity-primary)] text-center break-words hover:underline"
+              title={formatProcessPath(node.processes[0], macroNome)}
+            >
+              {node.label}
+            </Link>
+          ) : (
+            <p className="flex-1 font-semibold text-sm text-[var(--identity-primary)] text-center break-words">
+              {node.label}
+            </p>
+          )}
+          {hasProcesses && (
+            <div className="flex shrink-0 gap-0.5">
+              {node.processes.map((process) => (
+                <Button
+                  key={process.id}
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onEdit(process);
+                  }}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {hasChildren && (
+        <>
+          <FlowchartArrowDown className="my-1" />
+          <div className="flex flex-row flex-wrap justify-center gap-4 md:gap-6 items-start">
+            {node.children.map((child) => (
+              <ProcessFlowchartNode
+                key={child.label}
+                node={child}
+                macroNome={macroNome}
+                onEdit={onEdit}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function CadeiaValorPage() {
@@ -427,6 +555,7 @@ export default function CadeiaValorPage() {
   const [filterMacroprocesso, setFilterMacroprocesso] = useState(DEFAULT_UI_STATE.filterMacroprocesso);
   const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_UI_STATE.sortMode);
   const [currentPage, setCurrentPage] = useState(DEFAULT_UI_STATE.currentPage);
+  const [expandedMacro, setExpandedMacro] = useState<string | null>(null);
 
   useEffect(() => {
     const storedProcesses = localStorage.getItem(STORAGE_KEY_PROCESSES);
@@ -581,8 +710,8 @@ export default function CadeiaValorPage() {
     return filteredSortedProcesses.slice(start, start + PAGE_SIZE);
   }, [filteredSortedProcesses, currentPage]);
 
-  const hierarchy = useMemo(
-    () => buildHierarchy(filteredSortedProcesses),
+  const hierarchyByCategory = useMemo(
+    () => buildHierarchyByCategory(filteredSortedProcesses),
     [filteredSortedProcesses]
   );
 
@@ -803,40 +932,56 @@ export default function CadeiaValorPage() {
   }
 
   function exportDiagramImage() {
-    const source = filteredSortedProcesses;
+    const categories = buildHierarchyByCategory(filteredSortedProcesses);
     const width = 1400;
-    const lineHeight = 34;
-    const height = Math.max(220, 140 + source.length * lineHeight);
-    let y = 80;
+    const padding = 40;
+    const cardW = 180;
+    const cardH = 56;
+    const gap = 12;
+    const cols = 5;
+    let y = 60;
 
-    const lines = source.map(
-      (process) =>
-        `${normalizeLevel(process.macroprocesso, "Sem Macroprocesso")} > ${normalizeLevel(process.nivel1, "Sem Nível 1")} > ${normalizeLevel(process.nivel2, "Sem Nível 2")} > ${normalizeLevel(process.nivel3, "Sem Nível 3")} (${process.tipo})`
-    );
+    let height = 100;
 
-    const escapedLines = lines.map((line) =>
-      line
+    const escape = (s: string) =>
+      s
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-    );
+        .replaceAll('"', "&quot;");
 
-    const textBlocks = escapedLines
-      .map((line) => {
-        const currentY = y;
-        y += lineHeight;
-        return `<text x="40" y="${currentY}" font-family="Arial, sans-serif" font-size="14" fill="#1f2937">${line}</text>`;
-      })
-      .join("");
+    const parts: string[] = [];
+    parts.push(`<text x="${padding}" y="${y}" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#111827">Diagrama da Cadeia de Valor</text>`);
+    y += 50;
+
+    for (const cat of categories) {
+      parts.push(`<text x="${padding}" y="${y}" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#374151">${escape(cat.label)}</text>`);
+      y += 32;
+
+      let row = 0;
+      let col = 0;
+      for (const macro of cat.macros) {
+        const x = padding + col * (cardW + gap);
+        const cy = y + row * (cardH + gap);
+        parts.push(`<rect x="${x}" y="${cy}" width="${cardW}" height="${cardH}" fill="#f3f4f6" stroke="#d1d5db" rx="6" />`);
+        parts.push(`<text x="${x + cardW / 2}" y="${cy + cardH / 2 - 4}" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#0d9488" text-anchor="middle">${escape(macro.nome)}</text>`);
+        parts.push(`<text x="${x + cardW / 2}" y="${cy + cardH / 2 + 10}" font-family="Arial, sans-serif" font-size="10" fill="#6b7280" text-anchor="middle">${macro.processos.length} processo(s)</text>`);
+        col += 1;
+        if (col >= cols) {
+          col = 0;
+          row += 1;
+        }
+      }
+      const rowsUsed = Math.ceil(cat.macros.length / cols);
+      y += rowsUsed * (cardH + gap) + 24;
+    }
+
+    height = Math.max(220, y + 40);
 
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
         <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff" />
-        <text x="40" y="45" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#111827">
-          Diagrama da Cadeia de Valor
-        </text>
-        ${textBlocks}
+        ${parts.join("\n        ")}
       </svg>
     `.trim();
 
@@ -1150,13 +1295,13 @@ export default function CadeiaValorPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card id="cadeia-valor-diagrama">
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <CardTitle>Diagrama da Cadeia de Valor</CardTitle>
                 <CardDescription>
-                  Árvore colapsável por macroprocesso e níveis, com contagem e acesso rápido.
+                  Visão por categorias (Negócio, Gestão, Apoio) com grid de macroprocessos. Clique em um macro para ver os processos.
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -1172,80 +1317,69 @@ export default function CadeiaValorPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {hierarchy.length === 0 ? (
+            {hierarchyByCategory.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhum processo encontrado.</p>
             ) : (
-              <div className="space-y-3">
-                {hierarchy.map((macro) => (
-                  <details key={macro.nome} open className="rounded-lg border p-3">
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-semibold text-[var(--identity-primary)]">{macro.nome}</p>
-                        <Badge variant="outline">
-                          {macro.filhos.reduce(
-                            (accMacro, n1) =>
-                              accMacro +
-                              n1.filhos.reduce(
-                                (accN1, n2) =>
-                                  accN1 + n2.filhos.reduce((accN2, n3) => accN2 + n3.processos.length, 0),
-                                0
-                              ),
-                            0
-                          )}{" "}
-                          processos
-                        </Badge>
-                      </div>
-                    </summary>
-
-                    <div className="mt-3 ml-3 space-y-3 border-l pl-4">
-                      {macro.filhos.map((n1) => (
-                        <details key={`${macro.nome}-${n1.nome}`} open className="rounded-md border p-2">
-                          <summary className="cursor-pointer list-none text-sm font-medium">{n1.nome}</summary>
-                          <div className="mt-2 ml-3 space-y-2 border-l pl-4">
-                            {n1.filhos.map((n2) => (
-                              <details key={`${n1.nome}-${n2.nome}`} open className="rounded-md border p-2">
-                                <summary className="cursor-pointer list-none text-sm text-muted-foreground">
-                                  {n2.nome}
-                                </summary>
-                                <div className="mt-2 ml-3 space-y-2 border-l pl-4">
-                                  {n2.filhos.map((n3) => (
-                                    <div key={`${n2.nome}-${n3.nome}`} className="space-y-2 rounded-md border p-2">
-                                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{n3.nome}</p>
-                                      {n3.processos.map((process) => (
-                                        <div
-                                          key={process.id}
-                                          className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2"
-                                        >
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            <span className="font-medium">{process.gestorProcesso}</span>
-                                            <Badge variant="outline">{process.tipo}</Badge>
-                                            <Badge variant={getGeneralStatusVariant(process.statusGeral)}>
-                                              {process.statusGeral}
-                                            </Badge>
-                                          </div>
-                                          <div className="flex gap-1">
-                                            <Button size="sm" variant="ghost" onClick={() => openEditDialog(process)}>
-                                              <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Link href={`/escritorio/demandas?processo=${process.id}`}>
-                                              <Button size="sm" variant="outline">
-                                                <ExternalLink className="h-4 w-4" />
-                                                Acessar processo
-                                              </Button>
-                                            </Link>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ))}
+              <div className="space-y-8">
+                {hierarchyByCategory.map((category) => (
+                  <div key={category.tipo} className="space-y-3">
+                    <h3 className="text-base font-semibold text-foreground border-b pb-2">
+                      {category.label}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                      {category.macros.map((macro) => {
+                        const expandKey = `${category.tipo}::${macro.nome}`;
+                        const isExpanded = expandedMacro === expandKey;
+                        return (
+                          <div
+                            key={expandKey}
+                            className={cn("space-y-2", isExpanded && "col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5")}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setExpandedMacro(isExpanded ? null : expandKey)}
+                              className="w-full min-h-[72px] flex flex-col items-center justify-center gap-1 rounded-lg border bg-muted/30 hover:bg-muted/50 p-3 text-center transition-colors"
+                            >
+                              <p className="font-semibold text-sm text-[var(--identity-primary)] leading-tight break-words">
+                                {macro.nome}
+                              </p>
+                              <Badge variant="outline" className="text-xs">
+                                {macro.processos.length} processo{macro.processos.length !== 1 ? "s" : ""}
+                              </Badge>
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </button>
+                            {isExpanded && (
+                              <div className="rounded-lg border p-4 space-y-4 bg-background">
+                                <div className="flex flex-col items-center w-full">
+                                  <div className="rounded-lg border-2 border-muted bg-background p-3 min-w-[180px] max-w-[280px]">
+                                    <p className="font-semibold text-sm text-[var(--identity-primary)] text-center break-words">
+                                      {macro.nome}
+                                    </p>
+                                  </div>
+                                  <FlowchartArrowDown className="my-1" />
+                                  <div className="w-full max-w-full border-t-2 border-muted my-1" />
+                                  <div className="flex flex-row flex-wrap justify-center gap-6 py-4 rounded-lg border border-dashed border-muted/50 bg-muted/5 px-4 overflow-x-auto">
+                                    {buildProcessTree(macro.processos).map((rootNode) => (
+                                      <ProcessFlowchartNode
+                                        key={rootNode.label}
+                                        node={rootNode}
+                                        macroNome={macro.nome}
+                                        onEdit={openEditDialog}
+                                      />
+                                    ))}
+                                  </div>
                                 </div>
-                              </details>
-                            ))}
+                              </div>
+                            )}
                           </div>
-                        </details>
-                      ))}
+                        );
+                      })}
                     </div>
-                  </details>
+                  </div>
                 ))}
               </div>
             )}

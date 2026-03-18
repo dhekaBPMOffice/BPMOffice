@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -25,7 +26,6 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { type UserRole } from "@/types/database";
-import { useState } from "react";
 import { IconChip } from "@/components/ui/icon-chip";
 
 interface NavItem {
@@ -122,6 +122,11 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const navGroups =
     role === "admin_master"
@@ -214,53 +219,74 @@ export function Sidebar({
       )}
 
       <nav className="flex-1 overflow-y-auto px-2 py-2">
-        {navGroups.map((group, groupIdx) => (
-          <div key={groupIdx}>
-            {groupIdx > 0 && (
-              <div className="divider mx-2 my-2" />
-            )}
-            <div className="space-y-0.5">
-              {group.items.map((item) => {
-                const isActive =
-                  item.href === "/admin" || item.href === "/escritorio/dashboard" || item.href === "/escritorio/trabalho"
-                    ? pathname === item.href
-                    : pathname.startsWith(item.href);
-
-                const Icon = item.icon;
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "group flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-all duration-150",
-                      collapsed ? "justify-center px-2" : "px-3",
-                      isActive
-                        ? "border-l-[3px] border-l-[var(--identity-primary)] bg-gradient-to-r from-[var(--identity-primary)]/12 to-[var(--identity-primary)]/4 text-[var(--identity-primary)] font-semibold"
-                        : "border-l-[3px] border-l-transparent text-muted-foreground/80 hover:bg-accent/50 hover:text-foreground"
-                    )}
-                    title={collapsed ? item.label : undefined}
-                  >
-                    {isActive ? (
-                      <IconChip icon={Icon} variant="teal" size="sm" />
-                    ) : (
-                      <Icon
-                        className={cn(
-                          "h-5 w-5 shrink-0 transition-all",
-                          "opacity-70 group-hover:opacity-100"
-                        )}
-                      />
-                    )}
-                    {!collapsed && <span>{item.label}</span>}
-                    {isActive && !collapsed && (
-                      <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--identity-primary)]" />
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
+        {!mounted ? (
+          <div className="space-y-0.5" aria-hidden="true">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className={cn(
+                  "rounded-lg py-2",
+                  collapsed ? "mx-auto w-8" : "px-3"
+                )}
+              >
+                <div
+                  className={cn(
+                    "rounded bg-muted/40 animate-pulse",
+                    collapsed ? "h-5 w-5" : "h-5 w-20"
+                  )}
+                />
+              </div>
+            ))}
           </div>
-        ))}
+        ) : (
+          navGroups.map((group, groupIdx) => (
+            <div key={groupIdx}>
+              {groupIdx > 0 && (
+                <div className="divider mx-2 my-2" />
+              )}
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const isActive =
+                    item.href === "/admin" || item.href === "/escritorio/dashboard" || item.href === "/escritorio/trabalho"
+                      ? pathname === item.href
+                      : pathname.startsWith(item.href);
+
+                  const Icon = item.icon;
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "group flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-all duration-150",
+                        collapsed ? "justify-center px-2" : "px-3",
+                        isActive
+                          ? "border-l-[3px] border-l-[var(--identity-primary)] bg-gradient-to-r from-[var(--identity-primary)]/12 to-[var(--identity-primary)]/4 text-[var(--identity-primary)] font-semibold"
+                          : "border-l-[3px] border-l-transparent text-muted-foreground/80 hover:bg-accent/50 hover:text-foreground"
+                      )}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      {isActive ? (
+                        <IconChip icon={Icon} variant="teal" size="sm" />
+                      ) : (
+                        <Icon
+                          className={cn(
+                            "h-5 w-5 shrink-0 transition-all",
+                            "opacity-70 group-hover:opacity-100"
+                          )}
+                        />
+                      )}
+                      {!collapsed && <span>{item.label}</span>}
+                      {isActive && !collapsed && (
+                        <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--identity-primary)]" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        )}
       </nav>
     </aside>
   );
