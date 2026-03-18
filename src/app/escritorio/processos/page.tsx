@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { OFFICE_PROCESS_STATUS_META } from "@/lib/processes";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -89,10 +89,11 @@ export default async function ProcessosEscritorioPage() {
             <EmptyState
               icon={ClipboardList}
               title="Nenhum processo disponível"
-              description="Conclua o onboarding ou selecione processos manualmente no catálogo complementar."
+              description="Selecione processos no catálogo para adicionar ao portfólio do escritório."
               action={
-                <Link href="/escritorio/onboarding/processos" className={buttonVariants()}>
-                  Ir para onboarding
+                <Link href="/escritorio/processos/catalogo" className={buttonVariants()}>
+                  <Plus className="h-4 w-4" />
+                  Ver processos não selecionados
                 </Link>
               }
             />

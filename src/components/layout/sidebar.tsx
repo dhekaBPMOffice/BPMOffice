@@ -21,7 +21,6 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
-  Network,
   DatabaseBackup,
   HelpCircle,
 } from "lucide-react";
@@ -35,11 +34,13 @@ interface NavItem {
 }
 
 interface NavGroup {
+  label?: string;
   items: NavItem[];
 }
 
 const adminNavGroups: NavGroup[] = [
   {
+    label: "Plataforma",
     items: [
       { label: "Painel Geral", href: "/admin", icon: LayoutDashboard },
       { label: "Escritórios", href: "/admin/escritorios", icon: Building2 },
@@ -47,23 +48,29 @@ const adminNavGroups: NavGroup[] = [
     ],
   },
   {
+    label: "Catálogo",
     items: [
-      { label: "Identidade Visual", href: "/admin/branding", icon: Palette },
-      { label: "Configuração IA", href: "/admin/ia", icon: Bot },
-      { label: "Frameworks", href: "/admin/frameworks", icon: Network },
+      { label: "Processos Base", href: "/admin/processos", icon: ClipboardList },
+      { label: "Objetivos Base", href: "/admin/objetivos-escritorio", icon: Target },
       { label: "Serviços Base", href: "/admin/servicos", icon: FileText },
-      { label: "Processos", href: "/admin/processos", icon: ClipboardList },
-      { label: "Formulários", href: "/admin/formularios", icon: BookOpen },
-      { label: "Objetivos Escritório", href: "/admin/objetivos-escritorio", icon: Target },
     ],
   },
   {
+    label: "Configurações",
+    items: [
+      { label: "Identidade Visual", href: "/admin/branding", icon: Palette },
+      { label: "Formulários", href: "/admin/formularios", icon: BookOpen },
+      { label: "Configuração IA", href: "/admin/ia", icon: Bot },
+      { label: "Parâmetros da Plataforma", href: "/admin/configuracoes", icon: Settings },
+    ],
+  },
+  {
+    label: "Operação e Suporte",
     items: [
       { label: "Notificações", href: "/admin/notificacoes", icon: Bell },
       { label: "Chamados", href: "/admin/chamados", icon: LifeBuoy },
       { label: "Backup", href: "/admin/backup", icon: DatabaseBackup },
-      { label: "Manual", href: "/admin/manual", icon: HelpCircle },
-      { label: "Configurações", href: "/admin/configuracoes", icon: Settings },
+      { label: "Manual do Usuário", href: "/admin/manual", icon: HelpCircle },
     ],
   },
 ];
@@ -73,7 +80,7 @@ const leaderNavGroups: NavGroup[] = [
     items: [
       { label: "Dashboard", href: "/escritorio/dashboard", icon: LayoutDashboard },
       { label: "Estratégia", href: "/escritorio/estrategia", icon: Target },
-      { label: "Processos", href: "/escritorio/processos", icon: FileText },
+      { label: "Processos Base", href: "/escritorio/processos", icon: FileText },
       { label: "Demandas", href: "/escritorio/demandas", icon: ClipboardList },
     ],
   },
@@ -242,7 +249,12 @@ export function Sidebar({
           navGroups.map((group, groupIdx) => (
             <div key={groupIdx}>
               {groupIdx > 0 && (
-                <div className="divider mx-2 my-2" />
+                <div className="divider mx-2 mt-3 mb-5" />
+              )}
+              {group.label && !collapsed && (
+                <p className="px-3 pt-3 pb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+                  {group.label}
+                </p>
               )}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
