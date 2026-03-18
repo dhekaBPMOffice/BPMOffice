@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import { PageLayout } from "@/components/layout/page-layout";
 import { cn } from "@/lib/utils";
+import jsPDF from "jspdf";
 
 type ProcessType = "Primário" | "Apoio" | "Gerencial";
 type Priority = "Alta" | "Média" | "Baixa";
@@ -138,11 +139,11 @@ interface ProcessTreeNode {
   children: ProcessTreeNode[];
 }
 
-const CATEGORY_ORDER: ProcessType[] = ["Primário", "Gerencial", "Apoio"];
+const CATEGORY_ORDER: ProcessType[] = ["Gerencial", "Primário", "Apoio"];
 const CATEGORY_LABELS: Record<ProcessType, string> = {
   Primário: "Processos de Negócio",
   Gerencial: "Processos de Gestão",
-  Apoio: "Processos de Apoio",
+  Apoio: "Processos de Suporte",
 };
 
 const STORAGE_KEY_PROCESSES = "cadeia-valor-processos";
@@ -933,15 +934,13 @@ export default function CadeiaValorPage() {
 
   function exportDiagramImage() {
     const categories = buildHierarchyByCategory(filteredSortedProcesses);
-    const width = 1400;
+    const width = 1200;
     const padding = 40;
-    const cardW = 180;
-    const cardH = 56;
+    const cardW = 220;
+    const cardH = 36;
     const gap = 12;
-    const cols = 5;
-    let y = 60;
-
-    let height = 100;
+    const indent = 24;
+    let y = 50;
 
     const escape = (s: string) =>
       s
@@ -950,34 +949,68 @@ export default function CadeiaValorPage() {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;");
 
-    const parts: string[] = [];
-    parts.push(`<text x="${padding}" y="${y}" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#111827">Diagrama da Cadeia de Valor</text>`);
-    y += 50;
-
-    for (const cat of categories) {
-      parts.push(`<text x="${padding}" y="${y}" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#374151">${escape(cat.label)}</text>`);
-      y += 32;
-
-      let row = 0;
-      let col = 0;
-      for (const macro of cat.macros) {
-        const x = padding + col * (cardW + gap);
-        const cy = y + row * (cardH + gap);
-        parts.push(`<rect x="${x}" y="${cy}" width="${cardW}" height="${cardH}" fill="#f3f4f6" stroke="#d1d5db" rx="6" />`);
-        parts.push(`<text x="${x + cardW / 2}" y="${cy + cardH / 2 - 4}" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#0d9488" text-anchor="middle">${escape(macro.nome)}</text>`);
-        parts.push(`<text x="${x + cardW / 2}" y="${cy + cardH / 2 + 10}" font-family="Arial, sans-serif" font-size="10" fill="#6b7280" text-anchor="middle">${macro.processos.length} processo(s)</text>`);
-        col += 1;
-        if (col >= cols) {
-          col = 0;
-          row += 1;
+    function wrapText(text: string, maxW: number): string[] {
+      const words = text.split(/\s+/);
+      const lines: string[] = [];
+      let line = "";
+      for (const w of words) {
+        const test = line ? `${line} ${w}` : w;
+        if (test.length * 7 <= maxW) line = test;
+        else {
+          if (line) lines.push(line);
+          line = w;
         }
       }
-      const rowsUsed = Math.ceil(cat.macros.length / cols);
-      y += rowsUsed * (cardH + gap) + 24;
+      if (line) lines.push(line);
+      return lines;
     }
 
-    height = Math.max(220, y + 40);
+    const parts: string[] = [];
+    parts.push(`<text x="${padding}" y="${y}" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#111827">Diagrama da Cadeia de Valor</text>`);
+    y += 44;
 
+    for (const cat of categories) {
+      parts.push(`<text x="${padding}" y="${y}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#374151">${escape(cat.label)}</text>`);
+      y += 28;
+
+      for (const macro of cat.macros) {
+        const mx = padding;
+        parts.push(`<rect x="${mx}" y="${y}" width="${cardW}" height="${cardH}" fill="#f3f4f6" stroke="#0d9488" stroke-width="2" rx="6" />`);
+        const macroLines = wrapText(macro.nome, cardW - 16);
+        macroLines.forEach((line, i) => {
+          parts.push(`<text x="${mx + cardW / 2}" y="${y + cardH / 2 - (macroLines.length - 1) * 6 + i * 12}" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#0d9488" text-anchor="middle">${escape(line)}</text>`);
+        });
+        y += cardH + 8;
+
+        const roots = buildProcessTree(macro.processos);
+        for (const root of roots) {
+          parts.push(`<line x1="${mx + cardW / 2}" y1="${y - 8}" x2="${mx + cardW / 2}" y2="${y}" stroke="#9ca3af" stroke-width="1" />`);
+          y += 4;
+          const drawNode = (node: ProcessTreeNode, depth: number) => {
+            const nx = mx + indent * depth;
+            const nodeW = Math.max(120, cardW - indent * depth);
+            parts.push(`<rect x="${nx}" y="${y}" width="${nodeW}" height="${cardH}" fill="#f9fafb" stroke="#d1d5db" rx="4" />`);
+            const lines = wrapText(node.label, nodeW - 16);
+            lines.forEach((line, i) => {
+              parts.push(`<text x="${nx + nodeW / 2}" y="${y + cardH / 2 - (lines.length - 1) * 5 + i * 10}" font-family="Arial, sans-serif" font-size="10" fill="#374151" text-anchor="middle">${escape(line)}</text>`);
+            });
+            y += cardH + gap;
+            for (const child of node.children) {
+              const childNx = mx + indent * (depth + 1);
+              const childW = Math.max(120, cardW - indent * (depth + 1));
+              parts.push(`<line x1="${nx + nodeW / 2}" y1="${y - gap}" x2="${childNx + childW / 2}" y2="${y}" stroke="#9ca3af" stroke-width="1" />`);
+              drawNode(child, depth + 1);
+            }
+          };
+          drawNode(root, 0);
+          y += 8;
+        }
+        y += 16;
+      }
+      y += 12;
+    }
+
+    const height = Math.max(400, y + 40);
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
         <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff" />
@@ -995,7 +1028,75 @@ export default function CadeiaValorPage() {
   }
 
   function exportDiagramPDF() {
-    window.print();
+    const categories = buildHierarchyByCategory(filteredSortedProcesses);
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let y = 20;
+
+    const drawTitle = (text: string, fontSize: number, bold: boolean) => {
+      if (y > pageH - 20) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setFontSize(fontSize);
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.text(text, margin, y);
+      y += fontSize * 0.5 + 2;
+    };
+
+    const drawBox = (text: string, indentMm: number) => {
+      if (y > pageH - 25) {
+        doc.addPage();
+        y = 20;
+      }
+      const x = margin + indentMm;
+      const w = pageW - 2 * margin - indentMm;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      const lines = doc.splitTextToSize(text, w - 4);
+      const boxH = Math.max(10, lines.length * 5 + 4);
+      doc.rect(x, y - 4, w, boxH);
+      doc.text(lines, x + 2, y + 2);
+      y += boxH + 4;
+    };
+
+    drawTitle("Diagrama da Cadeia de Valor", 16, true);
+    y += 4;
+
+    for (const cat of categories) {
+      drawTitle(cat.label, 12, true);
+      y += 2;
+
+      for (const macro of cat.macros) {
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(13, 148, 136);
+        doc.text(macro.nome, margin, y);
+        doc.setTextColor(0, 0, 0);
+        y += 8;
+
+        const roots = buildProcessTree(macro.processos);
+          const drawNode = (node: ProcessTreeNode, depth: number) => {
+            if (y > pageH - 20) {
+              doc.addPage();
+              y = 20;
+            }
+            drawBox(node.label, depth * 8);
+          for (const child of node.children) {
+            drawNode(child, depth + 1);
+          }
+        };
+        for (const root of roots) {
+          drawNode(root, 0);
+        }
+        y += 6;
+      }
+      y += 8;
+    }
+
+    doc.save("cadeia-valor-diagrama.pdf");
   }
 
   const showingFrom = filteredSortedProcesses.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;

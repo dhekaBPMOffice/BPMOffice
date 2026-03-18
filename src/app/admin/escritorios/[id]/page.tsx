@@ -217,21 +217,19 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
         <CardHeader>
           <CardTitle>Líder do escritório</CardTitle>
           <CardDescription>
-            Líder responsável por este escritório. Pode cadastrar com e-mail e senha.
+            Líderes do escritório. Cadastre novos, edite, exclua ou redefina a senha.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {leaders && leaders.length > 0 && (
-            <ul className="space-y-2">
-              {leaders.map((l) => (
-                <li key={l.id} className="flex flex-col text-sm">
-                  <span className="font-medium">{l.full_name}</span>
-                  <span className="text-muted-foreground">{l.email}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <LiderEscritorioCardClient officeId={id} hasLeaders={(leaders?.length ?? 0) > 0} />
+        <CardContent>
+          <LiderEscritorioCardClient
+            officeId={id}
+            leaders={(leaders ?? []).map((l) => ({
+              id: l.id,
+              full_name: l.full_name,
+              email: l.email,
+              created_at: l.created_at,
+            }))}
+          />
         </CardContent>
       </Card>
 

@@ -198,3 +198,136 @@ export async function createLeader(officeId: string, input: CreateLeaderInput) {
   revalidatePath("/admin");
   return { success: true };
 }
+
+export type UpdateLeaderInput = {
+  full_name: string;
+  email: string;
+};
+
+export async function updateLeader(profileId: string, officeId: string, input: UpdateLeaderInput) {
+  const profile = await getProfile();
+  if (profile.role !== "admin_master") {
+    return { error: "Sem permissão para editar líder." };
+  }
+
+  if (!input.full_name?.trim() || !input.email?.trim()) {
+    return { error: "Nome e e-mail são obrigatórios." };
+  }
+
+  const supabase = await createServiceClient();
+
+  const { data: leaderProfile, error: fetchError } = await supabase
+    .from("profiles")
+    .select("id, auth_user_id, email")
+    .eq("id", profileId)
+    .eq("office_id", officeId)
+    .eq("role", "leader")
+    .single();
+
+  if (fetchError || !leaderProfile) {
+    return { error: "Líder não encontrado." };
+  }
+
+  // Atualizar perfil
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({
+      full_name: input.full_name.trim(),
+      email: input.email.trim(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", profileId)
+    .eq("office_id", officeId);
+
+  if (profileError) return { error: profileError.message };
+
+  // Se o e-mail mudou, atualizar no auth.users
+  if (leaderProfile.email !== input.email.trim()) {
+    const { error: authError } = await supabase.auth.admin.updateUserById(leaderProfile.auth_user_id, {
+      email: input.email.trim(),
+      user_metadata: { full_name: input.full_name.trim() },
+    });
+    if (authError) return { error: authError.message };
+  } else {
+    const { error: authError } = await supabase.auth.admin.updateUserById(leaderProfile.auth_user_id, {
+      user_metadata: { full_name: input.full_name.trim() },
+    });
+    if (authError) return { error: authError.message };
+  }
+
+  revalidatePath(`/admin/escritorios/${officeId}`);
+  revalidatePath("/admin/escritorios");
+  return { success: true };
+}
+
+export async function deleteLeader(profileId: string, officeId: string) {
+  const profile = await getProfile();
+  if (profile.role !== "admin_master") {
+    return { error: "Sem permissão para excluir líder." };
+  }
+
+  const supabase = await createServiceClient();
+
+  const { data: leaderProfile, error: fetchError } = await supabase
+    .from("profiles")
+    .select("auth_user_id")
+    .eq("id", profileId)
+    .eq("office_id", officeId)
+    .eq("role", "leader")
+    .single();
+
+  if (fetchError || !leaderProfile) {
+    return { error: "Líder não encontrado." };
+  }
+
+  // Excluir do auth.users (o perfil é removido por ON DELETE CASCADE)
+  const { error: authError } = await supabase.auth.admin.deleteUser(leaderProfile.auth_user_id);
+
+  if (authError) return { error: authError.message };
+
+  revalidatePath(`/admin/escritorios/${officeId}`);
+  revalidatePath("/admin/escritorios");
+  return { success: true };
+}
+
+export async function resetLeaderPassword(profileId: string, officeId: string, newPassword: string) {
+  const profile = await getProfile();
+  if (profile.role !== "admin_master") {
+    return { error: "Sem permissão para redefinir senha." };
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    return { error: "A senha deve ter pelo menos 6 caracteres." };
+  }
+
+  const supabase = await createServiceClient();
+
+  const { data: leaderProfile, error: fetchError } = await supabase
+    .from("profiles")
+    .select("auth_user_id")
+    .eq("id", profileId)
+    .eq("office_id", officeId)
+    .eq("role", "leader")
+    .single();
+
+  if (fetchError || !leaderProfile) {
+    return { error: "Líder não encontrado." };
+  }
+
+  const { error: authError } = await supabase.auth.admin.updateUserById(leaderProfile.auth_user_id, {
+    password: newPassword,
+  });
+
+  if (authError) return { error: authError.message };
+
+  // Obrigar troca de senha no próximo login
+  await supabase
+    .from("profiles")
+    .update({ must_change_password: true, password_change_approved: false })
+    .eq("id", profileId)
+    .eq("office_id", officeId);
+
+  revalidatePath(`/admin/escritorios/${officeId}`);
+  revalidatePath("/admin/escritorios");
+  return { success: true };
+}
