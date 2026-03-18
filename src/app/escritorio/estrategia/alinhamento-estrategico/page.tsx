@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -359,20 +358,20 @@ export default function AlinhamentoEstrategicoPage() {
                 Nenhum objetivo ou processo encontrado para montar a matriz.
               </div>
             ) : (
-              <div className="max-h-[540px] w-full overflow-auto rounded-md border">
-                <Table className="min-w-[720px]">
+              <div className="max-h-[720px] w-full overflow-auto rounded-md border">
+                <table className="min-w-[720px] w-full caption-bottom text-sm">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="sticky left-0 z-20 bg-muted/60 backdrop-blur">
+                      <TableHead className="sticky left-0 top-0 z-30 max-w-[180px] bg-muted/60 backdrop-blur">
                         Processo
                       </TableHead>
                       {filteredObjectives.map((objective) => (
                         <TableHead
                           key={objective.id}
-                          className="min-w-[140px] whitespace-nowrap text-center align-bottom"
+                          className="sticky top-0 z-20 min-w-[90px] max-w-[130px] text-center align-middle bg-muted/60 backdrop-blur"
                           title={objective.title}
                         >
-                          <span className="line-clamp-2 text-xs font-medium">
+                          <span className="block break-words line-clamp-3 text-xs font-medium">
                             {objective.title}
                           </span>
                         </TableHead>
@@ -382,7 +381,7 @@ export default function AlinhamentoEstrategicoPage() {
                   <TableBody>
                     {filteredProcesses.map((process) => (
                       <TableRow key={process.id}>
-                        <TableCell className="sticky left-0 z-10 bg-background/95">
+                        <TableCell className="sticky left-0 z-10 max-w-[180px] bg-background/95">
                           <div className="space-y-0.5">
                             <p className="text-sm font-medium">
                               {process.macroprocesso || "Sem Macroprocesso"}
@@ -426,7 +425,7 @@ export default function AlinhamentoEstrategicoPage() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </table>
               </div>
             )}
           </CardContent>

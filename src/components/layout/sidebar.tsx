@@ -82,7 +82,7 @@ const leaderNavGroups: NavGroup[] = [
     items: [
       { label: "Dashboard", href: "/escritorio/dashboard", icon: LayoutDashboard },
       { label: "Estratégia", href: "/escritorio/estrategia", icon: Target },
-      { label: "Processos Base", href: "/escritorio/processos", icon: FileText },
+      { label: "Processos do Escritório", href: "/escritorio/processos", icon: FileText },
       { label: "Demandas", href: "/escritorio/demandas", icon: ClipboardList },
     ],
   },

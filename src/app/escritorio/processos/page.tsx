@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageLayout } from "@/components/layout/page-layout";
-import { ClipboardList, Plus } from "lucide-react";
+import { ClipboardList, Plus, PlusCircle } from "lucide-react";
 import type { OfficeProcessStatus } from "@/types/database";
 
 export default async function ProcessosEscritorioPage() {
@@ -44,10 +44,16 @@ export default async function ProcessosEscritorioPage() {
       description="Lista oficial de processos do escritório, gerada pelo onboarding e complementada manualmente quando necessário."
       icon={ClipboardList}
       actions={
-        <Link href="/escritorio/processos/catalogo" className={buttonVariants()}>
-          <Plus className="h-4 w-4" />
-          Ver processos não selecionados
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/escritorio/processos/catalogo" className={buttonVariants()}>
+            <PlusCircle className="h-4 w-4" />
+            Ver processos não selecionados
+          </Link>
+          <Link href="/escritorio/processos/catalogo" className={buttonVariants()}>
+            <PlusCircle className="h-4 w-4" />
+            Adicionar processo
+          </Link>
+        </div>
       }
     >
       <div className="grid gap-4 md:grid-cols-3">
@@ -91,10 +97,16 @@ export default async function ProcessosEscritorioPage() {
               title="Nenhum processo disponível"
               description="Selecione processos no catálogo para adicionar ao portfólio do escritório."
               action={
-                <Link href="/escritorio/processos/catalogo" className={buttonVariants()}>
-                  <Plus className="h-4 w-4" />
-                  Ver processos não selecionados
-                </Link>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Link href="/escritorio/processos/catalogo" className={buttonVariants()}>
+                    <PlusCircle className="h-4 w-4" />
+                    Ver processos não selecionados
+                  </Link>
+                  <Link href="/escritorio/processos/catalogo" className={buttonVariants()}>
+                    <PlusCircle className="h-4 w-4" />
+                    Adicionar processo
+                  </Link>
+                </div>
               }
             />
           ) : (

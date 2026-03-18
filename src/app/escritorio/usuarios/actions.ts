@@ -129,6 +129,34 @@ export async function toggleUserActive(profileId: string) {
   return { success: true };
 }
 
+export async function deleteUser(profileId: string) {
+  const profile = await getProfile();
+  if (profile.role !== "leader" || !profile.office_id) {
+    return { error: "Sem permissão para excluir usuários." };
+  }
+  if (profile.id === profileId) {
+    return { error: "Você não pode excluir sua própria conta." };
+  }
+
+  const supabase = await createServiceClient();
+
+  const { data: target, error: fetchError } = await supabase
+    .from("profiles")
+    .select("id, auth_user_id, role")
+    .eq("id", profileId)
+    .eq("office_id", profile.office_id)
+    .single();
+
+  if (fetchError || !target) return { error: "Usuário não encontrado." };
+  if (target.role === "leader") return { error: "Não é possível excluir o líder do escritório." };
+
+  const { error: authError } = await supabase.auth.admin.deleteUser(target.auth_user_id);
+  if (authError) return { error: authError.message };
+
+  revalidatePath("/escritorio/usuarios");
+  return { success: true };
+}
+
 export async function approvePasswordChange(profileId: string) {
   const profile = await getProfile();
   if (profile.role !== "leader" || !profile.office_id) {

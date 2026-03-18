@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PageLayout } from "@/components/layout/page-layout";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile, requireRole } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import {
   Card,
   CardContent,
@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { UsuarioRowActions } from "./usuario-row-actions";
 import { LayoutGrid, List, Plus, Users } from "lucide-react";
 
 interface UsuariosPageProps {
@@ -37,22 +38,35 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
     );
   }
 
-  const { data: users, error } = await supabase
-    .from("profiles")
-    .select(`
-      id,
-      full_name,
-      email,
-      role,
-      department,
-      is_active,
-      last_login_at,
-      custom_roles:custom_role_id (
-        name
-      )
-    `)
-    .eq("office_id", profile.office_id)
-    .order("full_name");
+  const [
+    { data: users, error },
+    { data: customRoles },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(`
+        id,
+        full_name,
+        email,
+        role,
+        department,
+        phone,
+        job_title,
+        custom_role_id,
+        is_active,
+        last_login_at,
+        custom_roles:custom_role_id (
+          name
+        )
+      `)
+      .eq("office_id", profile.office_id)
+      .order("full_name"),
+    supabase
+      .from("custom_roles")
+      .select("id, name")
+      .eq("office_id", profile.office_id)
+      .order("name"),
+  ]);
 
   if (error) {
     return (
@@ -180,12 +194,13 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
                   <TableHead>Departamento</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Último acesso</TableHead>
+                  <TableHead className="w-[100px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {usuariosVisiveis.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       {aba === "arquivados" ? "Nenhum usuário arquivado." : "Nenhum usuário ativo."}
                     </TableCell>
                   </TableRow>
@@ -204,6 +219,22 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
                       <TableCell className="text-muted-foreground">
                         {formatDate(u.last_login_at)}
                       </TableCell>
+                      <TableCell>
+                        <UsuarioRowActions
+                          usuario={{
+                            id: u.id,
+                            full_name: u.full_name,
+                            email: u.email,
+                            phone: u.phone ?? null,
+                            department: u.department ?? null,
+                            job_title: u.job_title ?? null,
+                            custom_role_id: u.custom_role_id ?? null,
+                            role: u.role,
+                          }}
+                          customRoles={customRoles ?? []}
+                          currentUserId={profile.id}
+                        />
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -220,9 +251,25 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <CardTitle className="text-base">{u.full_name}</CardTitle>
-                      <Badge variant={u.is_active ? "success" : "secondary"}>
-                        {u.is_active ? "Ativo" : "Inativo"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={u.is_active ? "success" : "secondary"}>
+                          {u.is_active ? "Ativo" : "Inativo"}
+                        </Badge>
+                        <UsuarioRowActions
+                          usuario={{
+                            id: u.id,
+                            full_name: u.full_name,
+                            email: u.email,
+                            phone: u.phone ?? null,
+                            department: u.department ?? null,
+                            job_title: u.job_title ?? null,
+                            custom_role_id: u.custom_role_id ?? null,
+                            role: u.role,
+                          }}
+                          customRoles={customRoles ?? []}
+                          currentUserId={profile.id}
+                        />
+                      </div>
                     </div>
                     <CardDescription>{u.email}</CardDescription>
                   </CardHeader>
