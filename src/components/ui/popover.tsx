@@ -83,6 +83,7 @@ export function PopoverContent({
     if (!ctx?.open) return;
 
     function handleClickOutside(e: MouseEvent) {
+      if (!ctx) return;
       const target = e.target as Node;
       if (
         contentRef.current?.contains(target) ||
@@ -92,7 +93,7 @@ export function PopoverContent({
     }
 
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") ctx.setOpen(false);
+      if (e.key === "Escape") ctx?.setOpen(false);
     }
 
     document.addEventListener("mousedown", handleClickOutside);
