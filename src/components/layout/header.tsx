@@ -1,12 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LogOut, Bell, Sun, Moon, Monitor } from "lucide-react";
+import { LogOut, Sun, Moon, Monitor } from "lucide-react";
 import { type Profile } from "@/types/database";
+
 import { useTheme } from "@/components/providers/theme-provider";
+
+const NotificationBell = dynamic(
+  () => import("./notification-bell").then((m) => ({ default: m.NotificationBell })),
+  { ssr: false }
+);
 
 function getInitials(name: string) {
   return name
@@ -66,7 +73,7 @@ export function Header({
       : profile.avatar_url;
 
   return (
-    <header className="relative flex h-14 items-center justify-between border-b border-border/60 bg-card/80 backdrop-blur-sm px-6 shrink-0">
+    <header className="relative z-[100] flex h-14 items-center justify-between border-b border-border/60 bg-card/80 backdrop-blur-sm px-6 shrink-0">
       <div className="accent-line absolute top-0 left-0 right-0" />
       <div className="flex items-center gap-2">
         <h2 className="text-sm font-medium text-muted-foreground">
@@ -107,14 +114,7 @@ export function Header({
           )}
         </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-9 w-9 rounded-lg text-muted-foreground hover:text-[var(--identity-primary)] hover:bg-accent/50 transition-all duration-150"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[var(--dheka-magenta)]" />
-        </Button>
+        <NotificationBell profileId={profile.id} />
 
         <div className="h-5 w-px bg-border/50 mx-1" />
 

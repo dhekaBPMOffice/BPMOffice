@@ -153,6 +153,7 @@ export default function NotificacoesPage() {
 
   return (
     <PageLayout title="Notificações" description="Envie notificações para os escritórios e visualize o histórico." icon={Bell}>
+      <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
           <CardTitle>Enviar Notificação</CardTitle>
@@ -161,7 +162,7 @@ export default function NotificacoesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
@@ -178,7 +179,6 @@ export default function NotificacoesPage() {
                 required
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="message">Mensagem</Label>
               <Textarea
@@ -190,54 +190,56 @@ export default function NotificacoesPage() {
                 required
               />
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="target">Destino</Label>
-                <Select
-                  id="target"
-                  value={targetType}
-                  onChange={(e) => setTargetType(e.target.value as "all" | "office")}
-                >
-                  <option value="all">Todos os escritórios</option>
-                  <option value="office">Escritório específico</option>
-                </Select>
-              </div>
-              {targetType === "office" && (
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-4">
+              <p className="text-sm font-medium">Configuração de envio</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="office_id">Escritório</Label>
+                  <Label htmlFor="target">Destino</Label>
                   <Select
-                    id="office_id"
-                    value={targetOfficeId}
-                    onChange={(e) => setTargetOfficeId(e.target.value)}
-                    required={targetType === "office"}
+                    id="target"
+                    value={targetType}
+                    onChange={(e) => setTargetType(e.target.value as "all" | "office")}
                   >
-                    <option value="">Selecione</option>
-                    {offices.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
+                    <option value="all">Todos os escritórios</option>
+                    <option value="office">Escritório específico</option>
                   </Select>
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="channel">Canal</Label>
-                <Select
-                  id="channel"
-                  value={channel}
-                  onChange={(e) =>
-                    setChannel(e.target.value as "platform" | "email" | "both")
-                  }
-                >
-                  <option value="platform">Plataforma</option>
-                  <option value="email">E-mail</option>
-                  <option value="both">Ambos</option>
-                </Select>
+                {targetType === "office" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="office_id">Escritório</Label>
+                    <Select
+                      id="office_id"
+                      value={targetOfficeId}
+                      onChange={(e) => setTargetOfficeId(e.target.value)}
+                      required={targetType === "office"}
+                    >
+                      <option value="">Selecione</option>
+                      {offices.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="channel">Canal</Label>
+                  <Select
+                    id="channel"
+                    value={channel}
+                    onChange={(e) =>
+                      setChannel(e.target.value as "platform" | "email" | "both")
+                    }
+                  >
+                    <option value="platform">Plataforma</option>
+                    <option value="email">E-mail</option>
+                    <option value="both">Ambos</option>
+                  </Select>
+                </div>
               </div>
             </div>
 
-            <Button type="submit" disabled={sending}>
+            <Button type="submit" disabled={sending} className="mt-2">
               {sending ? "Enviando..." : "Enviar notificação"}
             </Button>
           </form>
@@ -245,8 +247,8 @@ export default function NotificacoesPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Notificações enviadas</CardTitle>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg">Notificações enviadas</CardTitle>
           <CardDescription>
             Histórico das últimas notificações enviadas.
           </CardDescription>
@@ -254,11 +256,11 @@ export default function NotificacoesPage() {
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Título</TableHead>
-                <TableHead>Destino</TableHead>
-                <TableHead>Canal</TableHead>
-                <TableHead>Data</TableHead>
+              <TableRow className="border-b border-border/60 hover:bg-transparent">
+                <TableHead className="font-semibold bg-muted/30">Título</TableHead>
+                <TableHead className="font-semibold bg-muted/30">Destino</TableHead>
+                <TableHead className="font-semibold bg-muted/30">Canal</TableHead>
+                <TableHead className="font-semibold bg-muted/30">Data</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -276,7 +278,7 @@ export default function NotificacoesPage() {
                 </TableRow>
               ) : (
                 notifications.map((n) => (
-                  <TableRow key={n.id}>
+                  <TableRow key={n.id} className="transition-colors hover:bg-accent/30">
                     <TableCell className="font-medium">{n.title}</TableCell>
                     <TableCell>
                       {n.target_type === "all"
@@ -294,6 +296,7 @@ export default function NotificacoesPage() {
           </Table>
         </CardContent>
       </Card>
+      </div>
     </PageLayout>
   );
 }
