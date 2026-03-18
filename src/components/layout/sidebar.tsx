@@ -23,6 +23,7 @@ import {
   ChevronRight,
   DatabaseBackup,
   HelpCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { type UserRole } from "@/types/database";
 import { IconChip } from "@/components/ui/icon-chip";
@@ -45,6 +46,7 @@ const adminNavGroups: NavGroup[] = [
       { label: "Painel Geral", href: "/admin", icon: LayoutDashboard },
       { label: "Escritórios", href: "/admin/escritorios", icon: Building2 },
       { label: "Planos", href: "/admin/planos", icon: CreditCard },
+      { label: "Administradores Master", href: "/admin/administradores", icon: ShieldCheck },
     ],
   },
   {

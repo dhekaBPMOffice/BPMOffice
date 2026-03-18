@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, ArrowRight } from "lucide-react";
 
@@ -189,6 +190,9 @@ export default function LoginPage() {
                     required
                     className="h-11"
                   />
+                  <Link href="/esqueci-senha" className="text-sm text-muted-foreground hover:underline">
+                    Esqueci a senha
+                  </Link>
                 </div>
 
                 {error && (

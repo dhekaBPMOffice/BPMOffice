@@ -2,6 +2,7 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
+import { validatePassword } from "@/lib/password";
 import { revalidatePath } from "next/cache";
 
 function generateSlug(name: string): string {
@@ -140,8 +141,9 @@ export async function createLeader(officeId: string, input: CreateLeaderInput) {
     return { error: "Nome, e-mail e senha são obrigatórios." };
   }
 
-  if (input.initial_password.length < 6) {
-    return { error: "A senha deve ter pelo menos 6 caracteres." };
+  const pwdResult = validatePassword(input.initial_password);
+  if (!pwdResult.valid) {
+    return { error: pwdResult.error };
   }
 
   const supabase = await createServiceClient();
@@ -296,8 +298,9 @@ export async function resetLeaderPassword(profileId: string, officeId: string, n
     return { error: "Sem permissão para redefinir senha." };
   }
 
-  if (!newPassword || newPassword.length < 6) {
-    return { error: "A senha deve ter pelo menos 6 caracteres." };
+  const pwdResult = validatePassword(newPassword);
+  if (!pwdResult.valid) {
+    return { error: pwdResult.error };
   }
 
   const supabase = await createServiceClient();

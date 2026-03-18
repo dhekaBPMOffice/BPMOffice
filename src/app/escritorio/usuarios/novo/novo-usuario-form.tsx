@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createUser } from "../actions";
+import { validatePassword, PASSWORD_HINT } from "@/lib/password";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +39,14 @@ export function NovoUsuarioForm({ customRoles }: NovoUsuarioFormProps) {
 
     const form = e.currentTarget;
     const formData = new FormData(form);
+    const initialPassword = formData.get("initial_password") as string;
+
+    const pwdResult = validatePassword(initialPassword);
+    if (!pwdResult.valid) {
+      setError(pwdResult.error ?? "Senha inválida.");
+      setLoading(false);
+      return;
+    }
 
     const result = await createUser({
       full_name: formData.get("full_name") as string,
@@ -48,7 +57,7 @@ export function NovoUsuarioForm({ customRoles }: NovoUsuarioFormProps) {
       custom_role_id: formData.get("custom_role_id")
         ? (formData.get("custom_role_id") as string)
         : null,
-      initial_password: formData.get("initial_password") as string,
+      initial_password: initialPassword,
     });
 
     setLoading(false);
@@ -148,9 +157,10 @@ export function NovoUsuarioForm({ customRoles }: NovoUsuarioFormProps) {
               name="initial_password"
               type="password"
               required
-              minLength={6}
-              placeholder="Mínimo 6 caracteres"
+              minLength={8}
+              placeholder="Mínimo 8 caracteres"
             />
+            <p className="text-xs text-muted-foreground">{PASSWORD_HINT}</p>
           </div>
 
           <div className="flex gap-2 pt-4">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { resetLeaderPassword } from "@/app/admin/escritorios/actions";
+import { validatePassword, PASSWORD_HINT } from "@/lib/password";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,13 @@ export function RedefinirSenhaForm({
       return;
     }
 
+    const pwdResult = validatePassword(newPassword);
+    if (!pwdResult.valid) {
+      setError(pwdResult.error ?? "Senha inválida.");
+      setLoading(false);
+      return;
+    }
+
     const result = await resetLeaderPassword(profileId, officeId, newPassword);
 
     setLoading(false);
@@ -85,9 +93,10 @@ export function RedefinirSenhaForm({
               name="new_password"
               type="password"
               required
-              minLength={6}
-              placeholder="Mínimo 6 caracteres"
+              minLength={8}
+              placeholder="Mínimo 8 caracteres"
             />
+            <p className="text-xs text-muted-foreground">{PASSWORD_HINT}</p>
           </div>
 
           <div className="space-y-2">
@@ -97,7 +106,7 @@ export function RedefinirSenhaForm({
               name="confirm_password"
               type="password"
               required
-              minLength={6}
+              minLength={8}
               placeholder="Repita a senha"
             />
           </div>

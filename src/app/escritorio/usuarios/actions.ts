@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getProfile } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { validatePassword } from "@/lib/password";
 
 export type CreateUserInput = {
   full_name: string;
@@ -18,6 +19,11 @@ export async function createUser(input: CreateUserInput) {
   const profile = await getProfile();
   if (profile.role !== "leader" || !profile.office_id) {
     return { error: "Sem permissão para criar usuários." };
+  }
+
+  const pwdResult = validatePassword(input.initial_password);
+  if (!pwdResult.valid) {
+    return { error: pwdResult.error };
   }
 
   const supabase = await createServiceClient();
