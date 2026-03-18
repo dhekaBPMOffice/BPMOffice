@@ -75,9 +75,9 @@ export async function updateUser(
   data: {
     full_name?: string;
     email?: string;
-    phone?: string;
-    department?: string;
-    job_title?: string;
+    phone?: string | null;
+    department?: string | null;
+    job_title?: string | null;
     custom_role_id?: string | null;
   }
 ) {
