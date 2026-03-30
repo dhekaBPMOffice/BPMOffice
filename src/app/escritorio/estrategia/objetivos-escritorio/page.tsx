@@ -619,7 +619,14 @@ export default function ObjetivosEscritorioPage() {
                     )}
                   </span>
                   <span className="min-w-0 flex-1 break-words text-left leading-snug">
-                    {base.title}
+                    <span className="block font-medium text-foreground">
+                      {base.title}
+                    </span>
+                    {base.central_theme && (
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Tema central: {base.central_theme}
+                      </span>
+                    )}
                   </span>
                 </Button>
               ))}

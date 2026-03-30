@@ -36,7 +36,8 @@ export interface OfficeObjectiveGoal {
 export interface BaseOfficeObjective {
   id: string;
   title: string;
-  description: string | null;
+  /** Nome do tema central (lista administrativa). */
+  central_theme: string | null;
 }
 
 export async function getOfficeObjectives(): Promise<{
@@ -73,12 +74,29 @@ export async function getBaseOfficeObjectives(): Promise<{
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("base_office_objectives")
-    .select("id, title, description")
+    .select("id, title, central_themes(name)")
     .eq("is_active", true)
     .order("title");
 
   if (error) return { data: null, error: error.message };
-  return { data: (data ?? []) as BaseOfficeObjective[], error: null };
+  const raw = (data ?? []) as Record<string, unknown>[];
+  return {
+    data: raw.map((r) => {
+      const ct = r.central_themes;
+      const themeRow =
+        Array.isArray(ct) && ct[0] && typeof ct[0] === "object"
+          ? (ct[0] as { name?: string })
+          : ct && typeof ct === "object"
+            ? (ct as { name?: string })
+            : null;
+      return {
+        id: String(r.id),
+        title: String(r.title),
+        central_theme: themeRow?.name ?? null,
+      };
+    }),
+    error: null,
+  };
 }
 
 export async function createOfficeObjective(
@@ -137,21 +155,31 @@ export async function addObjectiveFromCatalog(
 
   const { data: base } = await supabase
     .from("base_office_objectives")
-    .select("id, title, description")
+    .select("id, title, central_themes(name)")
     .eq("id", baseObjectiveId)
     .eq("is_active", true)
     .single();
 
   if (!base) return { data: null, error: "Opção de objetivo não encontrada." };
 
+  const b = base as Record<string, unknown>;
+  const ct = b.central_themes;
+  const themeObj =
+    Array.isArray(ct) && ct[0] && typeof ct[0] === "object"
+      ? (ct[0] as { name?: string })
+      : ct && typeof ct === "object"
+        ? (ct as { name?: string })
+        : null;
+  const descriptionFromTheme = themeObj?.name ?? null;
+
   const { data: obj, error } = await supabase
     .from("office_objectives")
     .insert({
       office_id: profile.office_id,
-      base_objective_id: base.id,
+      base_objective_id: String(b.id),
       parent_objective_id: null,
-      title: base.title,
-      description: base.description,
+      title: String(b.title),
+      description: descriptionFromTheme,
       type: "primary",
       sort_order: 0,
       origin: "catalog",
