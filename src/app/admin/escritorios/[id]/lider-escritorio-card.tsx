@@ -12,9 +12,10 @@ import { deleteLeader } from "@/app/admin/escritorios/actions";
 interface LiderEscritorioCardProps {
   officeId: string;
   leaders: LeaderData[];
+  activeLeaderCount: number;
 }
 
-export function LiderEscritorioCard({ officeId, leaders }: LiderEscritorioCardProps) {
+export function LiderEscritorioCard({ officeId, leaders, activeLeaderCount }: LiderEscritorioCardProps) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [editingLeader, setEditingLeader] = useState<LeaderData | null>(null);
@@ -85,7 +86,7 @@ export function LiderEscritorioCard({ officeId, leaders }: LiderEscritorioCardPr
                     variant="outline"
                     size="sm"
                     onClick={() => handleDelete(leader)}
-                    disabled={deletingId === leader.id}
+                    disabled={deletingId === leader.id || activeLeaderCount <= 1}
                     title="Excluir"
                     className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   >

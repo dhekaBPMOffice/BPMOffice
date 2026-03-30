@@ -46,19 +46,26 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const [{ count: userCount }, { data: branding }, { data: leaders }] = await Promise.all([
-    supabaseAdmin
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .eq("office_id", id),
-    supabase.from("branding").select("*").eq("office_id", id).single(),
-    supabaseAdmin
-      .from("profiles")
-      .select("id, full_name, email, created_at")
-      .eq("office_id", id)
-      .eq("role", "leader")
-      .order("created_at", { ascending: true }),
-  ]);
+  const [{ count: userCount }, { data: branding }, { data: leaders }, { count: activeLeaderCount }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("office_id", id),
+      supabase.from("branding").select("*").eq("office_id", id).single(),
+      supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, email, created_at")
+        .eq("office_id", id)
+        .eq("role", "leader")
+        .order("created_at", { ascending: true }),
+      supabaseAdmin
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("office_id", id)
+        .eq("role", "leader")
+        .eq("is_active", true),
+    ]);
 
   const plansData = office.plans as unknown;
   const planName = Array.isArray(plansData)
@@ -218,11 +225,15 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
           <CardTitle>Líder do escritório</CardTitle>
           <CardDescription>
             Líderes do escritório. Cadastre novos, edite, exclua ou redefina a senha.
+            <span className="mt-1.5 block text-xs text-muted-foreground">
+              É obrigatório manter pelo menos um líder ativo.
+            </span>
           </CardDescription>
         </CardHeader>
         <CardContent>
           <LiderEscritorioCardClient
             officeId={id}
+            activeLeaderCount={activeLeaderCount ?? 0}
             leaders={(leaders ?? []).map((l) => ({
               id: l.id,
               full_name: l.full_name,

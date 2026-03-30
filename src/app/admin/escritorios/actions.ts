@@ -282,6 +282,18 @@ export async function deleteLeader(profileId: string, officeId: string) {
     return { error: "Líder não encontrado." };
   }
 
+  const { count, error: countError } = await supabase
+    .from("profiles")
+    .select("*", { count: "exact", head: true })
+    .eq("office_id", officeId)
+    .eq("role", "leader")
+    .eq("is_active", true);
+
+  if (countError) return { error: countError.message };
+  if ((count ?? 0) <= 1) {
+    return { error: "O escritório não pode ficar sem líder ativo." };
+  }
+
   // Excluir do auth.users (o perfil é removido por ON DELETE CASCADE)
   const { error: authError } = await supabase.auth.admin.deleteUser(leaderProfile.auth_user_id);
 

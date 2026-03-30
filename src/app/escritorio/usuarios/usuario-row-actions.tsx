@@ -37,12 +37,14 @@ interface UsuarioRowActionsProps {
   usuario: UsuarioParaEdicao;
   customRoles: CustomRole[];
   currentUserId: string;
+  activeLeaderCount: number;
 }
 
 export function UsuarioRowActions({
   usuario,
   customRoles,
   currentUserId,
+  activeLeaderCount,
 }: UsuarioRowActionsProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -50,7 +52,9 @@ export function UsuarioRowActions({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canDelete = usuario.id !== currentUserId && usuario.role !== "leader";
+  const canDelete =
+    usuario.id !== currentUserId &&
+    (usuario.role !== "leader" || activeLeaderCount > 1);
 
   async function handleEdit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

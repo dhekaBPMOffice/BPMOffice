@@ -17,16 +17,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { UsuarioRowActions } from "./usuario-row-actions";
 import { LayoutGrid, List, Plus, Users } from "lucide-react";
 
 interface UsuariosPageProps {
-  searchParams?: Promise<{ aba?: string; visualizacao?: string }>;
+  searchParams?: Promise<{ visualizacao?: string }>;
 }
 
 export default async function UsuariosPage({ searchParams: searchParamsPromise }: UsuariosPageProps) {
-  const searchParams: { aba?: string; visualizacao?: string } = await (searchParamsPromise ?? Promise.resolve({}));
+  const searchParams: { visualizacao?: string } = await (searchParamsPromise ?? Promise.resolve({}));
   const profile = await requireRole(["leader"]);
   const supabase = await createClient();
 
@@ -96,13 +95,13 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
     return labels[role] ?? role;
   };
 
-  const aba = searchParams?.aba === "arquivados" ? "arquivados" : "lista";
   const visualizacao = searchParams?.visualizacao === "card" ? "card" : "lista";
-  const usuariosAtivos = (users ?? []).filter((u) => u.is_active);
-  const usuariosArquivados = (users ?? []).filter((u) => !u.is_active);
-  const usuariosVisiveis = aba === "arquivados" ? usuariosArquivados : usuariosAtivos;
-  const buildHref = (nextAba: "lista" | "arquivados", nextVisualizacao: "lista" | "card") =>
-    `/escritorio/usuarios?aba=${nextAba}&visualizacao=${nextVisualizacao}`;
+  const usuariosLista = (users ?? []).filter((u) => u.is_active);
+  const activeLeaderCount = usuariosLista.filter((u) => u.role === "leader").length;
+  const buildHref = (nextVisualizacao: "lista" | "card") =>
+    nextVisualizacao === "lista"
+      ? "/escritorio/usuarios"
+      : `/escritorio/usuarios?visualizacao=${nextVisualizacao}`;
   const getRoleName = (u: (typeof users)[number]) => {
     const cr = u.custom_roles as unknown;
     if (cr && typeof cr === "object" && cr !== null && "name" in cr) {
@@ -137,34 +136,15 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
       <Card>
         <CardHeader>
           <CardTitle>Lista de Usuários</CardTitle>
-          <CardDescription>
-            Nome, e-mail, perfil, departamento e status.
-          </CardDescription>
+          <p className="text-xs text-muted-foreground pt-1">
+            O escritório deve manter pelo menos um líder ativo.
+          </p>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="inline-flex rounded-md bg-muted p-1">
-              <Link
-                href={buildHref("lista", visualizacao)}
-                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
-                  aba === "lista" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Lista
-              </Link>
-              <Link
-                href={buildHref("arquivados", visualizacao)}
-                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
-                  aba === "arquivados" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Arquivados
-              </Link>
-            </div>
-
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
             <div className="inline-flex rounded-md border border-input bg-background p-1">
               <Link
-                href={buildHref(aba, "lista")}
+                href={buildHref("lista")}
                 className={`rounded-sm p-2 transition-colors ${
                   visualizacao === "lista" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -173,7 +153,7 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
                 <List className="h-4 w-4" />
               </Link>
               <Link
-                href={buildHref(aba, "card")}
+                href={buildHref("card")}
                 className={`rounded-sm p-2 transition-colors ${
                   visualizacao === "card" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -192,30 +172,24 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
                   <TableHead>E-mail</TableHead>
                   <TableHead>Perfil</TableHead>
                   <TableHead>Departamento</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Último acesso</TableHead>
                   <TableHead className="w-[100px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {usuariosVisiveis.length === 0 ? (
+                {usuariosLista.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      {aba === "arquivados" ? "Nenhum usuário arquivado." : "Nenhum usuário ativo."}
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      Nenhum usuário ativo.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  usuariosVisiveis.map((u) => (
+                  usuariosLista.map((u) => (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">{u.full_name}</TableCell>
                       <TableCell className="text-muted-foreground">{u.email}</TableCell>
                       <TableCell>{getRoleName(u)}</TableCell>
                       <TableCell>{u.department ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={u.is_active ? "success" : "secondary"}>
-                          {u.is_active ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {formatDate(u.last_login_at)}
                       </TableCell>
@@ -233,6 +207,7 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
                           }}
                           customRoles={customRoles ?? []}
                           currentUserId={profile.id}
+                          activeLeaderCount={activeLeaderCount}
                         />
                       </TableCell>
                     </TableRow>
@@ -240,36 +215,30 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
                 )}
               </TableBody>
             </Table>
-          ) : usuariosVisiveis.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">
-              {aba === "arquivados" ? "Nenhum usuário arquivado." : "Nenhum usuário ativo."}
-            </p>
+          ) : usuariosLista.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground">Nenhum usuário ativo.</p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {usuariosVisiveis.map((u) => (
+              {usuariosLista.map((u) => (
                 <Card key={u.id} className="border border-border/60">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <CardTitle className="text-base">{u.full_name}</CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={u.is_active ? "success" : "secondary"}>
-                          {u.is_active ? "Ativo" : "Inativo"}
-                        </Badge>
-                        <UsuarioRowActions
-                          usuario={{
-                            id: u.id,
-                            full_name: u.full_name,
-                            email: u.email,
-                            phone: u.phone ?? null,
-                            department: u.department ?? null,
-                            job_title: u.job_title ?? null,
-                            custom_role_id: u.custom_role_id ?? null,
-                            role: u.role,
-                          }}
-                          customRoles={customRoles ?? []}
-                          currentUserId={profile.id}
-                        />
-                      </div>
+                      <UsuarioRowActions
+                        usuario={{
+                          id: u.id,
+                          full_name: u.full_name,
+                          email: u.email,
+                          phone: u.phone ?? null,
+                          department: u.department ?? null,
+                          job_title: u.job_title ?? null,
+                          custom_role_id: u.custom_role_id ?? null,
+                          role: u.role,
+                        }}
+                        customRoles={customRoles ?? []}
+                        currentUserId={profile.id}
+                        activeLeaderCount={activeLeaderCount}
+                      />
                     </div>
                     <CardDescription>{u.email}</CardDescription>
                   </CardHeader>

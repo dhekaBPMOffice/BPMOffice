@@ -11,8 +11,15 @@ const LiderEscritorioCard = dynamic(
 interface LiderEscritorioCardClientProps {
   officeId: string;
   leaders: LeaderData[];
+  activeLeaderCount: number;
 }
 
-export function LiderEscritorioCardClient({ officeId, leaders }: LiderEscritorioCardClientProps) {
-  return <LiderEscritorioCard officeId={officeId} leaders={leaders} />;
+export function LiderEscritorioCardClient({
+  officeId,
+  leaders,
+  activeLeaderCount,
+}: LiderEscritorioCardClientProps) {
+  return (
+    <LiderEscritorioCard officeId={officeId} leaders={leaders} activeLeaderCount={activeLeaderCount} />
+  );
 }

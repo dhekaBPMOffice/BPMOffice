@@ -148,12 +148,27 @@ export async function deleteUser(profileId: string) {
     .single();
 
   if (fetchError || !target) return { error: "Usuário não encontrado." };
-  if (target.role === "leader") return { error: "Não é possível excluir o líder do escritório." };
+
+  if (target.role === "leader") {
+    const { count, error: countError } = await supabase
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("office_id", profile.office_id)
+      .eq("role", "leader")
+      .eq("is_active", true);
+
+    if (countError) return { error: countError.message };
+    if ((count ?? 0) <= 1) {
+      return { error: "Não é possível remover o último líder do escritório." };
+    }
+  }
 
   const { error: authError } = await supabase.auth.admin.deleteUser(target.auth_user_id);
   if (authError) return { error: authError.message };
 
   revalidatePath("/escritorio/usuarios");
+  revalidatePath("/admin/escritorios");
+  revalidatePath(`/admin/escritorios/${profile.office_id}`);
   return { success: true };
 }
 
