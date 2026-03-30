@@ -4,17 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import jsPDF from "jspdf";
-import {
-  Document,
-  Packer,
-  Paragraph,
-  Table,
-  TableCell,
-  TableRow,
-  TextRun,
-  WidthType,
-  AlignmentType,
-} from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 import { useIdentity } from "@/components/providers/identity-provider";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -31,6 +21,7 @@ import type {
   DocumentTemplate,
   DocumentSectionConfig,
 } from "@/types/database";
+import { getPortfolioFieldRows, normalizePortfolioService } from "@/lib/export/portfolio-service-fields";
 
 export type ExportFormat = "pdf" | "docx" | "json";
 
@@ -220,19 +211,56 @@ function ensurePdfSpace(doc: jsPDF, y: number, lines: number, theme: ResolvedDoc
   return y;
 }
 
-interface PdfTableColumn {
-  header: string;
-  widthPct: number;
-  getValue: (row: ServiceLike) => string;
+function drawPdfPortfolioServiceBlock(
+  doc: jsPDF,
+  startY: number,
+  left: number,
+  theme: ResolvedDocumentExportTheme,
+  serviceRaw: unknown,
+  addLeadingSectionSpacing: boolean,
+): number {
+  const svc = normalizePortfolioService(serviceRaw);
+  const rows = getPortfolioFieldRows(svc);
+  const usableWidth = PAGE_WIDTH_MM - theme.marginMm.left - theme.marginMm.right;
+  const bodyParaMm = twipsToMm(theme.spacingBodyParagraphTwips);
+  const beforeSectionMm = twipsToMm(theme.spacingBeforeSectionTwips);
+  const afterSubtitleMm = twipsToMm(theme.spacingAfterSectionTitleTwips);
+  let y = startY;
+
+  if (addLeadingSectionSpacing) {
+    y += beforeSectionMm;
+  }
+  y = ensurePdfSpace(doc, y, 3, theme);
+  const [sr, sg, sb] = hexToRgb(theme.subtitleColor);
+  doc.setFont(theme.pdfFont, theme.subtitleBold ? "bold" : "normal");
+  doc.setFontSize(theme.subtitleFontPt);
+  doc.setTextColor(sr, sg, sb);
+  doc.text(svc.name, left, y, { align: pdfAlignment(theme.subtitleAlignment) });
+  y += theme.subtitleFontPt * 0.3528 + afterSubtitleMm;
+
+  doc.setFont(theme.pdfFont, theme.bodyBold ? "bold" : "normal");
+  doc.setFontSize(theme.bodyFontPt);
+  doc.setTextColor(...hexToRgb("#1a1a1a"));
+
+  rows.forEach(({ label, value }) => {
+    y = ensurePdfSpace(doc, y, 1, theme);
+    doc.setFont(theme.pdfFont, "bold");
+    doc.text(`${label}:`, left, y);
+    y += theme.bodyLineStepMm;
+    doc.setFont(theme.pdfFont, theme.bodyBold ? "bold" : "normal");
+    const wrapped = doc.splitTextToSize(String(value), usableWidth) as string[];
+    for (const wline of wrapped) {
+      y = ensurePdfSpace(doc, y, 1, theme);
+      doc.text(wline, left, y);
+      y += theme.bodyLineStepMm;
+    }
+    y += bodyParaMm;
+  });
+  y += bodyParaMm * 0.35;
+  return y;
 }
 
-const SERVICE_TABLE_COLS: PdfTableColumn[] = [
-  { header: "Nome", widthPct: 0.55, getValue: (r) => String(r.name ?? "-") },
-  { header: "Demanda", widthPct: 0.22, getValue: (r) => String(r.demand_level ?? "-") },
-  { header: "Capacidade", widthPct: 0.23, getValue: (r) => String(r.capacity_level ?? "-") },
-];
-
-function drawPdfServiceTable(
+function drawPdfPortfolioCatalog(
   doc: jsPDF,
   data: ServiceLike[],
   theme: ResolvedDocumentExportTheme,
@@ -240,69 +268,9 @@ function drawPdfServiceTable(
   left: number,
 ): number {
   let y = startY;
-  const usableWidth = PAGE_WIDTH_MM - theme.marginMm.left - theme.marginMm.right;
-  const colXs = SERVICE_TABLE_COLS.reduce<number[]>((acc, col, i) => {
-    const prev = i === 0 ? 0 : acc[i - 1] + SERVICE_TABLE_COLS[i - 1].widthPct * usableWidth;
-    acc.push(prev);
-    return acc;
-  }, []);
-  const colWidths = SERVICE_TABLE_COLS.map((c) => c.widthPct * usableWidth);
-
-  const rowHeight = theme.bodyLineStepMm * 1.3;
-  const cellPadding = 1;
-  const headerBg = hexToRgb(theme.tableHeaderColor);
-
-  doc.setDrawColor(200, 200, 200);
-
-  doc.setFillColor(headerBg[0], headerBg[1], headerBg[2]);
-  doc.rect(left, y - rowHeight + cellPadding + 1, usableWidth, rowHeight, "F");
-
-  doc.setFont(theme.pdfFont, theme.tableHeaderBold ? "bold" : "normal");
-  doc.setFontSize(theme.tableHeaderFontPt);
-  doc.setTextColor(255, 255, 255);
-  SERVICE_TABLE_COLS.forEach((col, i) => {
-    doc.text(col.header, left + colXs[i] + cellPadding, y, { maxWidth: colWidths[i] - cellPadding * 2 });
-  });
-  y += rowHeight * 0.3;
-
-  doc.setLineWidth(0.3);
-  doc.line(left, y, left + usableWidth, y);
-  y += theme.bodyLineStepMm * 0.5;
-
-  doc.setFont(theme.pdfFont, theme.bodyBold ? "bold" : "normal");
-  doc.setFontSize(theme.bodyFontPt);
-  doc.setTextColor(...hexToRgb("#1a1a1a"));
-
   data.forEach((row, idx) => {
-    const nameText = SERVICE_TABLE_COLS[0].getValue(row);
-    const wrappedName = doc.splitTextToSize(nameText, colWidths[0] - cellPadding * 2) as string[];
-    const linesNeeded = Math.max(wrappedName.length, 1);
-
-    y = ensurePdfSpace(doc, y, linesNeeded, theme);
-
-    if (idx % 2 === 1) {
-      doc.setFillColor(245, 245, 245);
-      doc.rect(left, y - theme.bodyLineStepMm * 0.7, usableWidth, linesNeeded * theme.bodyLineStepMm + 1, "F");
-    }
-
-    doc.setTextColor(...hexToRgb("#1a1a1a"));
-    doc.setFont(theme.pdfFont, theme.bodyBold ? "bold" : "normal");
-    doc.setFontSize(theme.bodyFontPt);
-
-    wrappedName.forEach((line, li) => {
-      doc.text(line, left + colXs[0] + cellPadding, y + li * theme.bodyLineStepMm);
-    });
-
-    for (let ci = 1; ci < SERVICE_TABLE_COLS.length; ci++) {
-      const val = SERVICE_TABLE_COLS[ci].getValue(row);
-      doc.text(val, left + colXs[ci] + cellPadding, y, {
-        maxWidth: colWidths[ci] - cellPadding * 2,
-      });
-    }
-
-    y += linesNeeded * theme.bodyLineStepMm + 1;
+    y = drawPdfPortfolioServiceBlock(doc, y, left, theme, row, idx > 0);
   });
-
   return y;
 }
 
@@ -313,7 +281,6 @@ function exportToPdf(data: unknown, filename: string, theme: ResolvedDocumentExp
 
   const [pr, pg, pb] = hexToRgb(theme.titleColor);
   const [sr, sg, sb] = hexToRgb(theme.subtitleColor);
-  const bodyRgb = hexToRgb("#1a1a1a");
 
   const afterTitleMm = twipsToMm(theme.spacingAfterTitleTwips);
   const beforeSectionMm = twipsToMm(theme.spacingBeforeSectionTwips);
@@ -338,12 +305,6 @@ function exportToPdf(data: unknown, filename: string, theme: ResolvedDocumentExp
     y += theme.subtitleFontPt * 0.3528 + afterSubtitleMm;
   }
 
-  function drawBody() {
-    doc.setFont(theme.pdfFont, theme.bodyBold ? "bold" : "normal");
-    doc.setFontSize(theme.bodyFontPt);
-    doc.setTextColor(bodyRgb[0], bodyRgb[1], bodyRgb[2]);
-  }
-
   if (theme.sections.length > 0) {
     for (let si = 0; si < theme.sections.length; si++) {
       const section = theme.sections[si];
@@ -361,23 +322,20 @@ function exportToPdf(data: unknown, filename: string, theme: ResolvedDocumentExp
           break;
         case "data_table":
           if (isServiceArray(data)) {
-            y = drawPdfServiceTable(doc, data as ServiceLike[], theme, y, left);
+            y = drawPdfPortfolioCatalog(doc, data as ServiceLike[], theme, y, left);
           }
           break;
         case "data_list":
           if (isMatrixData(data)) {
             (data.quadrants as MatrixQuadrant[]).forEach((q) => {
               drawSubtitle(q.label);
-              drawBody();
               if (!q.services.length) {
                 y = ensurePdfSpace(doc, y, 1, theme);
                 doc.text("- Nenhum serviço", left + theme.bulletIndentMm, y);
                 y += theme.bodyLineStepMm + bodyParaMm;
               } else {
-                q.services.forEach((s) => {
-                  y = ensurePdfSpace(doc, y, 1, theme);
-                  doc.text(`• ${s.name ?? "-"}`, left + theme.bulletIndentMm, y);
-                  y += theme.bodyLineStepMm + bodyParaMm * 0.3;
+                q.services.forEach((s, idx) => {
+                  y = drawPdfPortfolioServiceBlock(doc, y, left, theme, s, idx > 0);
                 });
               }
               y += bodyParaMm;
@@ -389,21 +347,18 @@ function exportToPdf(data: unknown, filename: string, theme: ResolvedDocumentExp
   } else {
     if (isServiceArray(data)) {
       drawTitle("Catálogo de Serviços");
-      y = drawPdfServiceTable(doc, data as ServiceLike[], theme, y, left);
+      y = drawPdfPortfolioCatalog(doc, data as ServiceLike[], theme, y, left);
     } else if (isMatrixData(data)) {
       drawTitle("Matriz Demanda × Capacidade");
       (data.quadrants as MatrixQuadrant[]).forEach((q) => {
         drawSubtitle(q.label);
-        drawBody();
         if (!q.services.length) {
           y = ensurePdfSpace(doc, y, 1, theme);
           doc.text("- Nenhum serviço", left + theme.bulletIndentMm, y);
           y += theme.bodyLineStepMm + bodyParaMm;
         } else {
-          q.services.forEach((s) => {
-            y = ensurePdfSpace(doc, y, 1, theme);
-            doc.text(`• ${s.name ?? "-"}`, left + theme.bulletIndentMm, y);
-            y += theme.bodyLineStepMm + bodyParaMm * 0.3;
+          q.services.forEach((s, idx) => {
+            y = drawPdfPortfolioServiceBlock(doc, y, left, theme, s, idx > 0);
           });
         }
         y += bodyParaMm;
@@ -472,53 +427,63 @@ function bodyParagraph(text: string, theme: ResolvedDocumentExportTheme) {
   });
 }
 
-function tableCellParagraph(text: string, theme: ResolvedDocumentExportTheme) {
+function portfolioFieldParagraph(label: string, value: string, theme: ResolvedDocumentExportTheme) {
+  const gapAfter = Math.round(theme.spacingBodyParagraphTwips * 1.35);
   return new Paragraph({
     children: [
       new TextRun({
-        text,
+        text: `${label}: `,
         font: theme.docxFont,
+        bold: true,
+        size: ptToHalfPoints(theme.bodyFontPt),
+        color: hexToDocxColor("#1a1a1a"),
+      }),
+      new TextRun({
+        text: value,
+        font: theme.docxFont,
+        bold: theme.bodyBold,
+        italics: theme.bodyItalic,
         size: ptToHalfPoints(theme.bodyFontPt),
         color: hexToDocxColor("#1a1a1a"),
       }),
     ],
+    spacing: { after: gapAfter },
+    alignment: DOCX_ALIGN[theme.bodyAlignment] ?? AlignmentType.LEFT,
   });
 }
 
-function tableHeaderParagraph(text: string, theme: ResolvedDocumentExportTheme) {
+function serviceNameParagraph(text: string, theme: ResolvedDocumentExportTheme, spacingBefore: boolean) {
   return new Paragraph({
     children: [
       new TextRun({
         text,
         font: theme.docxFont,
-        bold: theme.tableHeaderBold,
-        italics: theme.tableHeaderItalic,
-        size: ptToHalfPoints(theme.tableHeaderFontPt),
-        color: hexToDocxColor(theme.tableHeaderColor),
+        bold: theme.subtitleBold,
+        italics: theme.subtitleItalic,
+        size: ptToHalfPoints(theme.subtitleFontPt),
+        color: hexToDocxColor(theme.subtitleColor),
       }),
     ],
+    spacing: {
+      before: spacingBefore ? theme.spacingBeforeSectionTwips : 0,
+      after: theme.spacingAfterSectionTitleTwips,
+    },
+    alignment: DOCX_ALIGN[theme.subtitleAlignment] ?? AlignmentType.LEFT,
   });
 }
 
-function buildServiceTable(data: ServiceLike[], theme: ResolvedDocumentExportTheme): Table {
-  const headerRow = new TableRow({
-    children: [
-      new TableCell({ children: [tableHeaderParagraph("Nome", theme)] }),
-      new TableCell({ children: [tableHeaderParagraph("Demanda", theme)] }),
-      new TableCell({ children: [tableHeaderParagraph("Capacidade", theme)] }),
-    ],
+function docxPortfolioServiceParagraphs(
+  serviceRaw: unknown,
+  theme: ResolvedDocumentExportTheme,
+  spacingBeforeTitle: boolean,
+): Paragraph[] {
+  const svc = normalizePortfolioService(serviceRaw);
+  const rows = getPortfolioFieldRows(svc);
+  const paragraphs: Paragraph[] = [serviceNameParagraph(svc.name, theme, spacingBeforeTitle)];
+  rows.forEach(({ label, value }) => {
+    paragraphs.push(portfolioFieldParagraph(label, value, theme));
   });
-  const rows = data.map(
-    (s) =>
-      new TableRow({
-        children: [
-          new TableCell({ children: [tableCellParagraph(s.name ?? "-", theme)] }),
-          new TableCell({ children: [tableCellParagraph(String(s.demand_level ?? "-"), theme)] }),
-          new TableCell({ children: [tableCellParagraph(String(s.capacity_level ?? "-"), theme)] }),
-        ],
-      })
-  );
-  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] });
+  return paragraphs;
 }
 
 // ---------------------------------------------------------------------------
@@ -526,7 +491,7 @@ function buildServiceTable(data: ServiceLike[], theme: ResolvedDocumentExportThe
 // ---------------------------------------------------------------------------
 
 async function exportToDocx(data: unknown, filename: string, theme: ResolvedDocumentExportTheme) {
-  const children: (Paragraph | Table)[] = [];
+  const children: Paragraph[] = [];
 
   if (theme.sections.length > 0) {
     for (const section of theme.sections) {
@@ -542,7 +507,9 @@ async function exportToDocx(data: unknown, filename: string, theme: ResolvedDocu
         case "data_table":
           if (isServiceArray(data)) {
             children.push(new Paragraph(""));
-            children.push(buildServiceTable(data as ServiceLike[], theme));
+            (data as ServiceLike[]).forEach((s, idx) => {
+              children.push(...docxPortfolioServiceParagraphs(s, theme, idx > 0));
+            });
           }
           break;
         case "data_list":
@@ -552,8 +519,8 @@ async function exportToDocx(data: unknown, filename: string, theme: ResolvedDocu
               if (!q.services.length) {
                 children.push(bodyParagraph("- Nenhum serviço", theme));
               } else {
-                q.services.forEach((s) => {
-                  children.push(bodyParagraph(`• ${s.name ?? "-"}`, theme));
+                q.services.forEach((s, idx) => {
+                  children.push(...docxPortfolioServiceParagraphs(s, theme, idx > 0));
                 });
               }
             });
@@ -565,7 +532,9 @@ async function exportToDocx(data: unknown, filename: string, theme: ResolvedDocu
     if (isServiceArray(data)) {
       children.push(titleParagraph("Catálogo de Serviços", theme));
       children.push(new Paragraph(""));
-      children.push(buildServiceTable(data as ServiceLike[], theme));
+      (data as ServiceLike[]).forEach((s, idx) => {
+        children.push(...docxPortfolioServiceParagraphs(s, theme, idx > 0));
+      });
     } else if (isMatrixData(data)) {
       children.push(titleParagraph("Matriz Demanda × Capacidade", theme));
       (data.quadrants as MatrixQuadrant[]).forEach((q) => {
@@ -573,8 +542,8 @@ async function exportToDocx(data: unknown, filename: string, theme: ResolvedDocu
         if (!q.services.length) {
           children.push(bodyParagraph("- Nenhum serviço", theme));
         } else {
-          q.services.forEach((s) => {
-            children.push(bodyParagraph(`• ${s.name ?? "-"}`, theme));
+          q.services.forEach((s, idx) => {
+            children.push(...docxPortfolioServiceParagraphs(s, theme, idx > 0));
           });
         }
       });

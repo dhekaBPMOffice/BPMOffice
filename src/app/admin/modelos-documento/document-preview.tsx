@@ -1,6 +1,14 @@
 "use client";
 
+/**
+ * Pré-visualização dos tipos de documento (catálogo / matriz).
+ * O conteúdo por serviço deve seguir a mesma regra que a exportação PDF/DOCX
+ * (`export-button` + `portfolio-service-fields`); ao alterar campos exportáveis,
+ * atualize também este ficheiro se o layout de pré-visualização mudar.
+ */
+
 import type { DocumentTemplateStyles, DocumentSectionConfig, BrandingMapping } from "@/types/database";
+import { getPortfolioFieldRows, normalizePortfolioService } from "@/lib/export/portfolio-service-fields";
 
 interface DocumentPreviewProps {
   styles: DocumentTemplateStyles;
@@ -8,17 +16,69 @@ interface DocumentPreviewProps {
   brandingMapping: BrandingMapping;
 }
 
-const SAMPLE_SERVICES = [
-  { name: "Mapeamento de Processos", demand: "Alta", capacity: "Alta" },
-  { name: "Análise de Indicadores", demand: "Alta", capacity: "Baixa" },
-  { name: "Redesenho de Fluxos", demand: "Baixa", capacity: "Alta" },
+/** Objetos de exemplo com os mesmos campos que `ServicePortfolio` (exportação). */
+const SAMPLE_CATALOG_SERVICES = [
+  {
+    id: "demo-1",
+    office_id: "",
+    name: "Mapeamento de Processos",
+    description: "Levantamento e documentação dos processos da organização.",
+    methodology: "Entrevistas, workshops e modelagem BPMN.",
+    deliverables: "Mapa de processos, ata de reuniões.",
+    resources: "Software de modelagem, templates.",
+    team: "2 consultores sénior.",
+    pricing: "Projeto fechado por escopo.",
+    marketing: "Cases e página institucional.",
+    demand_level: "Alta",
+    capacity_level: "Alta",
+    is_custom: false,
+    base_service_id: "base-1",
+    created_at: "",
+    updated_at: "",
+  },
+  {
+    id: "demo-2",
+    office_id: "",
+    name: "Análise de Indicadores",
+    description: "Definição e acompanhamento de KPIs.",
+    methodology: "Dashboards e revisão periódica.",
+    deliverables: "Painel de indicadores, relatório mensal.",
+    resources: "BI, planilhas.",
+    team: "1 analista.",
+    pricing: "Retainer mensal.",
+    marketing: "Newsletter.",
+    demand_level: "Alta",
+    capacity_level: "Baixa",
+    is_custom: true,
+    base_service_id: null,
+    created_at: "",
+    updated_at: "",
+  },
+  {
+    id: "demo-3",
+    office_id: "",
+    name: "Redesenho de Fluxos",
+    description: "Otimização de processos e automação.",
+    methodology: "Lean e automação RPA.",
+    deliverables: "TO-BE, plano de implementação.",
+    resources: "Ferramentas RPA.",
+    team: "Arquiteto + desenvolvedor.",
+    pricing: "Por fase.",
+    marketing: "—",
+    demand_level: "Baixa",
+    capacity_level: "Alta",
+    is_custom: false,
+    base_service_id: "base-3",
+    created_at: "",
+    updated_at: "",
+  },
 ];
 
-const SAMPLE_QUADRANTS = [
-  { label: "Alta demanda / Alta capacidade", services: ["Mapeamento de Processos"] },
-  { label: "Alta demanda / Baixa capacidade", services: ["Análise de Indicadores"] },
-  { label: "Baixa demanda / Alta capacidade", services: ["Redesenho de Fluxos"] },
-  { label: "Baixa demanda / Baixa capacidade", services: [] as string[] },
+const SAMPLE_QUADRANTS: { label: string; services: typeof SAMPLE_CATALOG_SERVICES }[] = [
+  { label: "Alta demanda / Alta capacidade", services: [SAMPLE_CATALOG_SERVICES[0]] },
+  { label: "Alta demanda / Baixa capacidade", services: [SAMPLE_CATALOG_SERVICES[1]] },
+  { label: "Baixa demanda / Alta capacidade", services: [SAMPLE_CATALOG_SERVICES[2]] },
+  { label: "Baixa demanda / Baixa capacidade", services: [] },
 ];
 
 function resolveColor(field: string, mapping: BrandingMapping): string | undefined {
@@ -33,7 +93,6 @@ function resolveColor(field: string, mapping: BrandingMapping): string | undefin
 export function DocumentPreview({ styles, sections, brandingMapping }: DocumentPreviewProps) {
   const titleColor = resolveColor("title.color", brandingMapping) ?? "#1a1a1a";
   const subtitleColor = resolveColor("subtitle.color", brandingMapping) ?? "#1a1a1a";
-  const thColor = resolveColor("tableHeader.color", brandingMapping) ?? "#1a1a1a";
 
   const pageStyle: React.CSSProperties = {
     fontFamily: styles.fontFamily,
@@ -51,14 +110,26 @@ export function DocumentPreview({ styles, sections, brandingMapping }: DocumentP
     };
   }
 
-  function subtitleStyle(): React.CSSProperties {
+  function subtitleStyle(firstInGroup: boolean): React.CSSProperties {
     return {
       fontSize: `${styles.subtitle.fontSize}px`,
       fontWeight: styles.subtitle.bold ? 700 : 400,
       fontStyle: styles.subtitle.italic ? "italic" : "normal",
       textAlign: styles.subtitle.alignment,
       color: subtitleColor,
-      marginTop: `${styles.spacing.beforeSection}px`,
+      marginTop: firstInGroup ? 0 : `${styles.spacing.beforeSection}px`,
+      marginBottom: `${styles.spacing.afterSectionTitle}px`,
+    };
+  }
+
+  function quadrantTitleStyle(quadrantIndex: number): React.CSSProperties {
+    return {
+      fontSize: `${styles.subtitle.fontSize}px`,
+      fontWeight: styles.subtitle.bold ? 700 : 400,
+      fontStyle: styles.subtitle.italic ? "italic" : "normal",
+      textAlign: styles.subtitle.alignment,
+      color: subtitleColor,
+      marginTop: quadrantIndex === 0 ? 0 : `${styles.spacing.beforeSection}px`,
       marginBottom: `${styles.spacing.afterSectionTitle}px`,
     };
   }
@@ -74,16 +145,38 @@ export function DocumentPreview({ styles, sections, brandingMapping }: DocumentP
     };
   }
 
-  function thStyle(): React.CSSProperties {
-    return {
-      fontSize: `${styles.tableHeader.fontSize}px`,
-      fontWeight: styles.tableHeader.bold ? 700 : 400,
-      fontStyle: styles.tableHeader.italic ? "italic" : "normal",
-      textAlign: styles.tableHeader.alignment,
-      color: thColor,
-      padding: "4px 8px",
-      borderBottom: "1.5px solid #ccc",
-    };
+  const fieldGapPx = Math.max(10, Math.round(styles.spacing.bodyParagraph * 1.75));
+
+  function renderServiceBlock(
+    serviceRaw: unknown,
+    serviceIndexInSection: number,
+    keySuffix: string,
+  ) {
+    const svc = normalizePortfolioService(serviceRaw);
+    const rows = getPortfolioFieldRows(svc);
+    const isFirst = serviceIndexInSection === 0;
+    return (
+      <div key={keySuffix}>
+        <div style={subtitleStyle(isFirst)}>{svc.name}</div>
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            style={{
+              marginBottom: `${fieldGapPx}px`,
+              fontSize: `${styles.body.fontSize}px`,
+              fontWeight: styles.body.bold ? 700 : 400,
+              fontStyle: styles.body.italic ? "italic" : "normal",
+              textAlign: styles.body.alignment as React.CSSProperties["textAlign"],
+              color: "#1a1a1a",
+              lineHeight: 1.45,
+            }}
+          >
+            <span style={{ fontWeight: 700 }}>{row.label}:</span>{" "}
+            <span style={{ fontWeight: styles.body.bold ? 700 : 400 }}>{row.value}</span>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   function renderSection(section: DocumentSectionConfig) {
@@ -100,37 +193,24 @@ export function DocumentPreview({ styles, sections, brandingMapping }: DocumentP
         );
       case "data_table":
         return (
-          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: `${styles.spacing.beforeSection}px` }}>
-            <thead>
-              <tr>
-                <th style={thStyle()}>Nome</th>
-                <th style={thStyle()}>Demanda</th>
-                <th style={thStyle()}>Capacidade</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SAMPLE_SERVICES.map((s) => (
-                <tr key={s.name}>
-                  <td style={{ ...bodyStyle(), padding: "3px 8px", borderBottom: "1px solid #eee" }}>{s.name}</td>
-                  <td style={{ ...bodyStyle(), padding: "3px 8px", borderBottom: "1px solid #eee" }}>{s.demand}</td>
-                  <td style={{ ...bodyStyle(), padding: "3px 8px", borderBottom: "1px solid #eee" }}>{s.capacity}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ marginTop: `${styles.spacing.beforeSection}px` }}>
+            {SAMPLE_CATALOG_SERVICES.map((s, idx) =>
+              renderServiceBlock(s, idx, `cat-${s.id}-${idx}`),
+            )}
+          </div>
         );
       case "data_list":
         return (
           <div style={{ marginTop: `${styles.spacing.beforeSection}px` }}>
-            {SAMPLE_QUADRANTS.map((q) => (
+            {SAMPLE_QUADRANTS.map((q, qi) => (
               <div key={q.label}>
-                <div style={subtitleStyle()}>{q.label}</div>
+                <div style={quadrantTitleStyle(qi)}>{q.label}</div>
                 {q.services.length === 0 ? (
                   <div style={bodyStyle()}>- Nenhum serviço</div>
                 ) : (
-                  q.services.map((s) => (
-                    <div key={s} style={bodyStyle()}>• {s}</div>
-                  ))
+                  q.services.map((s, idx) =>
+                    renderServiceBlock(s, idx, `${q.label}-${idx}-${s.id}`),
+                  )
                 )}
               </div>
             ))}

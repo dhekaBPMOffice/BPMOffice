@@ -1,15 +1,16 @@
 import type { ServicePortfolio } from "@/app/escritorio/estrategia/portfolio/actions";
 
-/** Campos exportáveis (exceto nome, usado como título do bloco). */
+/**
+ * Utilitários de exportação do portfólio (PDF/DOCX e pré-visualização admin).
+ * Sem origem nem níveis de demanda/capacidade nos documentos.
+ * Ao alterar rótulos, atualize também `app/admin/modelos-documento/document-preview.tsx`.
+ */
 export function formatPortfolioScalar(value: string | null | undefined): string {
   const v = (value ?? "").trim();
   return v === "" ? "—" : v;
 }
 
-export function portfolioOriginLabel(service: Pick<ServicePortfolio, "is_custom">): string {
-  return service.is_custom ? "Customizado" : "Catálogo base";
-}
-
+/** Linhas exportáveis por serviço (sem origem nem níveis de demanda/capacidade). */
 export function getPortfolioFieldRows(service: ServicePortfolio): { label: string; value: string }[] {
   return [
     { label: "Descrição", value: formatPortfolioScalar(service.description) },
@@ -19,9 +20,6 @@ export function getPortfolioFieldRows(service: ServicePortfolio): { label: strin
     { label: "Equipe", value: formatPortfolioScalar(service.team) },
     { label: "Precificação", value: formatPortfolioScalar(service.pricing) },
     { label: "Marketing", value: formatPortfolioScalar(service.marketing) },
-    { label: "Nível de demanda", value: formatPortfolioScalar(service.demand_level) },
-    { label: "Nível de capacidade", value: formatPortfolioScalar(service.capacity_level) },
-    { label: "Origem", value: portfolioOriginLabel(service) },
   ];
 }
 

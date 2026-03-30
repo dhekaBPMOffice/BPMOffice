@@ -24,7 +24,7 @@ const TYPE_META: Record<
 > = {
   title: { label: "Título", icon: Type, removable: false },
   rich_text: { label: "Texto rico", icon: FileText, removable: true },
-  data_table: { label: "Tabela de dados", icon: Table2, removable: false },
+  data_table: { label: "Conteúdo do catálogo (serviços)", icon: Table2, removable: false },
   data_list: { label: "Lista de dados", icon: ListTree, removable: false },
 };
 

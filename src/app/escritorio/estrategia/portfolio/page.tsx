@@ -12,7 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select } from "@/components/ui/select";
 import {
@@ -49,7 +48,6 @@ const CAPACITY_OPTIONS = [
 ];
 
 type CatalogViewMode = "cards" | "list";
-type CatalogFilterOrigin = "all" | "custom" | "from_base";
 type CatalogFilterLevel = "all" | "alta" | "baixa" | "unset";
 type CatalogSortBy = "name_asc" | "name_desc" | "created_desc" | "created_asc" | "updated_desc";
 
@@ -233,7 +231,6 @@ export default function PortfolioPage() {
 
   const [catalogViewMode, setCatalogViewMode] = useState<CatalogViewMode>("cards");
   const [catalogSearch, setCatalogSearch] = useState("");
-  const [filterOrigin, setFilterOrigin] = useState<CatalogFilterOrigin>("all");
   const [filterDemand, setFilterDemand] = useState<CatalogFilterLevel>("all");
   const [filterCapacity, setFilterCapacity] = useState<CatalogFilterLevel>("all");
   const [catalogSortBy, setCatalogSortBy] = useState<CatalogSortBy>("name_asc");
@@ -248,13 +245,11 @@ export default function PortfolioPage() {
           (s.description ?? "").toLowerCase().includes(q)
       );
     }
-    if (filterOrigin === "custom") list = list.filter((s) => s.is_custom);
-    if (filterOrigin === "from_base") list = list.filter((s) => !s.is_custom);
     list = list.filter((s) => matchesLevelFilter(s.demand_level, filterDemand));
     list = list.filter((s) => matchesLevelFilter(s.capacity_level, filterCapacity));
     list.sort((a, b) => sortPortfolioServices(a, b, catalogSortBy));
     return list;
-  }, [services, catalogSearch, filterOrigin, filterDemand, filterCapacity, catalogSortBy]);
+  }, [services, catalogSearch, filterDemand, filterCapacity, catalogSortBy]);
 
   const availableBaseServices = useMemo(() => {
     const selectedIds = new Set(
@@ -316,7 +311,6 @@ export default function PortfolioPage() {
 
   function clearCatalogFilters() {
     setCatalogSearch("");
-    setFilterOrigin("all");
     setFilterDemand("all");
     setFilterCapacity("all");
     setCatalogSortBy("name_asc");
@@ -492,18 +486,6 @@ export default function PortfolioPage() {
               </div>
               <div className="flex flex-wrap gap-2 sm:gap-3">
                 <div className="space-y-1.5 min-w-[140px]">
-                  <Label className="text-xs text-muted-foreground">Origem</Label>
-                  <Select
-                    value={filterOrigin}
-                    onChange={(e) => setFilterOrigin(e.target.value as CatalogFilterOrigin)}
-                    aria-label="Filtrar por origem"
-                  >
-                    <option value="all">Todas</option>
-                    <option value="custom">Customizado</option>
-                    <option value="from_base">Catálogo base</option>
-                  </Select>
-                </div>
-                <div className="space-y-1.5 min-w-[140px]">
                   <Label className="text-xs text-muted-foreground">Demanda</Label>
                   <Select
                     value={filterDemand}
@@ -610,21 +592,6 @@ export default function PortfolioPage() {
                         {service.description}
                       </CardDescription>
                     )}
-                    <div className="flex gap-1 flex-wrap">
-                      {service.is_custom && (
-                        <Badge variant="outline">Customizado</Badge>
-                      )}
-                      {service.demand_level && (
-                        <Badge variant="secondary">
-                          Demanda: {service.demand_level}
-                        </Badge>
-                      )}
-                      {service.capacity_level && (
-                        <Badge variant="secondary">
-                          Capacidade: {service.capacity_level}
-                        </Badge>
-                      )}
-                    </div>
                   </CardHeader>
                 </Card>
               ))}
@@ -636,9 +603,6 @@ export default function PortfolioPage() {
                   <tr className="border-b bg-muted/40 text-left text-muted-foreground">
                     <th className="px-3 py-2 font-medium">Nome</th>
                     <th className="hidden md:table-cell px-3 py-2 font-medium">Descrição</th>
-                    <th className="px-3 py-2 font-medium">Origem</th>
-                    <th className="hidden sm:table-cell px-3 py-2 font-medium">Demanda</th>
-                    <th className="hidden sm:table-cell px-3 py-2 font-medium">Capacidade</th>
                     <th className="w-[100px] px-3 py-2 text-right font-medium">Ações</th>
                   </tr>
                 </thead>
@@ -651,19 +615,6 @@ export default function PortfolioPage() {
                       <td className="px-3 py-2 align-top font-medium">{service.name}</td>
                       <td className="hidden md:table-cell max-w-[240px] px-3 py-2 align-top text-muted-foreground">
                         <span className="line-clamp-2">{service.description || "—"}</span>
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        {service.is_custom ? (
-                          <Badge variant="outline">Customizado</Badge>
-                        ) : (
-                          <Badge variant="secondary">Catálogo base</Badge>
-                        )}
-                      </td>
-                      <td className="hidden sm:table-cell px-3 py-2 align-top text-muted-foreground">
-                        {service.demand_level || "—"}
-                      </td>
-                      <td className="hidden sm:table-cell px-3 py-2 align-top text-muted-foreground">
-                        {service.capacity_level || "—"}
                       </td>
                       <td className="px-3 py-2 align-top text-right">
                         <div className="flex justify-end gap-1">
