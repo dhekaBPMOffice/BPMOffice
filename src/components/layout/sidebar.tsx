@@ -62,6 +62,7 @@ const adminNavGroups: NavGroup[] = [
     label: "Configurações",
     items: [
       { label: "Identidade Visual", href: "/admin/branding", icon: Palette },
+      { label: "Modelos de Documento", href: "/admin/modelos-documento", icon: FileText },
       { label: "Formulários", href: "/admin/formularios", icon: BookOpen },
       { label: "Configuração IA", href: "/admin/ia", icon: Bot },
       { label: "Parâmetros da Plataforma", href: "/admin/configuracoes", icon: Settings },

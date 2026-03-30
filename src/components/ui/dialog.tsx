@@ -3,40 +3,101 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+const DialogCloseContext = React.createContext<null | (() => void)>(null);
+
+/** Fecha o modal mais próximo (útil em botões “Cancelar” dentro do painel). */
+export function useDialogClose() {
+  return React.useContext(DialogCloseContext);
+}
 
 interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
+  /** Largura máxima do conteúdo (padrão: max-w-lg). */
+  containerClassName?: string;
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, containerClassName }: DialogProps) {
+  const close = React.useCallback(() => onOpenChange(false), [onOpenChange]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, close]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => onOpenChange(false)} />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <div className="relative z-50 w-full max-w-lg">{children}</div>
+    <DialogCloseContext.Provider value={close}>
+      <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" onClick={close} />
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4"
+          onClick={close}
+          role="presentation"
+        >
+          <div
+            className={cn("relative z-50 w-full", containerClassName ?? "max-w-lg")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {children}
+          </div>
+        </div>
       </div>
-    </div>
+    </DialogCloseContext.Provider>
   );
 }
 
 export function DialogContent({
   className,
   children,
+  onClose,
+  showCloseButton = true,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & { onClose?: () => void }) {
+}: React.HTMLAttributes<HTMLDivElement> & {
+  onClose?: () => void;
+  /** Quando false, oculta o botão X (casos raros). Padrão: true. */
+  showCloseButton?: boolean;
+}) {
+  const close = React.useContext(DialogCloseContext);
+
+  const handleClose = React.useCallback(() => {
+    close?.();
+    onClose?.();
+  }, [close, onClose]);
+
+  const showX = Boolean(showCloseButton && close);
+
   return (
     <div
       className={cn(
-        "rounded-xl border border-border/60 bg-card p-6 max-h-[90vh] overflow-y-auto",
-        className
+        "relative rounded-xl border border-border/60 bg-card p-6 max-h-[90vh] overflow-y-auto",
+        className,
+        showX && "pr-12"
       )}
-      style={{ boxShadow: "0 8px 30px rgb(0 0 0 / 0.12), 0 2px 8px rgb(0 0 0 / 0.06)" }}
+      role="dialog"
+      aria-modal="true"
       {...props}
     >
+      {showX && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute right-2 top-2 h-8 w-8 shrink-0"
+          onClick={handleClose}
+          aria-label="Fechar"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
       {children}
     </div>
   );

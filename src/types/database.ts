@@ -311,3 +311,75 @@ export interface OfficeProcessHistory {
   metadata: Record<string, unknown>;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Document export templates
+// ---------------------------------------------------------------------------
+
+export type TextAlignment = "left" | "center" | "right";
+
+export interface DocumentStyleRole {
+  fontSize: number;
+  bold: boolean;
+  italic: boolean;
+  alignment: TextAlignment;
+}
+
+export interface DocumentSpacing {
+  afterTitle: number;
+  beforeSection: number;
+  afterSectionTitle: number;
+  bodyParagraph: number;
+}
+
+export interface DocumentMargins {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+}
+
+export interface DocumentTemplateStyles {
+  fontFamily: string;
+  title: DocumentStyleRole;
+  subtitle: DocumentStyleRole;
+  body: DocumentStyleRole;
+  tableHeader: DocumentStyleRole;
+  spacing: DocumentSpacing;
+  margins: DocumentMargins;
+}
+
+export type DocumentSectionType = "title" | "rich_text" | "data_table" | "data_list";
+
+export interface DocumentSectionConfig {
+  type: DocumentSectionType;
+  key: string;
+  label: string;
+  defaultText?: string;
+  content?: string;
+}
+
+export type BrandingMappingValue = "primary_color" | "secondary_color" | "accent_color";
+export type BrandingMapping = Record<string, BrandingMappingValue>;
+
+export interface DocumentTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  styles: DocumentTemplateStyles;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentTypeConfig {
+  id: string;
+  document_type: string;
+  label: string;
+  template_id: string | null;
+  style_overrides: Partial<DocumentTemplateStyles>;
+  sections: DocumentSectionConfig[];
+  branding_mapping: BrandingMapping;
+  created_at: string;
+  updated_at: string;
+}

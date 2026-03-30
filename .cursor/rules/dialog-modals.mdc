@@ -1,0 +1,10 @@
+---
+description: Modais devem usar o Dialog do projeto com fecho acessível (X, fora, Escape)
+alwaysApply: true
+---
+
+# Modais e janelas pop-up
+
+- Preferir sempre `Dialog` e `DialogContent` de [`src/components/ui/dialog.tsx`](src/components/ui/dialog.tsx), que já incluem fechar com botão **X**, **clique fora do painel** e tecla **Escape**.
+- Só usar `showCloseButton={false}` em casos excecionais e com justificativa (ex.: fluxo guiado que proíbe fecho acidental).
+- Não introduzir overlays/modais ad hoc sem estes três modos de fechar, salvo requisito explícito em contrário.
