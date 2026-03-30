@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { createDraftOfficeAndRedirect } from "./actions";
+import { createDraftOfficeAndRedirect } from "./draft-office-actions";
 
 export function NovoEscritorioButton() {
   return (
