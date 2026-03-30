@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { OFFICE_PROCESS_STATUS_META } from "@/lib/processes";
 import type {
@@ -13,9 +13,18 @@ import {
   addOfficeProcessAttachment,
   addOfficeProcessChecklistItem,
   toggleOfficeProcessChecklistItem,
+  updateOfficeProcessBpmPhase,
   updateOfficeProcessDetails,
   uploadOfficeAttachmentFile,
 } from "../actions";
+import {
+  BPM_PHASE_LABELS,
+  BPM_PHASE_SLUGS,
+  type BpmPhaseSlug,
+  type BpmStageStatusDb,
+  bpmStageStatusToLabel,
+  formatCurrentBpmPhaseLabel,
+} from "@/lib/bpm-phases";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -40,6 +49,7 @@ export function ProcessManagementClient({
   checklistItems,
   attachments,
   history,
+  bpmPhases,
 }: {
   officeProcess: {
     id: string;
@@ -51,7 +61,8 @@ export function ProcessManagementClient({
     flowchart_image_url?: string | null;
     template_files?: { url: string; label?: string }[];
     flowchart_files?: { url: string }[];
-    origin: "questionnaire" | "manual";
+    origin: "questionnaire" | "manual" | "value_chain";
+    creation_source?: string;
     status: OfficeProcessStatus;
     owner_profile_id: string | null;
     notes: string | null;
@@ -76,6 +87,7 @@ export function ProcessManagementClient({
     event_type: string;
     created_at: string;
   }[];
+  bpmPhases: Array<{ id: string; phase: string; stage_status: string; completed_at: string | null }>;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<OfficeProcessStatus>(officeProcess.status);
@@ -107,6 +119,19 @@ export function ProcessManagementClient({
     if (officeProcess.flowchart_image_url) return [{ url: officeProcess.flowchart_image_url }];
     return [];
   }, [officeProcess.flowchart_files, officeProcess.flowchart_image_url]);
+
+  const [bpmPhaseRows, setBpmPhaseRows] = useState(bpmPhases);
+  const [bpmError, setBpmError] = useState<string | null>(null);
+  const [bpmSaving, setBpmSaving] = useState<string | null>(null);
+
+  useEffect(() => {
+    setBpmPhaseRows(bpmPhases);
+  }, [bpmPhases]);
+
+  const currentBpmLabel = useMemo(
+    () => formatCurrentBpmPhaseLabel(bpmPhaseRows),
+    [bpmPhaseRows]
+  );
 
   const statusMeta = OFFICE_PROCESS_STATUS_META[status];
   const completedCount = useMemo(
@@ -221,9 +246,41 @@ export function ProcessManagementClient({
     setNewAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
+  async function handleBpmPhaseChange(phase: BpmPhaseSlug, stageStatus: BpmStageStatusDb) {
+    setBpmError(null);
+    setBpmSaving(phase);
+    const result = await updateOfficeProcessBpmPhase({
+      officeProcessId: officeProcess.id,
+      phase,
+      stageStatus,
+    });
+    setBpmSaving(null);
+    if ("error" in result && result.error) {
+      setBpmError(result.error);
+      return;
+    }
+    setBpmPhaseRows((prev) =>
+      prev.map((row) =>
+        row.phase === phase ? { ...row, stage_status: stageStatus } : row
+      )
+    );
+    router.refresh();
+  }
+
+  const originLabel =
+    officeProcess.origin === "questionnaire"
+      ? "Automática (questionário)"
+      : officeProcess.origin === "value_chain"
+        ? "Cadeia de valor"
+        : "Manual (catálogo)";
+  const creationHint =
+    officeProcess.creation_source === "created_in_value_chain"
+      ? "Criado na cadeia de valor"
+      : "A partir do catálogo";
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Status</CardTitle>
@@ -237,7 +294,16 @@ export function ProcessManagementClient({
             <CardTitle className="text-base">Origem</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm">{officeProcess.origin === "questionnaire" ? "Automática" : "Manual"}</p>
+            <p className="text-sm">{originLabel}</p>
+            <p className="text-xs text-muted-foreground">{creationHint}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Fase BPM atual</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm font-medium">{currentBpmLabel}</p>
           </CardContent>
         </Card>
         <Card>
@@ -263,6 +329,7 @@ export function ProcessManagementClient({
       <Tabs defaultValue="visao-geral" className="w-full">
         <TabsList className="flex h-auto flex-wrap gap-1">
           <TabsTrigger value="visao-geral">Visão geral</TabsTrigger>
+          <TabsTrigger value="ciclo-bpm">Ciclo BPM</TabsTrigger>
           <TabsTrigger value="checklist">Checklist</TabsTrigger>
           <TabsTrigger value="anexos">Anexos</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
@@ -395,6 +462,50 @@ export function ProcessManagementClient({
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="ciclo-bpm" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Etapas do ciclo BPM</CardTitle>
+              <CardDescription>
+                Atualize o status de cada etapa. A “fase atual” considera a primeira etapa ainda não concluída.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {bpmError ? <p className="text-sm text-destructive">{bpmError}</p> : null}
+              <div className="space-y-3">
+                {BPM_PHASE_SLUGS.map((slug) => {
+                  const row = bpmPhaseRows.find((r) => r.phase === slug);
+                  const st = (row?.stage_status as BpmStageStatusDb) || "not_started";
+                  return (
+                    <div
+                      key={slug}
+                      className="flex flex-col gap-2 rounded-lg border border-border/60 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="font-medium">{BPM_PHASE_LABELS[slug]}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {bpmSaving === slug ? "Salvando…" : `Atual: ${bpmStageStatusToLabel(st)}`}
+                        </p>
+                      </div>
+                      <Select
+                        value={st}
+                        onChange={(e) =>
+                          void handleBpmPhaseChange(slug, e.target.value as BpmStageStatusDb)
+                        }
+                        className="w-full sm:max-w-[220px]"
+                      >
+                        <option value="not_started">Não iniciado</option>
+                        <option value="in_progress">Em andamento</option>
+                        <option value="completed">Concluído</option>
+                      </Select>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="checklist" className="mt-4">

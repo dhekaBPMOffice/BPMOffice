@@ -24,6 +24,7 @@ import {
   DatabaseBackup,
   HelpCircle,
   ShieldCheck,
+  BarChart3,
 } from "lucide-react";
 import { type UserRole } from "@/types/database";
 import { IconChip } from "@/components/ui/icon-chip";
@@ -83,6 +84,7 @@ const leaderNavGroups: NavGroup[] = [
       { label: "Dashboard", href: "/escritorio/dashboard", icon: LayoutDashboard },
       { label: "Estratégia", href: "/escritorio/estrategia", icon: Target },
       { label: "Processos do Escritório", href: "/escritorio/processos", icon: FileText },
+      { label: "Visão geral — processos", href: "/escritorio/processos/visao-geral", icon: BarChart3 },
       { label: "Demandas", href: "/escritorio/demandas", icon: ClipboardList },
     ],
   },

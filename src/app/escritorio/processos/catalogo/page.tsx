@@ -34,7 +34,9 @@ export default async function CatalogoComplementarProcessosPage() {
   ]);
 
   const selectedProcessIds = new Set(
-    (officeProcesses ?? []).map((item) => item.base_process_id)
+    (officeProcesses ?? [])
+      .map((item) => item.base_process_id)
+      .filter((id): id is string => id != null)
   );
   const availableProcesses = (baseProcesses ?? []).filter(
     (process) => !selectedProcessIds.has(process.id)

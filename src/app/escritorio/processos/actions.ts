@@ -15,6 +15,7 @@ import type {
   OfficeProcessAttachmentType,
   Profile,
 } from "@/types/database";
+import type { BpmPhaseSlug } from "@/lib/bpm-phases";
 import { uploadProcessFile } from "@/lib/process-file-upload";
 
 type LeaderProfile = Profile & {
@@ -252,6 +253,7 @@ export async function submitProcessOnboarding(
             office_id: profile.office_id,
             ...buildOfficeProcessSnapshot(baseProcess),
             origin: "questionnaire",
+            creation_source: "from_catalog",
             status: "not_started",
             added_by_profile_id: profile.id,
           }))
@@ -330,6 +332,7 @@ export async function addManualOfficeProcess(baseProcessId: string) {
       office_id: profile.office_id,
       ...buildOfficeProcessSnapshot(baseProcess as BaseProcess),
       origin: "manual",
+      creation_source: "from_catalog",
       status: "not_started",
       added_by_profile_id: profile.id,
     })
@@ -422,6 +425,54 @@ export async function updateOfficeProcessDetails(input: {
 
   revalidatePath(`/escritorio/processos/${officeProcess.id}`);
   revalidatePath("/escritorio/processos");
+  return { success: true };
+}
+
+export async function updateOfficeProcessBpmPhase(input: {
+  officeProcessId: string;
+  phase: BpmPhaseSlug;
+  stageStatus: "not_started" | "in_progress" | "completed";
+}) {
+  const processAccess = await getOfficeProcessOrError(input.officeProcessId);
+  if ("error" in processAccess) return { error: processAccess.error };
+
+  const { profile, officeProcess } = processAccess;
+  const supabase = await createServiceClient();
+  const now = new Date().toISOString();
+
+  const payload: Record<string, unknown> = {
+    stage_status: input.stageStatus,
+    updated_at: now,
+  };
+  if (input.stageStatus === "completed") {
+    payload.completed_at = now;
+  } else {
+    payload.completed_at = null;
+  }
+
+  const { error } = await supabase
+    .from("office_process_bpm_phases")
+    .update(payload)
+    .eq("office_process_id", officeProcess.id)
+    .eq("phase", input.phase);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  await recordOfficeProcessHistory({
+    officeProcessId: officeProcess.id,
+    officeId: profile.office_id!,
+    actorProfileId: profile.id,
+    eventType: "bpm_phase_updated",
+    description: `Fase BPM atualizada: ${input.phase} → ${input.stageStatus}.`,
+    metadata: { phase: input.phase, stage_status: input.stageStatus },
+  });
+
+  revalidatePath(`/escritorio/processos/${officeProcess.id}`);
+  revalidatePath("/escritorio/processos");
+  revalidatePath("/escritorio/processos/visao-geral");
+  revalidatePath("/escritorio/estrategia/cadeia-valor");
   return { success: true };
 }
 

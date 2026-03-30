@@ -28,6 +28,7 @@ export default async function OfficeProcessDetailPage({
     { data: checklistItems },
     { data: attachments },
     { data: history },
+    { data: bpmPhases },
   ] = await Promise.all([
     supabase
       .from("office_processes")
@@ -55,6 +56,10 @@ export default async function OfficeProcessDetailPage({
       .select("id, description, event_type, created_at")
       .eq("office_process_id", id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("office_process_bpm_phases")
+      .select("id, phase, stage_status, completed_at, updated_at")
+      .eq("office_process_id", id),
   ]);
 
   if (processError || !officeProcess) {
@@ -75,6 +80,7 @@ export default async function OfficeProcessDetailPage({
         checklistItems={checklistItems ?? []}
         attachments={attachments ?? []}
         history={history ?? []}
+        bpmPhases={bpmPhases ?? []}
       />
     </PageLayout>
   );

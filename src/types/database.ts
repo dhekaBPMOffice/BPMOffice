@@ -125,7 +125,8 @@ export const FORM_QUESTION_TYPES: FormQuestionType[] = [
   "single_select",
   "multi_select",
 ];
-export type OfficeProcessOrigin = "questionnaire" | "manual";
+export type OfficeProcessOrigin = "questionnaire" | "manual" | "value_chain";
+export type OfficeProcessCreationSource = "from_catalog" | "created_in_value_chain";
 export type OfficeProcessStatus =
   | "not_started"
   | "in_progress"
@@ -237,7 +238,8 @@ export interface OfficeQuestionnaireAnswer {
 export interface OfficeProcess {
   id: string;
   office_id: string;
-  base_process_id: string;
+  base_process_id: string | null;
+  creation_source: OfficeProcessCreationSource;
   name: string;
   description: string | null;
   category: string | null;
@@ -255,6 +257,24 @@ export interface OfficeProcess {
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+  updated_at: string;
+  value_chain_id: string | null;
+  vc_macroprocesso: string | null;
+  vc_level1: string | null;
+  vc_level2: string | null;
+  vc_level3: string | null;
+  vc_process_type: "primario" | "apoio" | "gerencial" | null;
+  vc_priority: string | null;
+  vc_gestor_label: string | null;
+  vc_general_status: string | null;
+}
+
+export interface OfficeProcessBpmPhase {
+  id: string;
+  office_process_id: string;
+  phase: string;
+  stage_status: string;
+  completed_at: string | null;
   updated_at: string;
 }
 
