@@ -1,12 +1,15 @@
 /**
- * Extrai texto bruto de um documento (TXT, DOCX) para depois
+ * Extrai texto bruto de um documento (TXT, DOCX, XLSX, XLS) para depois
  * ser parseado em lista de objetivos.
  */
 import mammoth from "mammoth";
+import * as XLSX from "xlsx";
 
 const ACCEPTED_TYPES = [
   "text/plain",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
 ];
 
 export function isAcceptedMimeType(mime: string): boolean {
@@ -17,8 +20,33 @@ export function isAcceptedFilename(name: string): boolean {
   const lower = name.toLowerCase();
   return (
     lower.endsWith(".txt") ||
-    lower.endsWith(".docx")
+    lower.endsWith(".docx") ||
+    lower.endsWith(".xlsx") ||
+    lower.endsWith(".xls")
   );
+}
+
+/**
+ * Primeira aba: uma célula por linha na coluna A (ignora linhas vazias).
+ */
+function extractTextFromSpreadsheet(buffer: Buffer): string {
+  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  if (!wb.SheetNames.length) return "";
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+  }) as unknown[][];
+  const lines: string[] = [];
+  for (const row of rows) {
+    if (!Array.isArray(row)) continue;
+    const first = row[0];
+    if (first === "" || first == null) continue;
+    const s = String(first).trim();
+    if (s.length > 0) lines.push(s);
+  }
+  return lines.join("\n");
 }
 
 export async function extractTextFromDocument(
@@ -36,11 +64,20 @@ export async function extractTextFromDocument(
     return result.value || "";
   }
 
+  if (
+    mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    mimeType === "application/vnd.ms-excel" ||
+    lower.endsWith(".xlsx") ||
+    lower.endsWith(".xls")
+  ) {
+    return extractTextFromSpreadsheet(buffer);
+  }
+
   if (mimeType === "text/plain" || lower.endsWith(".txt")) {
     return buffer.toString("utf-8");
   }
 
-  throw new Error("Tipo de arquivo não suportado. Use TXT ou DOCX.");
+  throw new Error("Tipo de arquivo não suportado. Use TXT, DOCX ou Excel (.xlsx, .xls).");
 }
 
 /**

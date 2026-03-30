@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -8,12 +8,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -26,23 +25,30 @@ import {
   Target,
   FileUp,
   Loader2,
-  Search,
   Pencil,
   Trash2,
   ListChecks,
+  Plus,
 } from "lucide-react";
 import { PageLayout } from "@/components/layout/page-layout";
 import { cn } from "@/lib/utils";
+import {
+  ACCEPTED_IMPORT_EXT,
+  ACCEPT_IMPORT_INPUT,
+  isAcceptedImportFilename,
+} from "@/lib/estrategia/import-file-types";
 import {
   getOfficeStrategicObjectives,
   createOfficeStrategicObjective,
   updateOfficeStrategicObjective,
   deleteOfficeStrategicObjective,
   type OfficeStrategicObjective,
-  type ObjectiveOrigin,
 } from "./actions";
 
-const ACCEPTED_EXT = ".txt, .docx";
+type SortKey = "recent" | "oldest" | "title_asc" | "title_desc";
+
+const ACTION_TOOLBAR_BUTTON =
+  "shrink-0 border-[var(--identity-primary)]/35 bg-[var(--identity-primary)]/[0.06] text-foreground shadow-sm hover:bg-[var(--identity-primary)]/12 hover:border-[var(--identity-primary)]/50";
 
 export default function ObjetivosEstrategicosPage() {
   const [objectives, setObjectives] = useState<OfficeStrategicObjective[]>([]);
@@ -50,19 +56,23 @@ export default function ObjetivosEstrategicosPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
-  const [filterOrigem, setFilterOrigem] = useState<ObjectiveOrigin | "">("");
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  const [listSearch, setListSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("recent");
 
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
 
   const [editId, setEditId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const loadObjectives = useCallback(async () => {
@@ -77,12 +87,49 @@ export default function ObjetivosEstrategicosPage() {
     loadObjectives();
   }, [loadObjectives]);
 
-  const filteredObjectives = objectives.filter((obj) => {
-    const matchesSearch = obj.title.toLowerCase().includes(search.toLowerCase());
-    const matchesOrigem =
-      filterOrigem === "" || (obj.origin ?? "manual") === filterOrigem;
-    return matchesSearch && matchesOrigem;
-  });
+  const displayedObjectives = useMemo(() => {
+    const q = listSearch.trim().toLowerCase();
+    let list = objectives.filter((obj) => {
+      if (!q) return true;
+      return (
+        obj.title.toLowerCase().includes(q) ||
+        (obj.description?.toLowerCase().includes(q) ?? false)
+      );
+    });
+    list = [...list];
+    switch (sortKey) {
+      case "recent":
+        list.sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        break;
+      case "oldest":
+        list.sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        break;
+      case "title_asc":
+        list.sort((a, b) => a.title.localeCompare(b.title, "pt"));
+        break;
+      case "title_desc":
+        list.sort((a, b) => b.title.localeCompare(a.title, "pt"));
+        break;
+      default:
+        break;
+    }
+    return list;
+  }, [objectives, listSearch, sortKey]);
+
+  const listEmptyFiltered =
+    objectives.length > 0 && displayedObjectives.length === 0;
+
+  const resetCreateForm = () => {
+    setNewTitle("");
+    setNewDescription("");
+    setSubmitError(null);
+  };
 
   const handleImport = async () => {
     if (!file) {
@@ -109,6 +156,7 @@ export default function ObjetivosEstrategicosPage() {
       }
       setImportSuccess(json.count ?? 0);
       setFile(null);
+      setImportDialogOpen(false);
       await loadObjectives();
     } catch {
       setImportError("Erro de conexão ao importar.");
@@ -120,34 +168,40 @@ export default function ObjetivosEstrategicosPage() {
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
-    setSubmitSuccess(false);
     const title = newTitle.trim();
     if (!title) {
       setSubmitError("Título do objetivo é obrigatório.");
       return;
     }
-    const { data, error } = await createOfficeStrategicObjective(title, {
-      description: newDescription.trim() || null,
-      origin: "manual",
-    });
-    if (error) {
-      setSubmitError(error);
-      return;
+    setCreateSubmitting(true);
+    try {
+      const { data, error } = await createOfficeStrategicObjective(title, {
+        description: newDescription.trim() || null,
+        origin: "manual",
+      });
+      if (error) {
+        setSubmitError(error);
+        return;
+      }
+      setCreateDialogOpen(false);
+      resetCreateForm();
+      if (data) setObjectives((prev) => [data, ...prev]);
+      loadObjectives();
+    } finally {
+      setCreateSubmitting(false);
     }
-    setSubmitSuccess(true);
-    setNewTitle("");
-    setNewDescription("");
-    if (data) setObjectives((prev) => [data, ...prev]);
   };
 
   const handleEditSave = async () => {
     if (!editId) return;
     const title = editTitle.trim();
     if (!title) return;
+    setEditSaving(true);
     const { error } = await updateOfficeStrategicObjective(editId, {
       title,
       description: editDescription.trim() || null,
     });
+    setEditSaving(false);
     if (!error) {
       setObjectives((prev) =>
         prev.map((o) =>
@@ -157,6 +211,7 @@ export default function ObjetivosEstrategicosPage() {
         )
       );
       setEditId(null);
+      loadObjectives();
     }
   };
 
@@ -166,6 +221,7 @@ export default function ObjetivosEstrategicosPage() {
     if (!error) {
       setObjectives((prev) => prev.filter((o) => o.id !== deleteId));
       setDeleteId(null);
+      loadObjectives();
     }
   };
 
@@ -178,315 +234,347 @@ export default function ObjetivosEstrategicosPage() {
   return (
     <PageLayout
       title="Objetivos Estratégicos"
-      description="Importe um documento com os objetivos da empresa ou cadastre manualmente."
+      description="Visualize e organize os objetivos; use os botões ao lado para cadastrar ou importar."
       icon={Target}
       backHref="/escritorio/estrategia"
+      actions={
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={() => {
+              setImportError(null);
+              setImportSuccess(null);
+              setImportDialogOpen(true);
+            }}
+            className={ACTION_TOOLBAR_BUTTON}
+          >
+            <FileUp className="h-4 w-4 text-[var(--identity-primary)]" />
+            Importar Objetivos
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={() => {
+              resetCreateForm();
+              setCreateDialogOpen(true);
+            }}
+            className={ACTION_TOOLBAR_BUTTON}
+          >
+            <Plus className="h-4 w-4 text-[var(--identity-primary)]" />
+            Cadastrar Objetivo
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <FileUp className="h-5 w-5 text-[var(--identity-primary)]" />
-              <CardTitle>Importar objetivos da empresa</CardTitle>
+              <ListChecks className="h-5 w-5 text-[var(--identity-primary)]" />
+              <div>
+                <CardTitle>Meus objetivos estratégicos</CardTitle>
+                <CardDescription>
+                  {objectives.length} objetivo(s). Filtre, ordene e edite conforme necessário.
+                </CardDescription>
+              </div>
             </div>
-            <CardDescription>
-              Envie um arquivo de texto (TXT) ou DOCX com uma lista de objetivos
-              (um por linha ou com numeração). Formatos: {ACCEPTED_EXT}
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-                const f = e.dataTransfer.files[0];
-                if (f && (f.name.toLowerCase().endsWith(".txt") || f.name.toLowerCase().endsWith(".docx")))
-                  setFile(f);
-              }}
-              className={cn(
-                "rounded-lg border-2 border-dashed p-6 text-center transition-colors",
-                dragActive ? "border-[var(--identity-primary)] bg-[var(--identity-primary)]/5" : "border-border"
-              )}
-            >
-              <input
-                type="file"
-                accept=".txt,.docx"
-                className="hidden"
-                id="file-import"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              />
-              <label htmlFor="file-import" className="cursor-pointer">
-                <FileUp className="mx-auto h-10 w-10 text-muted-foreground" />
+            {objectives.length > 0 && (
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Label htmlFor="obj-search">Filtrar</Label>
+                  <Input
+                    id="obj-search"
+                    value={listSearch}
+                    onChange={(e) => setListSearch(e.target.value)}
+                    placeholder="Buscar por título ou descrição…"
+                    className="max-w-md"
+                  />
+                </div>
+                <div className="w-full space-y-1.5 sm:w-56">
+                  <Label htmlFor="obj-sort">Ordenar</Label>
+                  <Select
+                    id="obj-sort"
+                    value={sortKey}
+                    onChange={(e) => setSortKey(e.target.value as SortKey)}
+                  >
+                    <option value="recent">Mais recentes</option>
+                    <option value="oldest">Mais antigos</option>
+                    <option value="title_asc">Título (A–Z)</option>
+                    <option value="title_desc">Título (Z–A)</option>
+                  </Select>
+                </div>
+              </div>
+            )}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : objectives.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 py-12 text-center">
+                <Target className="mx-auto h-10 w-10 text-muted-foreground" />
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Solte aqui um TXT ou DOCX com os objetivos
+                  Nenhum objetivo cadastrado ainda.
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  ou clique para selecionar
+                <p className="text-sm text-muted-foreground">
+                  Use &quot;Cadastrar Objetivo&quot; ou &quot;Importar Objetivos&quot; no topo da página.
                 </p>
-              </label>
-            </div>
-            {file && (
-              <p className="text-sm text-foreground">
-                Arquivo: <strong>{file.name}</strong>
-              </p>
+              </div>
+            ) : listEmptyFiltered ? (
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 py-8 text-center text-sm text-muted-foreground">
+                Nenhum objetivo corresponde à busca.
+              </div>
+            ) : (
+              <ul className="space-y-4">
+                {displayedObjectives.map((obj) => (
+                  <li
+                    key={obj.id}
+                    className="rounded-lg border border-[var(--identity-primary)]/50 bg-[var(--identity-primary)]/5 p-4 transition-colors"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground">{obj.title}</p>
+                        {obj.description && (
+                          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                            {obj.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEdit(obj)}
+                          aria-label="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteId(obj.id)}
+                          className="text-destructive hover:text-destructive"
+                          aria-label="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
-            {importError && (
-              <p className="text-sm text-destructive">{importError}</p>
-            )}
-            {importSuccess !== null && (
-              <p className="text-sm text-green-600 dark:text-green-400">
-                {importSuccess} objetivo(s) importado(s) com sucesso.
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={handleImport}
-              disabled={!file || isImporting}
-              className={cn(
-                buttonVariants(),
-                "w-full"
-              )}
-            >
-              {isImporting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Importando…
-                </>
-              ) : (
-                "Importar objetivos"
-              )}
-            </button>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-[var(--identity-primary)]" />
-              <CardTitle>Cadastrar objetivo manualmente</CardTitle>
-            </div>
-            <CardDescription>
-              Adicione um objetivo à lista. Você pode combinar com os importados.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleManualSubmit} className="space-y-4">
+        <Dialog
+          open={createDialogOpen}
+          onOpenChange={(open) => {
+            setCreateDialogOpen(open);
+            if (!open) resetCreateForm();
+          }}
+        >
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Cadastrar objetivo</DialogTitle>
+              <DialogDescription>
+                Informe título e descrição opcional. O objetivo fica associado ao seu escritório.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleManualSubmit} className="space-y-4 py-2">
               <div>
-                <Label htmlFor="title">Título do objetivo *</Label>
+                <Label htmlFor="create-title">Título *</Label>
                 <Input
-                  id="title"
+                  id="create-title"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="Ex.: Aumentar faturamento em 15%"
                   className="mt-1"
+                  autoFocus
                 />
               </div>
               <div>
-                <Label htmlFor="desc">Descrição (opcional)</Label>
+                <Label htmlFor="create-desc">Descrição (opcional)</Label>
                 <Textarea
-                  id="desc"
+                  id="create-desc"
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="Contexto ou metas associadas"
-                  className="mt-1 min-h-[80px]"
+                  placeholder="Contexto ou detalhes"
+                  className="mt-1 min-h-[88px]"
                 />
               </div>
               {submitError && (
                 <p className="text-sm text-destructive">{submitError}</p>
               )}
-              {submitSuccess && (
-                <p className="text-sm text-green-600 dark:text-green-400">
-                  Objetivo adicionado.
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCreateDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={createSubmitting}>
+                  {createSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  Salvar
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Importar Objetivos</DialogTitle>
+              <DialogDescription>
+                Envie TXT, DOCX ou planilha Excel: um objetivo por linha (ou por
+                célula na coluna A da primeira aba). Formatos: {ACCEPTED_IMPORT_EXT}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragActive(true);
+                }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragActive(false);
+                  const f = e.dataTransfer.files[0];
+                  if (f && isAcceptedImportFilename(f.name)) setFile(f);
+                }}
+                className={cn(
+                  "rounded-lg border-2 border-dashed p-6 text-center transition-colors",
+                  dragActive
+                    ? "border-[var(--identity-primary)] bg-[var(--identity-primary)]/5"
+                    : "border-border"
+                )}
+              >
+                <input
+                  type="file"
+                  accept={ACCEPT_IMPORT_INPUT}
+                  className="hidden"
+                  id="file-import-dialog"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+                <label htmlFor="file-import-dialog" className="cursor-pointer">
+                  <FileUp className="mx-auto h-10 w-10 text-muted-foreground" />
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Solte aqui TXT, DOCX ou Excel
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    ou clique para selecionar
+                  </p>
+                </label>
+              </div>
+              {file && (
+                <p className="text-sm text-foreground">
+                  Arquivo: <strong>{file.name}</strong>
                 </p>
               )}
-              <button type="submit" className={cn(buttonVariants(), "w-full")}>
-                Adicionar objetivo
-              </button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+              {importError && (
+                <p className="text-sm text-destructive">{importError}</p>
+              )}
+              {importSuccess !== null && (
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  {importSuccess} objetivo(s) importado(s) com sucesso.
+                </p>
+              )}
+              <Button
+                type="button"
+                onClick={handleImport}
+                disabled={!file || isImporting}
+                className="w-full"
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Importando…
+                  </>
+                ) : (
+                  "Importar Objetivos"
+                )}
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setImportDialogOpen(false)}
+              >
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <ListChecks className="h-5 w-5 text-[var(--identity-primary)]" />
-            <div>
-              <CardTitle>Objetivos cadastrados</CardTitle>
-              <CardDescription>
-                {filteredObjectives.length} objetivo(s)
-              </CardDescription>
+        <Dialog open={!!editId} onOpenChange={(open) => !open && setEditId(null)}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar objetivo</DialogTitle>
+              <DialogDescription>
+                Altere o título e a descrição do objetivo estratégico.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label htmlFor="edit-title">Título *</Label>
+                <Input
+                  id="edit-title"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-desc">Descrição</Label>
+                <Textarea
+                  id="edit-desc"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="mt-1 min-h-[80px]"
+                />
+              </div>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[180px]">
-              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por título..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-            <Select
-              value={filterOrigem}
-              onChange={(e) => setFilterOrigem(e.target.value as ObjectiveOrigin | "")}
-              className="w-[160px]"
-            >
-              <option value="">Todos</option>
-              <option value="manual">Manual</option>
-              <option value="imported">Importado</option>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredObjectives.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-muted/30 py-12 text-center">
-              <Target className="mx-auto h-10 w-10 text-muted-foreground" />
-              <p className="mt-2 text-sm text-muted-foreground">
-                Nenhum objetivo cadastrado ainda.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Importe um documento ou cadastre manualmente acima.
-              </p>
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {filteredObjectives.map((obj) => (
-                <li
-                  key={obj.id}
-                  className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/20 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground">{obj.title}</p>
-                    {obj.description && (
-                      <p className="mt-0.5 text-sm text-muted-foreground line-clamp-2">
-                        {obj.description}
-                      </p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      <Badge variant="secondary" className="text-xs">
-                        {(obj.origin ?? "manual") === "imported"
-                          ? "Importado"
-                          : "Manual"}
-                      </Badge>
-                      {obj.source_file && (
-                        <Badge variant="outline" className="text-xs">
-                          {obj.source_file}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(obj)}
-                      className={cn(
-                        buttonVariants({ variant: "ghost", size: "icon" }),
-                        "h-9 w-9"
-                      )}
-                      aria-label="Editar"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteId(obj.id)}
-                      className={cn(
-                        buttonVariants({ variant: "ghost", size: "icon" }),
-                        "h-9 w-9 text-destructive hover:text-destructive"
-                      )}
-                      aria-label="Excluir"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditId(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditSave} disabled={editSaving}>
+                {editSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                Salvar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <Dialog open={!!editId} onOpenChange={(open) => !open && setEditId(null)}>
-        <DialogContent onClose={() => setEditId(null)}>
-          <DialogHeader>
-            <DialogTitle>Editar objetivo</DialogTitle>
-            <DialogDescription>
-              Altere o título e a descrição do objetivo.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label htmlFor="edit-title">Título *</Label>
-              <Input
-                id="edit-title"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-desc">Descrição</Label>
-              <Textarea
-                id="edit-desc"
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-                className="mt-1 min-h-[80px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => setEditId(null)}
-              className={buttonVariants({ variant: "outline" })}
-            >
-              Cancelar
-            </button>
-            <button type="button" onClick={handleEditSave} className={buttonVariants()}>
-              Salvar
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <DialogContent onClose={() => setDeleteId(null)}>
-          <DialogHeader>
-            <DialogTitle>Excluir objetivo</DialogTitle>
-            <DialogDescription>
-              Esta ação não pode ser desfeita. Deseja realmente excluir este objetivo?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => setDeleteId(null)}
-              className={buttonVariants({ variant: "outline" })}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteConfirm}
-              className={buttonVariants({ variant: "destructive" })}
-            >
-              Excluir
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Dialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Excluir objetivo</DialogTitle>
+              <DialogDescription>
+                Esta ação não pode ser desfeita. Deseja realmente excluir este objetivo?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteId(null)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteConfirm}>
+                Excluir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PageLayout>
   );

@@ -25,14 +25,14 @@ export async function POST(request: Request) {
     const file = formData.get("file");
     if (!file || !(file instanceof File)) {
       return NextResponse.json(
-        { error: "Envie um arquivo de texto (TXT) ou DOCX." },
+        { error: "Envie um arquivo TXT, DOCX ou planilha Excel (.xlsx, .xls)." },
         { status: 400 }
       );
     }
 
     if (!isAcceptedFilename(file.name)) {
       return NextResponse.json({
-        error: "Formato não suportado. Use arquivos .txt ou .docx.",
+        error: "Formato não suportado. Use arquivos .txt, .docx, .xlsx ou .xls.",
       }, { status: 400 });
     }
 

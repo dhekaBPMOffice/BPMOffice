@@ -52,48 +52,18 @@ export async function getOfficeObjectives(): Promise<{
     .from("office_objectives")
     .select("*")
     .eq("office_id", profile.office_id)
-    .order("type", { ascending: true }) // primary < secondary
+    .is("parent_objective_id", null)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
 
   if (error) return { data: null, error: error.message };
   const list = (data ?? []) as OfficeObjective[];
-  list.sort((a, b) => {
-    if (a.type === "primary" && b.type !== "primary") return -1;
-    if (a.type !== "primary" && b.type === "primary") return 1;
-    return a.sort_order - b.sort_order || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
+  list.sort(
+    (a, b) =>
+      a.sort_order - b.sort_order ||
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
   return { data: list, error: null };
-}
-
-export async function getChildObjectives(
-  primaryId: string
-): Promise<{ data: OfficeObjective[] | null; error: string | null }> {
-  const supabase = await createClient();
-  const profile = await getProfile();
-  if (!profile.office_id)
-    return { data: null, error: "Escritório não encontrado." };
-
-  const { data: primary } = await supabase
-    .from("office_objectives")
-    .select("id")
-    .eq("id", primaryId)
-    .eq("office_id", profile.office_id)
-    .is("parent_objective_id", null)
-    .single();
-
-  if (!primary) return { data: null, error: "Objetivo primário não encontrado." };
-
-  const { data, error } = await supabase
-    .from("office_objectives")
-    .select("*")
-    .eq("parent_objective_id", primaryId)
-    .eq("office_id", profile.office_id)
-    .order("sort_order")
-    .order("created_at");
-
-  if (error) return { data: null, error: error.message };
-  return { data: (data ?? []) as OfficeObjective[], error: null };
 }
 
 export async function getBaseOfficeObjectives(): Promise<{
@@ -111,29 +81,11 @@ export async function getBaseOfficeObjectives(): Promise<{
   return { data: (data ?? []) as BaseOfficeObjective[], error: null };
 }
 
-async function ensureSinglePrimary(supabase: Awaited<ReturnType<typeof createClient>>, officeId: string, excludeId?: string) {
-  const { data: others } = await supabase
-    .from("office_objectives")
-    .select("id")
-    .eq("office_id", officeId)
-    .eq("type", "primary")
-    .is("parent_objective_id", null);
-  const toUpdate = (others ?? []).filter((r: { id: string }) => r.id !== excludeId);
-  for (const row of toUpdate) {
-    await supabase
-      .from("office_objectives")
-      .update({ type: "secondary" })
-      .eq("id", row.id);
-  }
-}
-
 export async function createOfficeObjective(
   title: string,
-  type: OfficeObjectiveType,
   options?: {
     description?: string | null;
     goals?: { title: string; description?: string | null }[];
-    parentObjectiveId?: string | null;
   }
 ): Promise<{ data: OfficeObjective | null; error: string | null }> {
   const supabase = await createClient();
@@ -142,20 +94,15 @@ export async function createOfficeObjective(
     return { data: null, error: "Escritório não encontrado." };
   if (!title?.trim()) return { data: null, error: "Título é obrigatório." };
 
-  const isSecondary = !!options?.parentObjectiveId;
-  if (type === "primary" && !isSecondary) {
-    await ensureSinglePrimary(supabase, profile.office_id);
-  }
-
   const { data: obj, error: objError } = await supabase
     .from("office_objectives")
     .insert({
       office_id: profile.office_id,
       base_objective_id: null,
-      parent_objective_id: options?.parentObjectiveId ?? null,
+      parent_objective_id: null,
       title: title.trim(),
       description: options?.description?.trim() || null,
-      type: isSecondary ? "secondary" : type,
+      type: "primary",
       sort_order: 0,
       origin: "manual",
       source_file: null,
@@ -232,16 +179,12 @@ export async function updateOfficeObjective(
 
   const { data: existing } = await supabase
     .from("office_objectives")
-    .select("id, type")
+    .select("id")
     .eq("id", id)
     .eq("office_id", profile.office_id)
     .single();
 
   if (!existing) return { error: "Objetivo não encontrado." };
-
-  if (updates.type === "primary") {
-    await ensureSinglePrimary(supabase, profile.office_id, id);
-  }
 
   const { error } = await supabase
     .from("office_objectives")

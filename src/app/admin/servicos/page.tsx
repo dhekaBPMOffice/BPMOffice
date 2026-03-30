@@ -253,7 +253,7 @@ export default function ServicosPage() {
                   aba === "arquivados" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Arquivados
+                Inativos
               </button>
             </div>
             <div className="inline-flex rounded-md border border-input bg-background p-1">

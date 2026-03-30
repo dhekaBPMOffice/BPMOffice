@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -8,12 +8,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -30,9 +29,15 @@ import {
   Trash2,
   ListChecks,
   Plus,
+  Library,
 } from "lucide-react";
 import { PageLayout } from "@/components/layout/page-layout";
 import { cn } from "@/lib/utils";
+import {
+  ACCEPTED_IMPORT_EXT,
+  ACCEPT_IMPORT_INPUT,
+  isAcceptedImportFilename,
+} from "@/lib/estrategia/import-file-types";
 import {
   getOfficeObjectives,
   getBaseOfficeObjectives,
@@ -41,26 +46,21 @@ import {
   updateOfficeObjective,
   deleteOfficeObjective,
   getGoalsByObjectiveId,
-  getChildObjectives,
   createGoal,
   updateGoal,
   deleteGoal,
   type OfficeObjective,
   type OfficeObjectiveGoal,
   type BaseOfficeObjective,
-  type OfficeObjectiveType,
 } from "./actions";
 
-const ACCEPTED_EXT = ".txt, .docx";
-
 type EditGoalItem = { id?: string; title: string; description?: string | null };
-type EditSecondaryItem = {
-  id?: string;
-  title: string;
-  description?: string | null;
-  goals: EditGoalItem[];
-  initialGoalIds?: string[];
-};
+
+type SortKey = "recent" | "oldest" | "title_asc" | "title_desc";
+
+/** Estilo único para os botões da barra de ações (importar / catálogo / cadastrar). */
+const ACTION_TOOLBAR_BUTTON =
+  "shrink-0 border-[var(--identity-primary)]/35 bg-[var(--identity-primary)]/[0.06] text-foreground shadow-sm hover:bg-[var(--identity-primary)]/12 hover:border-[var(--identity-primary)]/50";
 
 export default function ObjetivosEscritorioPage() {
   const [objectives, setObjectives] = useState<OfficeObjective[]>([]);
@@ -72,28 +72,26 @@ export default function ObjetivosEscritorioPage() {
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [catalogDialogOpen, setCatalogDialogOpen] = useState(false);
 
-  const [manualPrimary, setManualPrimary] = useState({
+  const [listSearch, setListSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("recent");
+
+  const [manualForm, setManualForm] = useState({
     title: "",
     description: "",
     goals: [] as { title: string; description: string }[],
   });
-  const [manualSecondaries, setManualSecondaries] = useState<
-    { title: string; description: string; goals: { title: string; description: string }[] }[]
-  >([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
 
   const [addingFromCatalogId, setAddingFromCatalogId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editParentId, setEditParentId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [editType, setEditType] = useState<OfficeObjectiveType>("primary");
   const [editGoals, setEditGoals] = useState<EditGoalItem[]>([]);
   const [editGoalsInitialIds, setEditGoalsInitialIds] = useState<string[]>([]);
-  const [editSecondaries, setEditSecondaries] = useState<EditSecondaryItem[]>([]);
-  const [editSecondariesInitialIds, setEditSecondariesInitialIds] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -111,6 +109,40 @@ export default function ObjetivosEscritorioPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const displayedObjectives = useMemo(() => {
+    const q = listSearch.trim().toLowerCase();
+    let list = objectives.filter(
+      (o) =>
+        !q ||
+        o.title.toLowerCase().includes(q) ||
+        (o.description?.toLowerCase().includes(q) ?? false)
+    );
+    list = [...list];
+    switch (sortKey) {
+      case "recent":
+        list.sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        break;
+      case "oldest":
+        list.sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        break;
+      case "title_asc":
+        list.sort((a, b) => a.title.localeCompare(b.title, "pt"));
+        break;
+      case "title_desc":
+        list.sort((a, b) => b.title.localeCompare(a.title, "pt"));
+        break;
+      default:
+        break;
+    }
+    return list;
+  }, [objectives, listSearch, sortKey]);
 
   const handleImport = async () => {
     if (!file) {
@@ -146,55 +178,39 @@ export default function ObjetivosEscritorioPage() {
     }
   };
 
+  const resetCreateForm = () => {
+    setManualForm({ title: "", description: "", goals: [] });
+    setSubmitError(null);
+  };
+
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
-    setSubmitSuccess(false);
-    const primaryTitle = manualPrimary.title.trim();
-    if (!primaryTitle) {
-      setSubmitError("O título do objetivo primário é obrigatório.");
+    const title = manualForm.title.trim();
+    if (!title) {
+      setSubmitError("O título do objetivo é obrigatório.");
       return;
     }
-    const secondariesWithTitle = manualSecondaries.filter((s) => s.title.trim());
-    const primaryGoals = manualPrimary.goals
+    const goals = manualForm.goals
       .filter((g) => g.title.trim())
       .map((g) => ({ title: g.title.trim(), description: g.description?.trim() || null }));
-    const { data: primaryData, error: primaryError } = await createOfficeObjective(
-      primaryTitle,
-      "primary",
-      {
-        description: manualPrimary.description.trim() || null,
-        goals: primaryGoals.length ? primaryGoals : undefined,
+    setCreateSubmitting(true);
+    try {
+      const { data, error } = await createOfficeObjective(title, {
+        description: manualForm.description.trim() || null,
+        goals: goals.length ? goals : undefined,
+      });
+      if (error) {
+        setSubmitError(error);
+        return;
       }
-    );
-    if (primaryError) {
-      setSubmitError(primaryError);
-      return;
+      setCreateDialogOpen(false);
+      resetCreateForm();
+      if (data) setObjectives((prev) => [data, ...prev]);
+      loadData();
+    } finally {
+      setCreateSubmitting(false);
     }
-    const created: OfficeObjective[] = primaryData ? [primaryData] : [];
-    const primaryId = primaryData?.id;
-    if (primaryId) {
-      for (const sec of secondariesWithTitle) {
-        const { data: secData, error: secError } = await createOfficeObjective(
-          sec.title.trim(),
-          "secondary",
-          {
-            description: sec.description?.trim() || null,
-            parentObjectiveId: primaryId,
-          }
-        );
-        if (secError) {
-          setSubmitError(secError);
-          return;
-        }
-        if (secData) created.push(secData);
-      }
-    }
-    setSubmitSuccess(true);
-    setManualPrimary({ title: "", description: "", goals: [] });
-    setManualSecondaries([]);
-    setObjectives((prev) => [...created, ...prev]);
-    loadData();
   };
 
   const handleAddFromCatalog = async (baseId: string) => {
@@ -202,17 +218,20 @@ export default function ObjetivosEscritorioPage() {
     const { data, error } = await addObjectiveFromCatalog(baseId);
     setAddingFromCatalogId(null);
     if (!error && data) {
+      const merged = [data, ...objectives];
       setObjectives((prev) => [data, ...prev]);
-      loadData();
+      await loadData();
+      const stillInCatalog = baseOptions.filter(
+        (b) => !merged.some((o) => o.base_objective_id === b.id)
+      );
+      if (stillInCatalog.length === 0) setCatalogDialogOpen(false);
     }
   };
 
   const openEdit = async (obj: OfficeObjective) => {
     setEditId(obj.id);
-    setEditParentId(obj.parent_objective_id ?? null);
     setEditTitle(obj.title);
     setEditDescription(obj.description ?? "");
-    setEditType(obj.type);
     const { data: goals } = await getGoalsByObjectiveId(obj.id);
     setEditGoals(
       (goals ?? []).map((g) => ({
@@ -222,32 +241,6 @@ export default function ObjetivosEscritorioPage() {
       }))
     );
     setEditGoalsInitialIds((goals ?? []).map((g) => g.id));
-    setEditSecondaries([]);
-    setEditSecondariesInitialIds([]);
-    const isPrimary = !obj.parent_objective_id;
-    if (isPrimary) {
-      const { data: children } = await getChildObjectives(obj.id);
-      if (children?.length) {
-        const withGoals: EditSecondaryItem[] = [];
-        for (const child of children) {
-          const { data: childGoals } = await getGoalsByObjectiveId(child.id);
-          const goals = (childGoals ?? []).map((g) => ({
-            id: g.id,
-            title: g.title,
-            description: g.description ?? undefined,
-          }));
-          withGoals.push({
-            id: child.id,
-            title: child.title,
-            description: child.description ?? undefined,
-            goals,
-            initialGoalIds: goals.map((g) => g.id as string),
-          });
-        }
-        setEditSecondaries(withGoals);
-        setEditSecondariesInitialIds(children.map((c) => c.id));
-      }
-    }
   };
 
   const handleEditSave = async () => {
@@ -262,32 +255,6 @@ export default function ObjetivosEscritorioPage() {
     if (updateErr) {
       setEditSaving(false);
       return;
-    }
-    const isPrimary = editParentId === null;
-    if (isPrimary) {
-      const currentSecondaryIds = editSecondaries
-        .filter((s) => s.id)
-        .map((s) => s.id as string);
-      const toDeleteSecondary = editSecondariesInitialIds.filter(
-        (id) => !currentSecondaryIds.includes(id)
-      );
-      for (const id of toDeleteSecondary) {
-        await deleteOfficeObjective(id);
-      }
-      for (const sec of editSecondaries) {
-        if (!sec.title.trim()) continue;
-        if (sec.id) {
-          await updateOfficeObjective(sec.id, {
-            title: sec.title.trim(),
-            description: sec.description?.trim() || null,
-          });
-        } else {
-          await createOfficeObjective(sec.title.trim(), "secondary", {
-            description: sec.description?.trim() || null,
-            parentObjectiveId: editId,
-          });
-        }
-      }
     }
     const currentGoalIds = editGoals.filter((g) => g.id).map((g) => g.id as string);
     const toDelete = editGoalsInitialIds.filter((id) => !currentGoalIds.includes(id));
@@ -318,71 +285,21 @@ export default function ObjetivosEscritorioPage() {
     loadData();
   };
 
-  const addPrimaryGoal = () =>
-    setManualPrimary((p) => ({
+  const addManualGoal = () =>
+    setManualForm((p) => ({
       ...p,
       goals: [...p.goals, { title: "", description: "" }],
     }));
-  const removePrimaryGoal = (i: number) =>
-    setManualPrimary((p) => ({
+  const removeManualGoal = (i: number) =>
+    setManualForm((p) => ({
       ...p,
       goals: p.goals.filter((_, idx) => idx !== i),
     }));
-  const setPrimaryGoal = (i: number, field: "title" | "description", value: string) =>
-    setManualPrimary((p) => ({
+  const setManualGoal = (i: number, field: "title" | "description", value: string) =>
+    setManualForm((p) => ({
       ...p,
       goals: p.goals.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)),
     }));
-
-  const addSecondaryBlock = () =>
-    setManualSecondaries((prev) => [
-      ...prev,
-      { title: "", description: "", goals: [] },
-    ]);
-  const removeSecondaryBlock = (i: number) =>
-    setManualSecondaries((prev) => prev.filter((_, idx) => idx !== i));
-  const setSecondaryBlock = (
-    i: number,
-    field: "title" | "description",
-    value: string
-  ) =>
-    setManualSecondaries((prev) =>
-      prev.map((s, idx) => (idx === i ? { ...s, [field]: value } : s))
-    );
-  const addSecondaryGoal = (blockIndex: number) =>
-    setManualSecondaries((prev) =>
-      prev.map((s, idx) =>
-        idx === blockIndex
-          ? { ...s, goals: [...s.goals, { title: "", description: "" }] }
-          : s
-      )
-    );
-  const removeSecondaryGoal = (blockIndex: number, goalIndex: number) =>
-    setManualSecondaries((prev) =>
-      prev.map((s, idx) =>
-        idx === blockIndex
-          ? { ...s, goals: s.goals.filter((_, gi) => gi !== goalIndex) }
-          : s
-      )
-    );
-  const setSecondaryGoal = (
-    blockIndex: number,
-    goalIndex: number,
-    field: "title" | "description",
-    value: string
-  ) =>
-    setManualSecondaries((prev) =>
-      prev.map((s, idx) =>
-        idx === blockIndex
-          ? {
-              ...s,
-              goals: s.goals.map((g, gi) =>
-                gi === goalIndex ? { ...g, [field]: value } : g
-              ),
-            }
-          : s
-      )
-    );
 
   const addEditGoal = () =>
     setEditGoals((prev) => [...prev, { title: "", description: null }]);
@@ -401,127 +318,211 @@ export default function ObjetivosEscritorioPage() {
       )
     );
 
-  const addEditSecondary = () =>
-    setEditSecondaries((prev) => [
-      ...prev,
-      { title: "", description: undefined, goals: [] },
-    ]);
-  const removeEditSecondary = (i: number) =>
-    setEditSecondaries((prev) => prev.filter((_, idx) => idx !== i));
-  const setEditSecondary = (
-    i: number,
-    field: "title" | "description",
-    value: string | undefined
-  ) =>
-    setEditSecondaries((prev) =>
-      prev.map((s, idx) =>
-        idx === i ? { ...s, [field]: value ?? "" } : s
-      )
-    );
-  const addEditSecondaryGoal = (secIndex: number) =>
-    setEditSecondaries((prev) =>
-      prev.map((s, idx) =>
-        idx === secIndex
-          ? {
-              ...s,
-              goals: [...s.goals, { title: "", description: null }],
-            }
-          : s
-      )
-    );
-  const removeEditSecondaryGoal = (secIndex: number, goalIndex: number) =>
-    setEditSecondaries((prev) =>
-      prev.map((s, idx) =>
-        idx === secIndex
-          ? { ...s, goals: s.goals.filter((_, gi) => gi !== goalIndex) }
-          : s
-      )
-    );
-  const setEditSecondaryGoal = (
-    secIndex: number,
-    goalIndex: number,
-    field: "title" | "description",
-    value: string | null
-  ) =>
-    setEditSecondaries((prev) =>
-      prev.map((s, idx) =>
-        idx === secIndex
-          ? {
-              ...s,
-              goals: s.goals.map((g, gi) =>
-                gi === goalIndex
-                  ? {
-                      ...g,
-                      [field]: field === "description" ? value ?? undefined : value,
-                    }
-                  : g
-              ),
-            }
-          : s
-      )
-    );
-
-  const primaryCount = objectives.filter((o) => o.type === "primary").length;
-  const deletingPrimary =
-    deleteId && objectives.find((o) => o.id === deleteId)?.type === "primary";
-
   const catalogOptionsToShow = baseOptions.filter(
     (base) => !objectives.some((o) => o.base_objective_id === base.id)
   );
 
+  const listEmptyFiltered =
+    objectives.length > 0 && displayedObjectives.length === 0;
+
   return (
     <PageLayout
       title="Objetivos do Escritório"
-      description="Defina o objetivo primário do escritório, objetivos secundários e metas."
+      description="Visualize a lista abaixo; use os botões ao lado para importar, escolher do catálogo ou cadastrar manualmente."
       icon={Target}
       backHref="/escritorio/estrategia"
       actions={
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setImportDialogOpen(true)}
-          className="shrink-0"
-        >
-          <FileUp className="h-4 w-4" />
-          <span className="ml-1.5">Importar Objetivos</span>
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={() => {
+              setImportError(null);
+              setImportSuccess(null);
+              setImportDialogOpen(true);
+            }}
+            className={ACTION_TOOLBAR_BUTTON}
+          >
+            <FileUp className="h-4 w-4 text-[var(--identity-primary)]" />
+            Importar Objetivos
+          </Button>
+          {catalogOptionsToShow.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              onClick={() => setCatalogDialogOpen(true)}
+              className={ACTION_TOOLBAR_BUTTON}
+            >
+              <Library className="h-4 w-4 text-[var(--identity-primary)]" />
+              Sugestões do Catálogo
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={() => {
+              resetCreateForm();
+              setCreateDialogOpen(true);
+            }}
+            className={ACTION_TOOLBAR_BUTTON}
+          >
+            <Plus className="h-4 w-4 text-[var(--identity-primary)]" />
+            Cadastrar Objetivo
+          </Button>
+        </div>
       }
     >
       <div className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-1">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-[var(--identity-primary)]" />
-              <CardTitle>Cadastrar objetivo manualmente</CardTitle>
+              <ListChecks className="h-5 w-5 text-[var(--identity-primary)]" />
+              <div>
+                <CardTitle>Meus objetivos</CardTitle>
+                <CardDescription>
+                  {objectives.length} objetivo(s). Filtre, ordene e edite conforme necessário.
+                </CardDescription>
+              </div>
             </div>
-            <CardDescription>
-              O objetivo primário é essencial; você pode adicionar objetivos secundários no mesmo formato abaixo.
-            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleManualSubmit} className="space-y-6">
-              <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
-                <Label className="text-base font-medium">Objetivo primário</Label>
-                <div>
-                  <Label htmlFor="manual_primary_title" className="text-muted-foreground">Título *</Label>
+          <CardContent className="space-y-4">
+            {objectives.length > 0 && (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex-1 space-y-1.5">
+                  <Label htmlFor="obj-search">Filtrar</Label>
                   <Input
-                    id="manual_primary_title"
-                    value={manualPrimary.title}
+                    id="obj-search"
+                    value={listSearch}
+                    onChange={(e) => setListSearch(e.target.value)}
+                    placeholder="Buscar por título ou descrição…"
+                    className="max-w-md"
+                  />
+                </div>
+                <div className="w-full space-y-1.5 sm:w-56">
+                  <Label htmlFor="obj-sort">Ordenar</Label>
+                  <Select
+                    id="obj-sort"
+                    value={sortKey}
+                    onChange={(e) => setSortKey(e.target.value as SortKey)}
+                  >
+                    <option value="recent">Mais recentes</option>
+                    <option value="oldest">Mais antigos</option>
+                    <option value="title_asc">Título (A–Z)</option>
+                    <option value="title_desc">Título (Z–A)</option>
+                  </Select>
+                </div>
+              </div>
+            )}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : objectives.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 py-12 text-center">
+                <Target className="mx-auto h-10 w-10 text-muted-foreground" />
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Nenhum objetivo cadastrado ainda.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Use os botões no topo: Cadastrar Objetivo, Importar Objetivos
+                  {catalogOptionsToShow.length > 0 ? " ou Sugestões do Catálogo" : ""}.
+                </p>
+              </div>
+            ) : listEmptyFiltered ? (
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 py-8 text-center text-sm text-muted-foreground">
+                Nenhum objetivo corresponde à busca.
+              </div>
+            ) : (
+              <ul className="space-y-4">
+                {displayedObjectives.map((obj) => (
+                  <li
+                    key={obj.id}
+                    className="rounded-lg border border-[var(--identity-primary)]/50 bg-[var(--identity-primary)]/5 p-4 transition-colors"
+                  >
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <span className="font-medium text-foreground">
+                            {obj.title}
+                          </span>
+                          {obj.description && (
+                            <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                              {obj.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit(obj)}
+                            aria-label="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteId(obj.id)}
+                            className="text-destructive hover:text-destructive"
+                            aria-label="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <GoalsList objectiveId={obj.id} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog
+          open={createDialogOpen}
+          onOpenChange={(open) => {
+            setCreateDialogOpen(open);
+            if (!open) resetCreateForm();
+          }}
+        >
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Cadastrar objetivo</DialogTitle>
+              <DialogDescription>
+                Informe título, descrição opcional e metas opcionais.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleManualSubmit} className="space-y-4 py-2">
+              <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
+                <div>
+                  <Label htmlFor="manual_title" className="text-muted-foreground">
+                    Título *
+                  </Label>
+                  <Input
+                    id="manual_title"
+                    value={manualForm.title}
                     onChange={(e) =>
-                      setManualPrimary((p) => ({ ...p, title: e.target.value }))
+                      setManualForm((p) => ({ ...p, title: e.target.value }))
                     }
                     placeholder="Ex.: Reduzir tempo de ciclo dos processos"
                     className="mt-1"
+                    autoFocus
                   />
                 </div>
                 <div>
-                  <Label htmlFor="manual_primary_desc" className="text-muted-foreground">Descrição (opcional)</Label>
+                  <Label htmlFor="manual_desc" className="text-muted-foreground">
+                    Descrição (opcional)
+                  </Label>
                   <Textarea
-                    id="manual_primary_desc"
-                    value={manualPrimary.description}
+                    id="manual_desc"
+                    value={manualForm.description}
                     onChange={(e) =>
-                      setManualPrimary((p) => ({ ...p, description: e.target.value }))
+                      setManualForm((p) => ({ ...p, description: e.target.value }))
                     }
                     placeholder="Contexto ou detalhes"
                     className="mt-1 min-h-[80px]"
@@ -529,73 +530,19 @@ export default function ObjetivosEscritorioPage() {
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
-                    <Label className="text-muted-foreground">Objetivos secundários (opcional)</Label>
+                    <Label className="text-muted-foreground">Metas (opcional)</Label>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={addSecondaryBlock}
-                    >
-                      <Plus className="h-4 w-4" /> Adicionar objetivo secundário
-                    </Button>
-                  </div>
-                  {manualSecondaries.length > 0 && (
-                    <ul className="mt-2 space-y-3">
-                      {manualSecondaries.map((sec, blockIdx) => (
-                        <li
-                          key={blockIdx}
-                          className="flex flex-col gap-2 rounded-md border border-border bg-background p-2"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 space-y-1">
-                              <Input
-                                value={sec.title}
-                                onChange={(e) =>
-                                  setSecondaryBlock(blockIdx, "title", e.target.value)
-                                }
-                                placeholder="Título do objetivo secundário"
-                                className="h-9"
-                              />
-                              <Textarea
-                                value={sec.description}
-                                onChange={(e) =>
-                                  setSecondaryBlock(blockIdx, "description", e.target.value)
-                                }
-                                placeholder="Descrição (opcional)"
-                                rows={1}
-                                className="resize-none text-sm"
-                              />
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-9 w-9 shrink-0"
-                              onClick={() => removeSecondaryBlock(blockIdx)}
-                              aria-label="Remover objetivo secundário"
-                            >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-            )}
-            <div>
-              <div className="flex items-center justify-between">
-                <Label className="text-muted-foreground">Metas (opcional)</Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={addPrimaryGoal}
+                      onClick={addManualGoal}
                     >
                       <Plus className="h-4 w-4" /> Adicionar meta
                     </Button>
                   </div>
-                  {manualPrimary.goals.length > 0 && (
+                  {manualForm.goals.length > 0 && (
                     <ul className="mt-2 space-y-2">
-                      {manualPrimary.goals.map((g, i) => (
+                      {manualForm.goals.map((g, i) => (
                         <li
                           key={i}
                           className="flex gap-2 rounded-md border border-border bg-background p-2"
@@ -603,7 +550,7 @@ export default function ObjetivosEscritorioPage() {
                           <Input
                             value={g.title}
                             onChange={(e) =>
-                              setPrimaryGoal(i, "title", e.target.value)
+                              setManualGoal(i, "title", e.target.value)
                             }
                             placeholder="Título da meta"
                             className="flex-1"
@@ -612,7 +559,7 @@ export default function ObjetivosEscritorioPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={() => removePrimaryGoal(i)}
+                            onClick={() => removeManualGoal(i)}
                             aria-label="Remover meta"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -623,460 +570,257 @@ export default function ObjetivosEscritorioPage() {
                   )}
                 </div>
               </div>
-            </div>
-
               {submitError && (
                 <p className="text-sm text-destructive">{submitError}</p>
               )}
-              {submitSuccess && (
-                <p className="text-sm text-green-600 dark:text-green-400">
-                  Objetivo(s) adicionado(s).
-                </p>
-              )}
-              <Button type="submit" className="w-full">
-                Salvar objetivos
-              </Button>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCreateDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={createSubmitting}>
+                  {createSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  Salvar
+                </Button>
+              </DialogFooter>
             </form>
-          </CardContent>
-        </Card>
-      </div>
+          </DialogContent>
+        </Dialog>
 
-      {catalogOptionsToShow.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Sugestões do catálogo</CardTitle>
-            <CardDescription>
-              Clique para adicionar ao seu escritório.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
+        <Dialog open={catalogDialogOpen} onOpenChange={setCatalogDialogOpen}>
+          <DialogContent className="max-h-[85vh] min-w-0 max-w-lg overflow-y-auto overflow-x-hidden sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Sugestões do Catálogo</DialogTitle>
+              <DialogDescription>
+                Opções pré-definidas pelo administrador. Clique para adicionar ao seu escritório.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex min-w-0 w-full flex-col gap-2 py-2">
               {catalogOptionsToShow.map((base) => (
                 <Button
                   key={base.id}
+                  type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => handleAddFromCatalog(base.id)}
                   disabled={addingFromCatalogId === base.id}
+                  className="h-auto min-h-10 w-full min-w-0 justify-start gap-2 whitespace-normal py-2.5 text-left font-normal"
                 >
-                  {addingFromCatalogId === base.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                  <span className="ml-1">{base.title}</span>
+                  <span className="shrink-0">
+                    {addingFromCatalogId === base.id ? (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--identity-primary)]" />
+                    ) : (
+                      <Plus className="h-4 w-4 shrink-0 text-[var(--identity-primary)]" />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1 break-words text-left leading-snug">
+                    {base.title}
+                  </span>
                 </Button>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCatalogDialogOpen(false)}
+              >
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <ListChecks className="h-5 w-5 text-[var(--identity-primary)]" />
-            <div>
-              <CardTitle>Meus objetivos</CardTitle>
-              <CardDescription>
-                {objectives.length} objetivo(s). Ordene e edite conforme necessário.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : objectives.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-muted/30 py-12 text-center">
-              <Target className="mx-auto h-10 w-10 text-muted-foreground" />
-              <p className="mt-2 text-sm text-muted-foreground">
-                Nenhum objetivo cadastrado ainda.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Importe um documento, use o catálogo ou cadastre manualmente acima.
-              </p>
-            </div>
-          ) : (
-            <ul className="space-y-4">
-              {objectives
-                .filter((o) => !o.parent_objective_id)
-                .map((primary) => {
-                  const secondaries = objectives.filter(
-                    (o) => o.parent_objective_id === primary.id
-                  );
-                  return (
-                    <li
-                      key={primary.id}
-                      className="rounded-lg border border-[var(--identity-primary)]/50 bg-[var(--identity-primary)]/5 p-4 transition-colors"
-                    >
-                      <div className="flex flex-col gap-4">
-                        {/* Objetivo primário */}
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-medium text-foreground">
-                                {primary.title}
-                              </span>
-                              <Badge variant="default">Primário</Badge>
-                              {primary.origin === "imported" && (
-                                <Badge variant="outline" className="text-xs">
-                                  Importado
-                                </Badge>
-                              )}
-                              {primary.origin === "catalog" && (
-                                <Badge variant="outline" className="text-xs">
-                                  Catálogo
-                                </Badge>
-                              )}
-                            </div>
-                            {primary.description && (
-                              <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                                {primary.description}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex shrink-0 gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEdit(primary)}
-                              aria-label="Editar"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeleteId(primary.id)}
-                              className="text-destructive hover:text-destructive"
-                              aria-label="Excluir"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* Objetivos secundários (dentro do mesmo card) */}
-                        {secondaries.length > 0 && (
-                          <ul className="space-y-2 border-l-2 border-[var(--identity-primary)]/30 pl-4">
-                            {secondaries.map((sec) => (
-                              <li
-                                key={sec.id}
-                                className="rounded-md border border-border bg-card p-3 transition-colors hover:bg-accent/10"
-                              >
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <span className="text-sm font-medium text-foreground">
-                                        {sec.title}
-                                      </span>
-                                      <Badge variant="secondary">
-                                        Secundário
-                                      </Badge>
-                                    </div>
-                                    {sec.description && (
-                                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                                        {sec.description}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="flex shrink-0 gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => openEdit(sec)}
-                                      aria-label="Editar"
-                                    >
-                                      <Pencil className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-destructive hover:text-destructive"
-                                      onClick={() => setDeleteId(sec.id)}
-                                      aria-label="Excluir"
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-
-                        {/* Metas do objetivo primário */}
-                        <GoalsList objectiveId={primary.id} />
-                      </div>
-                    </li>
-                  );
-                })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog
-        open={!!editId}
-        onOpenChange={(open) => !open && setEditId(null)}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar objetivo</DialogTitle>
-            <DialogDescription>
-              Altere título, descrição e metas. Só pode haver um objetivo
-              primário por escritório.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label htmlFor="edit-title">Título *</Label>
-              <Input
-                id="edit-title"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-desc">Descrição</Label>
-              <Textarea
-                id="edit-desc"
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-                className="mt-1 min-h-[80px]"
-              />
-            </div>
-            {editParentId === null && (
+        <Dialog open={!!editId} onOpenChange={(open) => !open && setEditId(null)}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar objetivo</DialogTitle>
+              <DialogDescription>
+                Altere o título, a descrição e as metas deste objetivo.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label htmlFor="edit-title">Título *</Label>
+                <Input
+                  id="edit-title"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-desc">Descrição</Label>
+                <Textarea
+                  id="edit-desc"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="mt-1 min-h-[80px]"
+                />
+              </div>
               <div>
                 <div className="flex items-center justify-between">
-                  <Label>Objetivos secundários</Label>
+                  <Label>Metas</Label>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={addEditSecondary}
+                    onClick={addEditGoal}
                   >
-                    <Plus className="h-4 w-4" /> Adicionar objetivo secundário
+                    <Plus className="h-4 w-4" /> Adicionar meta
                   </Button>
                 </div>
-                <ul className="mt-2 space-y-3">
-                  {editSecondaries.map((sec, secIdx) => (
+                <ul className="mt-2 space-y-2">
+                  {editGoals.map((g, i) => (
                     <li
-                      key={secIdx}
-                      className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-2"
+                      key={i}
+                      className="flex gap-2 rounded-md border border-border p-2"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 space-y-1">
-                          <Input
-                            value={sec.title}
-                            onChange={(e) =>
-                              setEditSecondary(secIdx, "title", e.target.value)
-                            }
-                            placeholder="Título do objetivo secundário"
-                            className="h-9"
-                          />
-                          <Textarea
-                            value={sec.description ?? ""}
-                            onChange={(e) =>
-                              setEditSecondary(secIdx, "description", e.target.value)
-                            }
-                            placeholder="Descrição (opcional)"
-                            rows={1}
-                            className="resize-none text-sm"
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          onClick={() => removeEditSecondary(secIdx)}
-                          aria-label="Remover objetivo secundário"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Input
+                        value={g.title}
+                        onChange={(e) => setEditGoal(i, "title", e.target.value)}
+                        placeholder="Título da meta"
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeEditGoal(i)}
+                        aria-label="Remover meta"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </li>
                   ))}
                 </ul>
               </div>
-            )}
-            <div>
-              <div className="flex items-center justify-between">
-                <Label>Metas</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={addEditGoal}
-                >
-                  <Plus className="h-4 w-4" /> Adicionar meta
-                </Button>
-              </div>
-              <ul className="mt-2 space-y-2">
-                {editGoals.map((g, i) => (
-                  <li
-                    key={i}
-                    className="flex gap-2 rounded-md border border-border p-2"
-                  >
-                    <Input
-                      value={g.title}
-                      onChange={(e) => setEditGoal(i, "title", e.target.value)}
-                      placeholder="Título da meta"
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeEditGoal(i)}
-                      aria-label="Remover meta"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
             </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditId(null)}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleEditSave} disabled={editSaving}>
-              {editSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : null}
-              Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Importar objetivos</DialogTitle>
-            <DialogDescription>
-              Envie um arquivo TXT ou DOCX com uma lista de objetivos (um por
-              linha ou com numeração). Formatos aceitos: {ACCEPTED_EXT}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-                const f = e.dataTransfer.files[0];
-                if (
-                  f &&
-                  (f.name.toLowerCase().endsWith(".txt") ||
-                    f.name.toLowerCase().endsWith(".docx"))
-                )
-                  setFile(f);
-              }}
-              className={cn(
-                "rounded-lg border-2 border-dashed p-6 text-center transition-colors",
-                dragActive ? "border-[var(--identity-primary)] bg-[var(--identity-primary)]/5" : "border-border"
-              )}
-            >
-              <input
-                type="file"
-                accept=".txt,.docx"
-                className="hidden"
-                id="file-import-dialog"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              />
-              <label htmlFor="file-import-dialog" className="cursor-pointer">
-                <FileUp className="mx-auto h-10 w-10 text-muted-foreground" />
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Solte aqui um TXT ou DOCX
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  ou clique para selecionar
-                </p>
-              </label>
-            </div>
-            {file && (
-              <p className="text-sm text-foreground">
-                Arquivo: <strong>{file.name}</strong>
-              </p>
-            )}
-            {importError && (
-              <p className="text-sm text-destructive">{importError}</p>
-            )}
-            {importSuccess !== null && (
-              <p className="text-sm text-green-600 dark:text-green-400">
-                {importSuccess} objetivo(s) importado(s) com sucesso.
-              </p>
-            )}
-            <Button
-              type="button"
-              onClick={handleImport}
-              disabled={!file || isImporting}
-              className="w-full"
-            >
-              {isImporting ? (
-                <>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditId(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditSave} disabled={editSaving}>
+                {editSaving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Importando…
-                </>
-              ) : (
-                "Importar objetivos"
-              )}
-            </Button>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setImportDialogOpen(false)}
-            >
-              Fechar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                ) : null}
+                Salvar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <Dialog
-        open={!!deleteId}
-        onOpenChange={(open) => !open && setDeleteId(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Excluir objetivo</DialogTitle>
-            <DialogDescription>
-              {deletingPrimary && primaryCount <= 1
-                ? "Este é o único objetivo primário. Ao excluí-lo, defina outro como primário na edição depois. Deseja realmente excluir?"
-                : "Esta ação não pode ser desfeita. Deseja realmente excluir este objetivo?"}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm}>
-              Excluir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Importar Objetivos</DialogTitle>
+              <DialogDescription>
+                Envie TXT, DOCX ou planilha Excel: um objetivo por linha (ou por
+                célula na coluna A da primeira aba). Formatos: {ACCEPTED_IMPORT_EXT}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragActive(true);
+                }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragActive(false);
+                  const f = e.dataTransfer.files[0];
+                  if (f && isAcceptedImportFilename(f.name)) setFile(f);
+                }}
+                className={cn(
+                  "rounded-lg border-2 border-dashed p-6 text-center transition-colors",
+                  dragActive
+                    ? "border-[var(--identity-primary)] bg-[var(--identity-primary)]/5"
+                    : "border-border"
+                )}
+              >
+                <input
+                  type="file"
+                  accept={ACCEPT_IMPORT_INPUT}
+                  className="hidden"
+                  id="file-import-dialog"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+                <label htmlFor="file-import-dialog" className="cursor-pointer">
+                  <FileUp className="mx-auto h-10 w-10 text-muted-foreground" />
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Solte aqui TXT, DOCX ou Excel
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    ou clique para selecionar
+                  </p>
+                </label>
+              </div>
+              {file && (
+                <p className="text-sm text-foreground">
+                  Arquivo: <strong>{file.name}</strong>
+                </p>
+              )}
+              {importError && (
+                <p className="text-sm text-destructive">{importError}</p>
+              )}
+              {importSuccess !== null && (
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  {importSuccess} objetivo(s) importado(s) com sucesso.
+                </p>
+              )}
+              <Button
+                type="button"
+                onClick={handleImport}
+                disabled={!file || isImporting}
+                className="w-full"
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Importando…
+                  </>
+                ) : (
+                  "Importar Objetivos"
+                )}
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setImportDialogOpen(false)}
+              >
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Excluir objetivo</DialogTitle>
+              <DialogDescription>
+                Esta ação não pode ser desfeita. As metas associadas a este objetivo
+                também serão removidas. Deseja realmente excluir?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteId(null)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteConfirm}>
+                Excluir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PageLayout>
   );
