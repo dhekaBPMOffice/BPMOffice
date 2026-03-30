@@ -2,6 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
+type ProfileGate = {
+  role: string;
+  office_id: string | null;
+};
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -44,7 +49,6 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Cliente com service role só para ler perfil (ignora RLS e evita "conta pendente")
   const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseAdmin = serviceKey
@@ -66,6 +70,64 @@ export async function updateSession(request: NextRequest) {
       .eq("auth_user_id", authUserId)
       .single();
     return data;
+  }
+
+  async function isOfficeActive(officeId: string): Promise<boolean | null> {
+    if (supabaseAdmin) {
+      const { data } = await supabaseAdmin.from("offices").select("is_active").eq("id", officeId).single();
+      return data?.is_active ?? null;
+    }
+    const { data } = await supabase.from("offices").select("is_active").eq("id", officeId).single();
+    return data?.is_active ?? null;
+  }
+
+  /**
+   * Escritório inativo: bloqueia rotas do escritório (mantém dados no banco).
+   * admin_master ignora. Sem office_id em /conta-inativa redireciona para conta-pendente.
+   */
+  async function resolveOfficeAccessRequest(profile: ProfileGate, pathname: string): Promise<NextResponse | null> {
+    if (profile.role === "admin_master") {
+      if (pathname === "/conta-inativa") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/admin";
+        return NextResponse.redirect(url);
+      }
+      return null;
+    }
+
+    if (!profile.office_id) {
+      if (pathname === "/conta-inativa") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/conta-pendente";
+        return NextResponse.redirect(url);
+      }
+      return null;
+    }
+
+    const active = await isOfficeActive(profile.office_id);
+    if (active === true) {
+      if (pathname === "/conta-inativa") {
+        const url = request.nextUrl.clone();
+        url.pathname = profile.role === "leader" ? "/escritorio/processos" : "/escritorio/trabalho";
+        return NextResponse.redirect(url);
+      }
+      return null;
+    }
+
+    if (pathname === "/conta-inativa" || pathname.startsWith("/primeiro-acesso")) {
+      return null;
+    }
+
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "O escritório está inativo. Entre em contato com o suporte." },
+        { status: 403 }
+      );
+    }
+
+    const url = request.nextUrl.clone();
+    url.pathname = "/conta-inativa";
+    return NextResponse.redirect(url);
   }
 
   async function isLeaderOnboardingPending(officeId: string | null | undefined) {
@@ -98,6 +160,9 @@ export async function updateSession(request: NextRequest) {
       url.pathname = "/conta-pendente";
       return NextResponse.redirect(url);
     }
+
+    const officeGate = await resolveOfficeAccessRequest(profile, pathname);
+    if (officeGate) return officeGate;
 
     if (profile?.must_change_password && !pathname.startsWith("/primeiro-acesso")) {
       const url = request.nextUrl.clone();
@@ -133,6 +198,11 @@ export async function updateSession(request: NextRequest) {
 
   if (user && !isAuthRoute) {
     const profile = await getProfile(user.id);
+
+    if (profile) {
+      const officeGate = await resolveOfficeAccessRequest(profile, pathname);
+      if (officeGate) return officeGate;
+    }
 
     if (profile?.must_change_password && !pathname.startsWith("/primeiro-acesso")) {
       const url = request.nextUrl.clone();

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -19,13 +18,23 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/layout/page-layout";
 import { Building2, LayoutGrid, List, Plus } from "lucide-react";
+import { NovoEscritorioButton } from "./novo-escritorio-button";
 
 interface EscritoriosPageProps {
-  searchParams?: Promise<{ aba?: string; visualizacao?: string }>;
+  searchParams?: Promise<{ aba?: string; visualizacao?: string; novo_erro?: string }>;
 }
 
 export default async function EscritoriosPage({ searchParams: searchParamsPromise }: EscritoriosPageProps) {
-  const searchParams: { aba?: string; visualizacao?: string } = await (searchParamsPromise ?? Promise.resolve({}));
+  const searchParams: { aba?: string; visualizacao?: string; novo_erro?: string } =
+    await (searchParamsPromise ?? Promise.resolve({}));
+  let novoErro: string | null = null;
+  if (searchParams?.novo_erro) {
+    try {
+      novoErro = decodeURIComponent(searchParams.novo_erro);
+    } catch {
+      novoErro = searchParams.novo_erro;
+    }
+  }
   const supabase = await createClient();
 
   const { data: offices, error } = await supabase
@@ -58,12 +67,14 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
       year: "numeric",
     });
 
-  const aba = searchParams?.aba === "arquivados" ? "arquivados" : "lista";
+  const rawAba = searchParams?.aba;
+  const aba =
+    rawAba === "inativos" || rawAba === "arquivados" ? "inativos" : "lista";
   const visualizacao = searchParams?.visualizacao === "card" ? "card" : "lista";
   const escritoriosAtivos = (offices ?? []).filter((office) => office.is_active);
-  const escritoriosArquivados = (offices ?? []).filter((office) => !office.is_active);
-  const escritoriosVisiveis = aba === "arquivados" ? escritoriosArquivados : escritoriosAtivos;
-  const buildHref = (nextAba: "lista" | "arquivados", nextVisualizacao: "lista" | "card") =>
+  const escritoriosInativos = (offices ?? []).filter((office) => !office.is_active);
+  const escritoriosVisiveis = aba === "inativos" ? escritoriosInativos : escritoriosAtivos;
+  const buildHref = (nextAba: "lista" | "inativos", nextVisualizacao: "lista" | "card") =>
     `/admin/escritorios?aba=${nextAba}&visualizacao=${nextVisualizacao}`;
   const getPlanName = (office: (typeof offices)[number]) => {
     const p = office.plans as unknown;
@@ -76,13 +87,13 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
       title="Escritórios"
       description="Gerencie os escritórios da plataforma BPM Office."
       icon={Building2}
-      actions={
-        <Link href="/admin/escritorios/novo" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--identity-primary)] text-[var(--identity-primary-foreground)] shadow-sm hover:shadow hover:brightness-110 h-10 px-4 py-2 text-sm font-medium transition-all duration-150">
-          <Plus className="h-4 w-4" />
-          Novo Escritório
-        </Link>
-      }
+      actions={<NovoEscritorioButton />}
     >
+      {novoErro && (
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {novoErro}
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -103,12 +114,12 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
                 Lista
               </Link>
               <Link
-                href={buildHref("arquivados", visualizacao)}
+                href={buildHref("inativos", visualizacao)}
                 className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
-                  aba === "arquivados" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  aba === "inativos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Arquivados
+                Inativos
               </Link>
             </div>
 
@@ -150,7 +161,7 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
                 {escritoriosVisiveis.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      {aba === "arquivados" ? "Nenhum escritório arquivado." : "Nenhum escritório ativo."}
+                      {aba === "inativos" ? "Nenhum escritório inativo." : "Nenhum escritório ativo."}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -188,7 +199,7 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
             </Table>
           ) : escritoriosVisiveis.length === 0 ? (
             <p className="py-8 text-center text-muted-foreground">
-              {aba === "arquivados" ? "Nenhum escritório arquivado." : "Nenhum escritório ativo."}
+              {aba === "inativos" ? "Nenhum escritório inativo." : "Nenhum escritório ativo."}
             </p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

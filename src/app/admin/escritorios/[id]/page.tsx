@@ -9,10 +9,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/layout/page-layout";
 import { Building2 } from "lucide-react";
 import { EscritorioEditForm } from "./escritorio-edit-form";
+import { EscritorioAcoesCard } from "./escritorio-acoes-card";
 import { LiderEscritorioCardClient } from "./lider-escritorio-card-client";
 
 interface PageProps {
@@ -67,10 +67,6 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
         .eq("is_active", true),
     ]);
 
-  const plansData = office.plans as unknown;
-  const planName = Array.isArray(plansData)
-    ? (plansData[0] as { name: string })?.name ?? "—"
-    : (plansData as { name: string } | null)?.name ?? "—";
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString("pt-BR", {
       day: "2-digit",
@@ -100,40 +96,34 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
           <CardHeader>
             <CardTitle>Informações do Escritório</CardTitle>
             <CardDescription>
-              Dados cadastrais e status do escritório.
+              Dados cadastrais do escritório. Altere os campos abaixo e clique em Salvar.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Nome</p>
-              <p className="text-base">{office.name}</p>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Usuários</p>
+                <p className="text-base">{userCount ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Criado em</p>
+                <p className="text-sm">{formatDate(office.created_at)}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-sm font-medium text-muted-foreground">Atualizado em</p>
+                <p className="text-sm">{formatDate(office.updated_at)}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Slug</p>
-              <p className="font-mono text-sm">{office.slug}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Plano</p>
-              <p>{planName}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Status</p>
-              <Badge variant={office.is_active ? "success" : "secondary"}>
-                {office.is_active ? "Ativo" : "Inativo"}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Usuários
-              </p>
-              <p className="text-base">{userCount ?? 0}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Criado em
-              </p>
-              <p className="text-sm">{formatDate(office.created_at)}</p>
-            </div>
+            <EscritorioEditForm
+              key={office.updated_at}
+              office={{
+                id: office.id,
+                name: office.name,
+                slug: office.slug,
+                plan_id: office.plan_id,
+              }}
+              plans={plans ?? []}
+            />
           </CardContent>
         </Card>
 
@@ -261,16 +251,7 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
-      <EscritorioEditForm
-        office={{
-          id: office.id,
-          name: office.name,
-          slug: office.slug,
-          plan_id: office.plan_id,
-          is_active: office.is_active,
-        }}
-        plans={plans ?? []}
-      />
+      <EscritorioAcoesCard officeId={id} isActive={office.is_active} />
     </PageLayout>
   );
 }

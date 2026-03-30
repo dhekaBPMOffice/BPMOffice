@@ -1,9 +1,11 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
 import { validatePassword } from "@/lib/password";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 function generateSlug(name: string): string {
   return name
@@ -71,11 +73,69 @@ export async function createOffice(formData: FormData) {
   return { success: true };
 }
 
+/** Cria escritório com nome/slug provisórios e branding padrão; usado por `createDraftOfficeAndRedirect`. */
+export async function createDraftOfficeForAdmin(): Promise<{ id: string } | { error: string }> {
+  const profile = await getProfile();
+  if (profile.role !== "admin_master") {
+    return { error: "Sem permissão para criar escritório." };
+  }
+
+  const supabase = await createServiceClient();
+  const slug = `escritorio-${randomUUID().replace(/-/g, "")}`;
+
+  const { data: office, error: officeError } = await supabase
+    .from("offices")
+    .insert({
+      name: "Novo escritório",
+      slug,
+      plan_id: null,
+      is_active: true,
+    })
+    .select("id")
+    .single();
+
+  if (officeError) {
+    if (officeError.code === "23505") {
+      return { error: "Não foi possível gerar um slug único. Tente novamente." };
+    }
+    return { error: officeError.message };
+  }
+
+  if (!office) {
+    return { error: "Escritório não foi criado." };
+  }
+
+  const { error: brandingError } = await supabase.from("branding").insert({
+    office_id: office.id,
+    primary_color: "#0097a7",
+    secondary_color: "#7b1fa2",
+    accent_color: "#c2185b",
+    is_default: false,
+  });
+
+  if (brandingError) {
+    await supabase.from("offices").delete().eq("id", office.id);
+    return { error: "Erro ao criar identidade visual do escritório." };
+  }
+
+  revalidatePath("/admin/escritorios");
+  revalidatePath("/admin");
+  return { id: office.id };
+}
+
+/** Server action para o botão «Novo Escritório» na lista (POST, evita criar rascunho ao atualizar GET /novo). */
+export async function createDraftOfficeAndRedirect() {
+  const result = await createDraftOfficeForAdmin();
+  if ("error" in result) {
+    redirect(`/admin/escritorios?novo_erro=${encodeURIComponent(result.error)}`);
+  }
+  redirect(`/admin/escritorios/${result.id}`);
+}
+
 export async function updateOffice(id: string, formData: FormData) {
   const name = formData.get("name") as string;
   const slug = formData.get("slug") as string;
   const planId = formData.get("plan_id") as string | null;
-  const isActive = formData.get("is_active") === "true";
 
   if (!name?.trim()) {
     return { error: "Nome é obrigatório." };
@@ -94,7 +154,6 @@ export async function updateOffice(id: string, formData: FormData) {
       name: name.trim(),
       slug: finalSlug,
       plan_id: planId || null,
-      is_active: isActive,
     })
     .eq("id", id);
 
@@ -111,8 +170,46 @@ export async function updateOffice(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function deleteOffice(id: string) {
+export async function setOfficeActive(id: string, isActive: boolean) {
   const supabase = await createServiceClient();
+
+  const { error } = await supabase.from("offices").update({ is_active: isActive }).eq("id", id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/admin/escritorios");
+  revalidatePath(`/admin/escritorios/${id}`);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function deleteOffice(id: string) {
+  const adminProfile = await getProfile();
+  if (adminProfile.role !== "admin_master") {
+    return { error: "Sem permissão para excluir escritório." };
+  }
+
+  const supabase = await createServiceClient();
+
+  const { data: members, error: membersError } = await supabase
+    .from("profiles")
+    .select("auth_user_id")
+    .eq("office_id", id);
+
+  if (membersError) {
+    return { error: membersError.message };
+  }
+
+  for (const row of members ?? []) {
+    if (row.auth_user_id) {
+      const { error: authErr } = await supabase.auth.admin.deleteUser(row.auth_user_id);
+      if (authErr) {
+        return { error: `Erro ao remover utilizador: ${authErr.message}` };
+      }
+    }
+  }
 
   const { error } = await supabase.from("offices").delete().eq("id", id);
 

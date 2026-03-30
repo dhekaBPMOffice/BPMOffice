@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 export async function createClient() {
@@ -36,6 +37,5 @@ export async function createServiceClient() {
     );
   }
 
-  const { createClient } = await import("@supabase/supabase-js");
-  return createClient(url, key);
+  return createSupabaseJsClient(url, key);
 }
