@@ -6,7 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { bpmStageLabelToDb, labelToBpmPhaseSlug, type BpmPhaseSlug } from "@/lib/bpm-phases";
 import {
   assertStage,
-  mapTipoToDb,
+  deriveVcProcessTypeFromLabel,
   processItemToPayload,
   type ValueChainProcessPayload,
 } from "@/lib/value-chain-mappers";
@@ -33,7 +33,8 @@ export async function saveValueChainOfficeProcess(payload: ValueChainProcessPayl
     name: payload.macroprocesso?.trim() || payload.nivel1?.trim() || "Processo",
     description: null as string | null,
     category: null as string | null,
-    vc_process_type: mapTipoToDb(payload.tipo),
+    vc_tipo_label: payload.tipo.trim() || null,
+    vc_process_type: deriveVcProcessTypeFromLabel(payload.tipo),
     vc_macroprocesso: payload.macroprocesso?.trim() || null,
     vc_level1: payload.nivel1?.trim() || null,
     vc_level2: payload.nivel2?.trim() || null,
@@ -126,31 +127,112 @@ export async function saveValueChainOfficeProcess(payload: ValueChainProcessPayl
   return { success: true, id: officeProcessId };
 }
 
+/** Mesma regra da query em cadeia-valor/page.tsx: o processo aparece na lista se qualquer condição for verdadeira. */
+function rowAppearsOnValueChainPage(row: {
+  creation_source: string | null;
+  value_chain_id: string | null;
+  vc_macroprocesso: string | null;
+}): boolean {
+  if (row.value_chain_id) return true;
+  const macro = row.vc_macroprocesso?.trim();
+  if (macro) return true;
+  return row.creation_source === "created_in_value_chain";
+}
+
+type DeleteVcRowOutcome =
+  | { kind: "ok" }
+  | { kind: "missing" }
+  | { kind: "not_in_vc" }
+  | { kind: "db_error"; message: string };
+
+async function deleteOneValueChainOfficeRow(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  officeId: string,
+  officeProcessId: string,
+  now: string
+): Promise<DeleteVcRowOutcome> {
+  const { data: row, error: fetchErr } = await supabase
+    .from("office_processes")
+    .select("id, creation_source, value_chain_id, vc_macroprocesso")
+    .eq("id", officeProcessId)
+    .eq("office_id", officeId)
+    .maybeSingle();
+
+  if (fetchErr) return { kind: "db_error", message: fetchErr.message };
+  if (!row) return { kind: "missing" };
+  if (!rowAppearsOnValueChainPage(row)) return { kind: "not_in_vc" };
+
+  if (row.creation_source === "created_in_value_chain") {
+    const { error } = await supabase.from("office_processes").delete().eq("id", officeProcessId);
+    if (error) return { kind: "db_error", message: error.message };
+  } else {
+    const { error } = await supabase
+      .from("office_processes")
+      .update({
+        value_chain_id: null,
+        vc_macroprocesso: null,
+        vc_level1: null,
+        vc_level2: null,
+        vc_level3: null,
+        vc_tipo_label: null,
+        vc_process_type: null,
+        vc_priority: null,
+        vc_gestor_label: null,
+        vc_general_status: null,
+        updated_at: now,
+      })
+      .eq("id", officeProcessId)
+      .eq("office_id", officeId);
+    if (error) return { kind: "db_error", message: error.message };
+  }
+
+  return { kind: "ok" };
+}
+
+function revalidateValueChainPaths() {
+  revalidatePath("/escritorio/estrategia/cadeia-valor");
+  revalidatePath("/escritorio/processos");
+}
+
+/** Uma ida ao servidor: evita várias chamadas paralelas (Promise.all) que podem travar ou demorar demais no cliente. */
+export async function deleteValueChainOfficeProcesses(ids: string[]) {
+  const access = await assertLeader();
+  if ("error" in access) return { error: access.error };
+
+  const { profile } = access;
+  const officeId = profile.office_id;
+  if (!officeId) return { error: "Escritório não encontrado." };
+
+  const supabase = await createServiceClient();
+  const now = new Date().toISOString();
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+
+  for (const officeProcessId of unique) {
+    const out = await deleteOneValueChainOfficeRow(supabase, officeId, officeProcessId, now);
+    if (out.kind === "db_error") return { error: out.message };
+  }
+
+  revalidateValueChainPaths();
+  return { success: true as const };
+}
+
 export async function deleteValueChainOfficeProcess(officeProcessId: string) {
   const access = await assertLeader();
   if ("error" in access) return { error: access.error };
 
   const { profile } = access;
+  const officeId = profile.office_id;
+  if (!officeId) return { error: "Escritório não encontrado." };
+
   const supabase = await createServiceClient();
+  const now = new Date().toISOString();
 
-  const { data: row } = await supabase
-    .from("office_processes")
-    .select("id, creation_source")
-    .eq("id", officeProcessId)
-    .eq("office_id", profile.office_id)
-    .single();
+  const out = await deleteOneValueChainOfficeRow(supabase, officeId, officeProcessId, now);
+  if (out.kind === "missing") return { error: "Processo não encontrado." };
+  if (out.kind === "not_in_vc") return { error: "Este processo não está na Cadeia de Valor." };
+  if (out.kind === "db_error") return { error: out.message };
 
-  if (!row) return { error: "Processo não encontrado." };
-
-  if (row.creation_source !== "created_in_value_chain") {
-    return { error: "Somente processos criados na cadeia de valor podem ser excluídos desta tela." };
-  }
-
-  const { error } = await supabase.from("office_processes").delete().eq("id", officeProcessId);
-  if (error) return { error: error.message };
-
-  revalidatePath("/escritorio/estrategia/cadeia-valor");
-  revalidatePath("/escritorio/processos");
+  revalidateValueChainPaths();
   return { success: true };
 }
 

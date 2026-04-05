@@ -17,7 +17,8 @@ export type BPMStage = (typeof BPM_STAGES)[number];
 
 export interface ProcessItem {
   id: string;
-  tipo: ProcessType;
+  /** Categoria livre (ex.: importação de planilha); valores canónicos incluem Primário, Apoio, Gerencial. */
+  tipo: string;
   macroprocesso: string;
   nivel1: string;
   nivel2: string;

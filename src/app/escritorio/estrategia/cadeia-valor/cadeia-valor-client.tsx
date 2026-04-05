@@ -1,8 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import React, { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
-import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +48,7 @@ import {
   ExternalLink,
   FileImage,
   FileText,
+  Loader2,
   Network,
   Pencil,
   Plus,
@@ -48,6 +57,11 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { PageLayout } from "@/components/layout/page-layout";
+import {
+  extractValueChainImport,
+  isAcceptedValueChainImportFilename,
+  type ValueChainStructuredRow,
+} from "@/lib/cadeia-valor/extract-attachment";
 import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import {
@@ -60,6 +74,8 @@ import {
   type StageStatus,
 } from "@/types/cadeia-valor";
 import {
+  deleteValueChainOfficeProcess,
+  deleteValueChainOfficeProcesses,
   importCadeiaValorFromLocalStorageJson,
   syncAllValueChainProcesses,
 } from "@/app/escritorio/processos/value-chain-actions";
@@ -74,7 +90,7 @@ type SortMode =
   | "prioridade";
 
 interface ProcessFormData {
-  tipo: ProcessType;
+  tipo: string;
   macroprocesso: string;
   nivel1: string;
   nivel2: string;
@@ -98,7 +114,7 @@ interface UploadedFileItem {
 interface UIState {
   viewMode: ViewMode;
   searchTerm: string;
-  filterType: ProcessType | "all";
+  filterType: string | "all";
   filterStatus: GeneralStatus | "all";
   filterPriority: Priority | "all";
   filterMacroprocesso: string;
@@ -108,7 +124,7 @@ interface UIState {
 
 interface CategoryGroup {
   label: string;
-  tipo: ProcessType;
+  tipo: string;
   macros: Array<{
     nome: string;
     processos: ProcessItem[];
@@ -121,15 +137,20 @@ interface ProcessTreeNode {
   children: ProcessTreeNode[];
 }
 
-const CATEGORY_ORDER: ProcessType[] = ["Gerencial", "Primário", "Apoio"];
 const CATEGORY_LABELS: Record<ProcessType, string> = {
   Primário: "Processos de Negócio",
   Gerencial: "Processos de Gestão",
   Apoio: "Processos de Suporte",
 };
 
+function categoryDisplayLabel(tipo: string): string {
+  const t = tipo.trim();
+  if (!t) return "Sem tipo";
+  if (t === "Primário" || t === "Apoio" || t === "Gerencial") return CATEGORY_LABELS[t];
+  return t;
+}
+
 const STORAGE_KEY_PROCESSES = "cadeia-valor-processos";
-const STORAGE_KEY_UPLOADS = "cadeia-valor-anexos";
 const STORAGE_KEY_UI = "cadeia-valor-ui-state";
 
 const PAGE_SIZE = 20;
@@ -214,6 +235,17 @@ function getDefaultFormData(): ProcessFormData {
 function normalizeLevel(value: string, fallback: string): string {
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : fallback;
+}
+
+/** Título em destaque na lista: último nível preenchido (3 → 2 → 1), ou macroprocesso se todos vazios. */
+function processHighlightTitle(process: ProcessItem): string {
+  const n3 = process.nivel3.trim();
+  const n2 = process.nivel2.trim();
+  const n1 = process.nivel1.trim();
+  if (n3) return n3;
+  if (n2) return n2;
+  if (n1) return n1;
+  return normalizeLevel(process.macroprocesso, "Sem Macroprocesso");
 }
 
 function formatDateTime(value: string): string {
@@ -335,15 +367,32 @@ function parseLineToProcess(line: string, fallbackMacro: string): ProcessFormDat
   };
 }
 
+function structuredRowToFormData(row: ValueChainStructuredRow): ProcessFormData {
+  return {
+    tipo: row.tipo,
+    macroprocesso: row.macroprocesso,
+    nivel1: row.nivel1,
+    nivel2: row.nivel2,
+    nivel3: row.nivel3,
+    gestorProcesso: "Definir gestor",
+    ultimaAtualizacao: new Date().toISOString().slice(0, 16),
+    responsavelAtualizacao: "Extração por planilha (revisar)",
+    prioridade: "Média",
+    statusGeral: "Não iniciado",
+    etapas: createDefaultStages("Não iniciado"),
+  };
+}
+
 async function extractProcessesFromAttachment(file: File): Promise<ProcessFormData[]> {
   const fallbackMacro = cleanFileName(file.name) || "Macroprocesso do anexo";
 
   try {
-    const content = (await file.text()).replace(/\s+/g, " ").trim();
-    if (!content) return [parseLineToProcess(fallbackMacro, fallbackMacro)];
-
-    const candidates = content
-      .split(/\r?\n|\. /)
+    const result = await extractValueChainImport(file);
+    if (result.mode === "structured") {
+      return result.rows.map(structuredRowToFormData);
+    }
+    const lines = result.lines;
+    const candidates = lines
       .map((line) => line.trim())
       .filter((line) => line.length >= 6)
       .slice(0, 12);
@@ -406,11 +455,10 @@ function buildAISuggestions(answers: Record<AIQuestionId, string>): ProcessFormD
 }
 
 function buildHierarchyByCategory(processes: ProcessItem[]): CategoryGroup[] {
-  const tipoFallback: ProcessType = "Apoio";
-  const byTipo = new Map<ProcessType, Map<string, ProcessItem[]>>();
+  const byTipo = new Map<string, Map<string, ProcessItem[]>>();
 
   for (const process of processes) {
-    const tipo = PROCESS_TYPES.includes(process.tipo) ? process.tipo : tipoFallback;
+    const tipo = process.tipo.trim() || "Sem tipo";
     const macro = normalizeLevel(process.macroprocesso, "Sem Macroprocesso");
 
     if (!byTipo.has(tipo)) byTipo.set(tipo, new Map());
@@ -419,8 +467,14 @@ function buildHierarchyByCategory(processes: ProcessItem[]): CategoryGroup[] {
     mapMacro.get(macro)!.push(process);
   }
 
+  const allTipos = [...byTipo.keys()];
+  const orderedTipos = allTipos
+    .filter((t) => t !== "Sem tipo")
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
+  if (allTipos.includes("Sem tipo")) orderedTipos.push("Sem tipo");
+
   const result: CategoryGroup[] = [];
-  for (const tipo of CATEGORY_ORDER) {
+  for (const tipo of orderedTipos) {
     const mapMacro = byTipo.get(tipo);
     if (!mapMacro || mapMacro.size === 0) continue;
 
@@ -429,7 +483,7 @@ function buildHierarchyByCategory(processes: ProcessItem[]): CategoryGroup[] {
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 
     result.push({
-      label: CATEGORY_LABELS[tipo],
+      label: tipo === "Sem tipo" ? "Sem tipo" : tipo,
       tipo,
       macros,
     });
@@ -518,7 +572,13 @@ function ProcessFlowchartNode({
   );
 }
 
+function deleteServerIgnoredError(res: { success?: boolean; error?: string }): boolean {
+  if (res.success === true) return true;
+  return res.error === "Processo não encontrado.";
+}
+
 export function CadeiaValorClient({ initialProcesses }: { initialProcesses: ProcessItem[] }) {
+  const router = useRouter();
   const [processes, setProcesses] = useState<ProcessItem[]>(initialProcesses);
   const [uploads, setUploads] = useState<UploadedFileItem[]>([]);
   const [formData, setFormData] = useState<ProcessFormData>(getDefaultFormData);
@@ -532,25 +592,28 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
 
   const [viewMode, setViewMode] = useState<ViewMode>(DEFAULT_UI_STATE.viewMode);
   const [searchTerm, setSearchTerm] = useState(DEFAULT_UI_STATE.searchTerm);
-  const [filterType, setFilterType] = useState<ProcessType | "all">(DEFAULT_UI_STATE.filterType);
+  const [filterType, setFilterType] = useState<string | "all">(DEFAULT_UI_STATE.filterType);
   const [filterStatus, setFilterStatus] = useState<GeneralStatus | "all">(DEFAULT_UI_STATE.filterStatus);
   const [filterPriority, setFilterPriority] = useState<Priority | "all">(DEFAULT_UI_STATE.filterPriority);
   const [filterMacroprocesso, setFilterMacroprocesso] = useState(DEFAULT_UI_STATE.filterMacroprocesso);
   const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_UI_STATE.sortMode);
   const [currentPage, setCurrentPage] = useState(DEFAULT_UI_STATE.currentPage);
   const [expandedMacro, setExpandedMacro] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
+  /** Evita corrida: o sync debounced (2s) não pode correr durante/após delete e regravar o registo no servidor. */
+  const [syncPaused, setSyncPaused] = useState(false);
+  const [bulkDeletePending, setBulkDeletePending] = useState(false);
+  const [importFilePending, setImportFilePending] = useState(false);
 
   useEffect(() => {
-    const storedUploads = localStorage.getItem(STORAGE_KEY_UPLOADS);
-    const storedUI = localStorage.getItem(STORAGE_KEY_UI);
-
-    if (storedUploads) {
-      try {
-        setUploads(JSON.parse(storedUploads) as UploadedFileItem[]);
-      } catch {
-        setUploads([]);
-      }
+    try {
+      localStorage.removeItem("cadeia-valor-anexos");
+    } catch {
+      // no-op
     }
+
+    const storedUI = localStorage.getItem(STORAGE_KEY_UI);
 
     if (storedUI) {
       try {
@@ -572,17 +635,12 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || syncPaused) return;
     const handle = setTimeout(() => {
       void syncAllValueChainProcesses(processes);
     }, 2000);
     return () => clearTimeout(handle);
-  }, [hydrated, processes]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem(STORAGE_KEY_UPLOADS, JSON.stringify(uploads));
-  }, [hydrated, uploads]);
+  }, [hydrated, processes, syncPaused]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -618,10 +676,20 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     return [...unique].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [processes]);
 
+  const tipoFilterOptions = useMemo(() => {
+    const unique = new Set(processes.map((process) => process.tipo.trim()).filter((value) => value.length > 0));
+    return [...unique].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [processes]);
+
+  useEffect(() => {
+    if (filterType === "all") return;
+    if (!tipoFilterOptions.includes(filterType)) setFilterType("all");
+  }, [filterType, tipoFilterOptions]);
+
   const filteredSortedProcesses = useMemo(() => {
     const text = searchTerm.trim().toLowerCase();
     const filtered = processes.filter((process) => {
-      if (filterType !== "all" && process.tipo !== filterType) return false;
+      if (filterType !== "all" && process.tipo.trim() !== filterType) return false;
       if (filterStatus !== "all" && process.statusGeral !== filterStatus) return false;
       if (filterPriority !== "all" && process.prioridade !== filterPriority) return false;
       if (
@@ -687,6 +755,24 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     return filteredSortedProcesses.slice(start, start + PAGE_SIZE);
   }, [filteredSortedProcesses, currentPage]);
 
+  const pageRowIds = useMemo(() => paginatedProcesses.map((p) => p.id), [paginatedProcesses]);
+
+  const pageSelectionState = useMemo(() => {
+    if (pageRowIds.length === 0) return { all: false, some: false };
+    const n = pageRowIds.filter((id) => selectedIds.includes(id)).length;
+    return { all: n === pageRowIds.length, some: n > 0 && n < pageRowIds.length };
+  }, [pageRowIds, selectedIds]);
+
+  useEffect(() => {
+    const el = selectAllCheckboxRef.current;
+    if (el) el.indeterminate = pageSelectionState.some;
+  }, [pageSelectionState]);
+
+  useEffect(() => {
+    const valid = new Set(processes.map((p) => p.id));
+    setSelectedIds((prev) => prev.filter((id) => valid.has(id)));
+  }, [processes]);
+
   const hierarchyByCategory = useMemo(
     () => buildHierarchyByCategory(filteredSortedProcesses),
     [filteredSortedProcesses]
@@ -713,15 +799,17 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
 
   function openManageDialog(mode: CreationMode = "manual") {
     clearMessages();
-    if (mode === "manual" && !editingId) {
-      resetForm();
-    }
+    setUploads([]);
+    setImportFilePending(false);
+    resetForm();
     setCreationMode(mode);
     setManageDialogOpen(true);
   }
 
   function openEditDialog(process: ProcessItem) {
     clearMessages();
+    setUploads([]);
+    setImportFilePending(false);
     setEditingId(process.id);
     setFormData({
       tipo: process.tipo,
@@ -750,6 +838,15 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     setCurrentPage(1);
   }
 
+  function handleManageDialogOpenChange(open: boolean) {
+    setManageDialogOpen(open);
+    if (!open) {
+      setUploads([]);
+      setImportFilePending(false);
+      resetForm();
+    }
+  }
+
   function handleBasicFieldChange<K extends keyof ProcessFormData>(
     key: K,
     value: ProcessFormData[K]
@@ -772,36 +869,40 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    const accepted = [".pdf", ".png", ".jpg", ".jpeg", ".webp", ".doc", ".docx", ".txt"];
-    const invalid = Array.from(files).find((file) => {
-      const name = file.name.toLowerCase();
-      return !accepted.some((ext) => name.endsWith(ext));
-    });
+    const invalid = Array.from(files).find((file) => !isAcceptedValueChainImportFilename(file.name));
     if (invalid) {
-      setError("Formato inválido. Use PDF, imagem ou documento (DOC/DOCX).");
+      setError("Formato inválido. Use planilha Excel (.xls, .xlsx), CSV ou TXT.");
       return;
     }
 
     const fileList = Array.from(files);
-    const mapped: UploadedFileItem[] = fileList.map((file) => ({
-      id: crypto.randomUUID(),
-      nome: file.name,
-      tipo: file.type || "documento",
-      tamanhoKb: Math.max(1, Math.round(file.size / 1024)),
-      dataUpload: new Date().toISOString(),
-    }));
+    setImportFilePending(true);
+    try {
+      const mapped: UploadedFileItem[] = fileList.map((file) => ({
+        id: crypto.randomUUID(),
+        nome: file.name,
+        tipo: file.type || "documento",
+        tamanhoKb: Math.max(1, Math.round(file.size / 1024)),
+        dataUpload: new Date().toISOString(),
+      }));
 
-    const extractedByFile = await Promise.all(fileList.map((file) => extractProcessesFromAttachment(file)));
-    const extractedProcesses: ProcessItem[] = extractedByFile
-      .flat()
-      .map((process) => ({ id: crypto.randomUUID(), ...process }));
+      const extractedByFile = await Promise.all(fileList.map((file) => extractProcessesFromAttachment(file)));
+      const extractedProcesses: ProcessItem[] = extractedByFile
+        .flat()
+        .map((process) => ({ id: crypto.randomUUID(), ...process }));
 
-    setUploads((prev) => [...mapped, ...prev]);
-    setProcesses((prev) => [...extractedProcesses, ...prev]);
-    setSuccess(
-      `${mapped.length} arquivo(s) anexado(s). ${extractedProcesses.length} processo(s) incluído(s) para revisão.`
-    );
-    event.target.value = "";
+      setProcesses((prev) => [...extractedProcesses, ...prev]);
+      setSuccess(
+        `${mapped.length} arquivo(s) anexado(s). ${extractedProcesses.length} processo(s) incluído(s) para revisão.`
+      );
+      setUploads([]);
+      setManageDialogOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível processar o ficheiro.");
+    } finally {
+      setImportFilePending(false);
+      event.target.value = "";
+    }
   }
 
   function removeUpload(id: string) {
@@ -809,12 +910,79 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     setUploads((prev) => prev.filter((file) => file.id !== id));
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     clearMessages();
     if (!confirm("Excluir este processo da Cadeia de Valor?")) return;
-    setProcesses((prev) => prev.filter((process) => process.id !== id));
-    setSuccess("Processo removido com sucesso.");
-    if (editingId === id) resetForm();
+    setSyncPaused(true);
+    try {
+      const res = await deleteValueChainOfficeProcess(id);
+      if (!deleteServerIgnoredError(res)) {
+        setError(
+          typeof res.error === "string" ? res.error : "Não foi possível excluir o processo."
+        );
+        return;
+      }
+      setProcesses((prev) => prev.filter((process) => process.id !== id));
+      setSelectedIds((prev) => prev.filter((x) => x !== id));
+      setSuccess("Processo removido com sucesso.");
+      if (editingId === id) resetForm();
+      void router.refresh();
+    } finally {
+      setSyncPaused(false);
+    }
+  }
+
+  function toggleProcessSelected(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  function toggleSelectCurrentPage() {
+    setSelectedIds((prev) => {
+      if (pageRowIds.length === 0) return prev;
+      const allSelected = pageRowIds.every((id) => prev.includes(id));
+      if (allSelected) {
+        return prev.filter((id) => !pageRowIds.includes(id));
+      }
+      return [...new Set([...prev, ...pageRowIds])];
+    });
+  }
+
+  async function handleDeleteSelected() {
+    if (selectedIds.length === 0) return;
+    clearMessages();
+    const n = selectedIds.length;
+    if (
+      !confirm(
+        n === 1
+          ? "Excluir este processo da Cadeia de Valor?"
+          : `Excluir ${n} processos da Cadeia de Valor?`
+      )
+    ) {
+      return;
+    }
+    const ids = [...selectedIds];
+    setBulkDeletePending(true);
+    setSyncPaused(true);
+    try {
+      const res = await deleteValueChainOfficeProcesses(ids);
+      if (!deleteServerIgnoredError(res)) {
+        setError(
+          typeof res.error === "string" ? res.error : "Não foi possível excluir os processos."
+        );
+        return;
+      }
+      const toRemove = new Set(ids);
+      setProcesses((prev) => prev.filter((p) => !toRemove.has(p.id)));
+      setSelectedIds([]);
+      setSuccess(n === 1 ? "Processo removido com sucesso." : `${n} processos removidos com sucesso.`);
+      if (editingId && toRemove.has(editingId)) resetForm();
+      void router.refresh();
+    } finally {
+      setBulkDeletePending(false);
+      setSyncPaused(false);
+    }
   }
 
   function handleSaveProcess(event: FormEvent<HTMLFormElement>) {
@@ -1158,14 +1326,14 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
               <Select
                 value={filterType}
                 onChange={(event) => {
-                  setFilterType(event.target.value as ProcessType | "all");
+                  setFilterType(event.target.value);
                   setCurrentPage(1);
                 }}
               >
                 <option value="all">Todos</option>
-                {PROCESS_TYPES.map((type) => (
+                {tipoFilterOptions.map((type) => (
                   <option key={type} value={type}>
-                    {type}
+                    {categoryDisplayLabel(type)}
                   </option>
                 ))}
               </Select>
@@ -1270,11 +1438,52 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {selectedIds.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                <span className="text-sm font-medium">
+                  {selectedIds.length} processo(s) selecionado(s)
+                </span>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={bulkDeletePending}
+                  onClick={() => void handleDeleteSelected()}
+                >
+                  {bulkDeletePending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      Excluindo…
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                      Excluir selecionados
+                    </>
+                  )}
+                </Button>
+                <Button size="sm" variant="ghost" type="button" onClick={() => setSelectedIds([])}>
+                  Limpar seleção
+                </Button>
+              </div>
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[44px]">
+                    <span className="sr-only">Selecionar</span>
+                    <input
+                      ref={selectAllCheckboxRef}
+                      type="checkbox"
+                      checked={pageSelectionState.all && pageRowIds.length > 0}
+                      onChange={toggleSelectCurrentPage}
+                      disabled={paginatedProcesses.length === 0}
+                      className="rounded border-input"
+                      aria-label="Selecionar todos os processos desta página"
+                    />
+                  </TableHead>
                   <TableHead>Processo</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Macroprocesso</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Prioridade</TableHead>
                   <TableHead>BPM</TableHead>
@@ -1288,9 +1497,18 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                   const bpm = getBpmSummary(process.etapas);
                   return (
                     <TableRow key={process.id}>
+                      <TableCell className="align-middle">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(process.id)}
+                          onChange={() => toggleProcessSelected(process.id)}
+                          className="rounded border-input"
+                          aria-label={`Selecionar processo ${processHighlightTitle(process)}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          <p className="font-medium">{normalizeLevel(process.macroprocesso, "Sem Macroprocesso")}</p>
+                          <p className="font-medium">{processHighlightTitle(process)}</p>
                           <p className="text-xs text-muted-foreground">
                             {normalizeLevel(process.nivel1, "Sem Nível 1")} • {normalizeLevel(process.nivel2, "Sem Nível 2")} •{" "}
                             {normalizeLevel(process.nivel3, "Sem Nível 3")}
@@ -1298,6 +1516,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                         </div>
                       </TableCell>
                       <TableCell>{process.tipo}</TableCell>
+                      <TableCell>{normalizeLevel(process.macroprocesso, "Sem Macroprocesso")}</TableCell>
                       <TableCell>
                         <Badge variant={getGeneralStatusVariant(process.statusGeral)}>{process.statusGeral}</Badge>
                       </TableCell>
@@ -1336,7 +1555,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
 
                 {paginatedProcesses.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
                       Nenhum processo encontrado para os filtros aplicados.
                     </TableCell>
                   </TableRow>
@@ -1378,7 +1597,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
               <div>
                 <CardTitle>Diagrama da Cadeia de Valor</CardTitle>
                 <CardDescription>
-                  Visão por categorias (Negócio, Gestão, Apoio) com grid de macroprocessos. Clique em um macro para ver os processos.
+                  Agrupamento por tipo cadastrado e macroprocesso. Expanda um macro para ver a árvore de níveis dos processos.
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -1398,8 +1617,8 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
               <p className="text-sm text-muted-foreground">Nenhum processo encontrado.</p>
             ) : (
               <div className="space-y-8">
-                {hierarchyByCategory.map((category) => (
-                  <div key={category.tipo} className="space-y-3">
+                {hierarchyByCategory.map((category, categoryIndex) => (
+                  <div key={`${category.tipo || "sem"}-${categoryIndex}`} className="space-y-3">
                     <h3 className="text-base font-semibold text-foreground border-b pb-2">
                       {category.label}
                     </h3>
@@ -1464,34 +1683,69 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
         </Card>
       )}
 
-      <Dialog open={manageDialogOpen} onOpenChange={setManageDialogOpen}>
+      <Dialog open={manageDialogOpen} onOpenChange={handleManageDialogOpenChange}>
         <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Editar processo" : "Adicionar Cadeia de Valor"}</DialogTitle>
+            <DialogTitle>
+              {editingId ? "Editar processo na Cadeia de Valor" : "Adicionar Cadeia de Valor"}
+            </DialogTitle>
             <DialogDescription>
-              Escolha o método de inclusão e mantenha a estrutura atualizada para acompanhamento dos módulos BPM.
+              Inclusão de instâncias de processo na cadeia de valor do escritório e parametrização do ciclo BPM.
+              Selecione o modo de entrada.
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs value={creationMode} onValueChange={(value) => setCreationMode(value as CreationMode)}>
+          <Tabs
+            value={creationMode}
+            onValueChange={(value) => {
+              const v = value as CreationMode;
+              setCreationMode(v);
+              if (v === "manual") {
+                setUploads([]);
+                setImportFilePending(false);
+              }
+            }}
+          >
             <TabsList className="w-full md:w-auto">
-              <TabsTrigger value="anexar">Anexar arquivo</TabsTrigger>
-              <TabsTrigger value="manual">Criar manualmente</TabsTrigger>
-              <TabsTrigger value="ia">Gerar com IA</TabsTrigger>
+              <TabsTrigger value="anexar">Importação por ficheiro</TabsTrigger>
+              <TabsTrigger value="manual">Registo unitário</TabsTrigger>
+              <TabsTrigger value="ia">Geração assistida</TabsTrigger>
             </TabsList>
 
             <TabsContent value="anexar" className="mt-4 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="arquivo-cadeia">
-                  Cadeia existente (PDF, imagem ou documento). Os processos serão inseridos automaticamente.
-                </Label>
-                <Input
-                  id="arquivo-cadeia"
-                  type="file"
-                  multiple
-                  accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt"
-                  onChange={handleFileUpload}
-                />
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground leading-snug">
+                  Importação estruturada em lote: cada linha de dados após o cabeçalho materializa uma instância de
+                  processo na lista. Formatos suportados: .xls, .xlsx, .csv ou .txt. Utilize o modelo (primeira linha =
+                  cabeçalhos).
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href="/modelo-importacao-cadeia-valor.csv"
+                    download="modelo-importacao-cadeia-valor.csv"
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  >
+                    <Download className="h-4 w-4" aria-hidden />
+                    Baixar modelo (CSV)
+                  </a>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="arquivo-cadeia">Carregar ficheiro</Label>
+                  <Input
+                    id="arquivo-cadeia"
+                    type="file"
+                    multiple
+                    disabled={importFilePending}
+                    accept=".xls,.xlsx,.csv,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain"
+                    onChange={handleFileUpload}
+                  />
+                </div>
+                {importFilePending && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                    A processar ficheiro…
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1518,126 +1772,185 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
               </div>
             </TabsContent>
 
-            <TabsContent value="manual" className="mt-4">
-              <form onSubmit={handleSaveProcess} className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label>Tipo</Label>
-                    <Select
-                      value={formData.tipo}
-                      onChange={(event) => handleBasicFieldChange("tipo", event.target.value as ProcessType)}
-                    >
-                      {PROCESS_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </Select>
+            <TabsContent value="manual" className="mt-4 space-y-6 pb-2">
+              <form onSubmit={handleSaveProcess} className="space-y-8">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Registo unitário: uma instância de processo por submissão, com classificação (tipo, macroprocesso) e
+                  níveis hierárquicos opcionais. Alterações e ciclo BPM aplicam-se ao processo corrente.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Estrutura na cadeia</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Classificação e desdobramento do processo na cadeia de valor.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+                    <div className="space-y-2 min-w-0">
+                      <Label htmlFor="form-tipo-cadeia">Tipo</Label>
+                      <Input
+                        id="form-tipo-cadeia"
+                        list="cadeia-valor-tipos-sugestao"
+                        value={formData.tipo}
+                        onChange={(event) => handleBasicFieldChange("tipo", event.target.value)}
+                        placeholder="Ex.: Gestão, Primário, Apoio…"
+                        required
+                        className="w-full"
+                      />
+                      <datalist id="cadeia-valor-tipos-sugestao">
+                        {PROCESS_TYPES.map((type) => (
+                          <option key={type} value={type} />
+                        ))}
+                      </datalist>
+                    </div>
+
+                    <div className="space-y-2 min-w-0">
+                      <Label htmlFor="form-macro-cadeia">Macroprocesso</Label>
+                      <Input
+                        id="form-macro-cadeia"
+                        value={formData.macroprocesso}
+                        onChange={(event) => handleBasicFieldChange("macroprocesso", event.target.value)}
+                        required
+                        className="w-full"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Macroprocesso</Label>
-                    <Input
-                      value={formData.macroprocesso}
-                      onChange={(event) => handleBasicFieldChange("macroprocesso", event.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Nível 1 (opcional)</Label>
-                    <Input
-                      value={formData.nivel1}
-                      onChange={(event) => handleBasicFieldChange("nivel1", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Nível 2 (opcional)</Label>
-                    <Input
-                      value={formData.nivel2}
-                      onChange={(event) => handleBasicFieldChange("nivel2", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Nível 3 (opcional)</Label>
-                    <Input
-                      value={formData.nivel3}
-                      onChange={(event) => handleBasicFieldChange("nivel3", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Gestor do processo</Label>
-                    <Input
-                      value={formData.gestorProcesso}
-                      onChange={(event) => handleBasicFieldChange("gestorProcesso", event.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Última atualização</Label>
-                    <Input
-                      type="datetime-local"
-                      value={formData.ultimaAtualizacao}
-                      onChange={(event) => handleBasicFieldChange("ultimaAtualizacao", event.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Responsável pela atualização</Label>
-                    <Input
-                      value={formData.responsavelAtualizacao}
-                      onChange={(event) =>
-                        handleBasicFieldChange("responsavelAtualizacao", event.target.value)
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Prioridade</Label>
-                    <Select
-                      value={formData.prioridade}
-                      onChange={(event) => handleBasicFieldChange("prioridade", event.target.value as Priority)}
-                    >
-                      {PRIORITIES.map((priority) => (
-                        <option key={priority} value={priority}>
-                          {priority}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Status geral</Label>
-                    <Select
-                      value={formData.statusGeral}
-                      onChange={(event) =>
-                        handleBasicFieldChange("statusGeral", event.target.value as GeneralStatus)
-                      }
-                    >
-                      {GENERAL_STATUSES.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </Select>
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Níveis do processo (opcional)
+                    </p>
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="form-n1-cadeia">Nível 1</Label>
+                        <Input
+                          id="form-n1-cadeia"
+                          value={formData.nivel1}
+                          onChange={(event) => handleBasicFieldChange("nivel1", event.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="form-n2-cadeia">Nível 2</Label>
+                        <Input
+                          id="form-n2-cadeia"
+                          value={formData.nivel2}
+                          onChange={(event) => handleBasicFieldChange("nivel2", event.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="form-n3-cadeia">Nível 3</Label>
+                        <Input
+                          id="form-n3-cadeia"
+                          value={formData.nivel3}
+                          onChange={(event) => handleBasicFieldChange("nivel3", event.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="rounded-md border p-4 space-y-3">
-                  <p className="font-medium">Etapas do ciclo BPM</p>
-                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    {BPM_STAGES.map((stage) => (
-                      <div key={stage} className="space-y-1">
-                        <Label>{stage}</Label>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Gestão e acompanhamento</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Responsáveis, datas e estado geral do processo.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+                    <div className="space-y-2 min-w-0 md:col-span-2">
+                      <Label htmlFor="form-gestor-cadeia">Gestor do processo</Label>
+                      <Input
+                        id="form-gestor-cadeia"
+                        value={formData.gestorProcesso}
+                        onChange={(event) => handleBasicFieldChange("gestorProcesso", event.target.value)}
+                        required
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="space-y-2 min-w-0">
+                      <Label htmlFor="form-atualizacao-cadeia">Última atualização</Label>
+                      <Input
+                        id="form-atualizacao-cadeia"
+                        type="datetime-local"
+                        value={formData.ultimaAtualizacao}
+                        onChange={(event) => handleBasicFieldChange("ultimaAtualizacao", event.target.value)}
+                        required
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="space-y-2 min-w-0">
+                      <Label htmlFor="form-resp-cadeia">Responsável pela atualização</Label>
+                      <Input
+                        id="form-resp-cadeia"
+                        value={formData.responsavelAtualizacao}
+                        onChange={(event) =>
+                          handleBasicFieldChange("responsavelAtualizacao", event.target.value)
+                        }
+                        required
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="space-y-2 min-w-0">
+                      <Label htmlFor="form-prioridade-cadeia">Prioridade</Label>
+                      <Select
+                        id="form-prioridade-cadeia"
+                        value={formData.prioridade}
+                        onChange={(event) => handleBasicFieldChange("prioridade", event.target.value as Priority)}
+                        className="w-full min-w-0"
+                      >
+                        {PRIORITIES.map((priority) => (
+                          <option key={priority} value={priority}>
+                            {priority}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2 min-w-0">
+                      <Label htmlFor="form-status-cadeia">Status geral</Label>
+                      <Select
+                        id="form-status-cadeia"
+                        value={formData.statusGeral}
+                        onChange={(event) =>
+                          handleBasicFieldChange("statusGeral", event.target.value as GeneralStatus)
+                        }
+                        className="w-full min-w-0"
+                      >
+                        {GENERAL_STATUSES.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/80 bg-muted/20 p-4 sm:p-5 space-y-4 min-w-0">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Etapas do ciclo BPM</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Estado de cada fase do ciclo neste processo.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 min-w-0">
+                    {BPM_STAGES.map((stage, stageIndex) => (
+                      <div key={stage} className="space-y-2 min-w-0">
+                        <Label className="text-sm leading-tight" htmlFor={`cadeia-bpm-stage-${stageIndex}`}>
+                          {stage}
+                        </Label>
                         <Select
+                          id={`cadeia-bpm-stage-${stageIndex}`}
                           value={formData.etapas[stage]}
                           onChange={(event) => handleStageStatusChange(stage, event.target.value as StageStatus)}
+                          className="w-full min-w-0"
                         >
                           {STAGE_STATUSES.map((status) => (
                             <option key={status} value={status}>
@@ -1650,7 +1963,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
                   <Button type="submit">
                     {editingId ? (
                       <>
@@ -1680,8 +1993,9 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
 
             <TabsContent value="ia" className="mt-4">
               <form onSubmit={handleGenerateByAI} className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Responda o questionário para gerar uma sugestão estruturada de Cadeia de Valor.
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Geração assistida de um conjunto de processos a partir do questionário; exige revisão antes de
+                  consolidar as entradas na lista da cadeia de valor.
                 </p>
                 <div className="grid gap-4">
                   {AI_QUESTIONS.map((question) => (

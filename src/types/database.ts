@@ -263,6 +263,7 @@ export interface OfficeProcess {
   vc_level1: string | null;
   vc_level2: string | null;
   vc_level3: string | null;
+  vc_tipo_label: string | null;
   vc_process_type: "primario" | "apoio" | "gerencial" | null;
   vc_priority: string | null;
   vc_gestor_label: string | null;

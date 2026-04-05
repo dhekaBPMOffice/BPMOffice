@@ -36,5 +36,10 @@ export default async function CadeiaValorPage() {
     dbRowToProcessItem(row, row.office_process_bpm_phases ?? [])
   );
 
-  return <CadeiaValorClient initialProcesses={initialProcesses} />;
+  const processListKey = rows
+    .map((r) => r.id as string)
+    .sort()
+    .join("|");
+
+  return <CadeiaValorClient key={processListKey} initialProcesses={initialProcesses} />;
 }

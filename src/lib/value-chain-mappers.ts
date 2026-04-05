@@ -15,7 +15,8 @@ type StageStatusPt = "Não iniciado" | "Em andamento" | "Concluído";
 
 export type ValueChainProcessPayload = {
   id?: string;
-  tipo: ProcessTypePt;
+  /** Texto livre; valores canónicos "Primário" | "Apoio" | "Gerencial" preenchem também vc_process_type. */
+  tipo: string;
   macroprocesso: string;
   nivel1: string;
   nivel2: string;
@@ -31,6 +32,15 @@ export function mapTipoToDb(t: ProcessTypePt): "primario" | "apoio" | "gerencial
   if (t === "Primário") return "primario";
   if (t === "Gerencial") return "gerencial";
   return "apoio";
+}
+
+/** Só quando o rótulo é exatamente um dos três canónicos (persistência legada em vc_process_type). */
+export function deriveVcProcessTypeFromLabel(label: string): "primario" | "apoio" | "gerencial" | null {
+  const s = label.trim();
+  if (s === "Primário") return "primario";
+  if (s === "Gerencial") return "gerencial";
+  if (s === "Apoio") return "apoio";
+  return null;
 }
 
 function mapTipoFromDb(t: string | null | undefined): ProcessTypePt {
@@ -109,9 +119,13 @@ export function mapOfficeProcessToValueChainPayload(
     etapas[ptLabel] = label;
   }
 
+  const label = String((row as { vc_tipo_label?: string | null }).vc_tipo_label ?? "").trim();
+  const tipoDisplay =
+    label.length > 0 ? label : mapTipoFromDb(row.vc_process_type as string | null);
+
   return {
     id: row.id as string,
-    tipo: mapTipoFromDb(row.vc_process_type as string | null),
+    tipo: tipoDisplay,
     macroprocesso: (row.vc_macroprocesso as string) || "",
     nivel1: (row.vc_level1 as string) || "",
     nivel2: (row.vc_level2 as string) || "",
