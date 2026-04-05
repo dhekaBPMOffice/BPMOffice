@@ -3,32 +3,86 @@ import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { OFFICE_PROCESS_STATUS_META } from "@/lib/processes";
 import { buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageLayout } from "@/components/layout/page-layout";
 import { ClipboardList, LayoutGrid, PlusCircle } from "lucide-react";
 import type { OfficeProcessStatus } from "@/types/database";
-import { computeCurrentBpmPhaseSlug, formatCurrentBpmPhaseLabel, type BpmPhaseSlug } from "@/lib/bpm-phases";
-import { cn } from "@/lib/utils";
+import { formatCurrentBpmPhaseLabel, type BpmPhaseSlug } from "@/lib/bpm-phases";
+import {
+  applyProcessosFilters,
+  buildProcessosHref,
+  formatVcProcessTypeLabel,
+  parseProcessosListQuery,
+  sortOfficeProcesses,
+  type OfficeProcessRowForList,
+} from "@/lib/office-processes-list";
+import { ProcessosFiltersClient } from "./processos-filters-client";
+import { ProcessosPortfolioClient, type ProcessoPortfolioItem } from "./processos-portfolio-client";
 
-const ORIGEM_OPTIONS = [
-  { value: "todos", label: "Todos", href: "/escritorio/processos" },
-  { value: "catalogo", label: "Catálogo", href: "/escritorio/processos?origem=catalogo" },
-  { value: "cadeia", label: "Na cadeia", href: "/escritorio/processos?origem=cadeia" },
-  { value: "cadeia_somente", label: "Só cadeia (sem base)", href: "/escritorio/processos?origem=cadeia_somente" },
-] as const;
+function toPortfolioItem(
+  process: OfficeProcessRowForList & {
+    owner_profile?: { full_name?: string } | null;
+  }
+): ProcessoPortfolioItem {
+  const statusMeta = OFFICE_PROCESS_STATUS_META[process.status as OfficeProcessStatus];
+  const owner = process.owner_profile as { full_name?: string } | null;
+  const phases = process.office_process_bpm_phases ?? [];
+  const faseBpmLabel = formatCurrentBpmPhaseLabel(phases);
+  const nivelParts = [process.vc_level1, process.vc_level2, process.vc_level3]
+    .map((x) => x?.trim())
+    .filter(Boolean) as string[];
+  const nivelLabel = nivelParts.length ? nivelParts.join(" › ") : null;
+  const tipoLabel = formatVcProcessTypeLabel(process.vc_process_type, process.vc_tipo_label);
+  const origemLabel =
+    process.creation_source === "created_in_value_chain" ? "Criado na cadeia" : "Catálogo";
+  const originDetailLabel =
+    process.origin === "questionnaire"
+      ? "Automática"
+      : process.origin === "value_chain"
+        ? "Cadeia de valor"
+        : "Manual";
+
+  const flowcharts =
+    Array.isArray(process.flowchart_files) && process.flowchart_files.length > 0
+      ? process.flowchart_files
+      : process.flowchart_image_url
+        ? [{ url: process.flowchart_image_url }]
+        : [];
+  const templates =
+    Array.isArray(process.template_files) && process.template_files.length > 0
+      ? process.template_files
+      : process.template_url
+        ? [{ url: process.template_url, label: process.template_label }]
+        : [];
+
+  return {
+    id: process.id,
+    name: process.name,
+    category: process.category,
+    description: process.description,
+    statusLabel: statusMeta.label,
+    statusVariant: statusMeta.variant,
+    origemLabel,
+    originDetailLabel,
+    faseBpmLabel,
+    tipoLabel,
+    nivelLabel,
+    ownerName: owner?.full_name ?? null,
+    flowcharts: flowcharts as { url: string }[],
+    templates: templates as { url: string; label?: string | null }[],
+  };
+}
 
 export default async function ProcessosEscritorioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ origem?: string; fase?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const profile = await requireRole(["leader"]);
   const supabase = await createClient();
   const sp = await searchParams;
-  const origem = sp.origem ?? "todos";
-  const faseFilter = (sp.fase ?? "") as BpmPhaseSlug | "";
+  const query = parseProcessosListQuery(sp);
 
   if (!profile.office_id) {
     return (
@@ -51,30 +105,44 @@ export default async function ProcessosEscritorioPage({
     .eq("office_id", profile.office_id)
     .order("selected_at", { ascending: false });
 
-  let processes = rawProcesses ?? [];
+  let afterOrigem = (rawProcesses ?? []) as OfficeProcessRowForList[];
 
-  if (origem === "catalogo") {
-    processes = processes.filter((p) => p.creation_source === "from_catalog");
-  } else if (origem === "cadeia_somente") {
-    processes = processes.filter((p) => p.creation_source === "created_in_value_chain");
-  } else if (origem === "cadeia") {
-    processes = processes.filter(
-      (p) => p.value_chain_id != null || (p.vc_macroprocesso != null && String(p.vc_macroprocesso).trim() !== "")
+  if (query.origem === "catalogo") {
+    afterOrigem = afterOrigem.filter((p) => p.creation_source === "from_catalog");
+  } else if (query.origem === "cadeia_somente") {
+    afterOrigem = afterOrigem.filter((p) => p.creation_source === "created_in_value_chain");
+  } else if (query.origem === "cadeia") {
+    afterOrigem = afterOrigem.filter(
+      (p) =>
+        p.value_chain_id != null ||
+        (p.vc_macroprocesso != null && String(p.vc_macroprocesso).trim() !== "")
     );
   }
 
-  if (faseFilter) {
-    processes = processes.filter((p) => {
-      const phases = (p as { office_process_bpm_phases: { phase: string; stage_status: string }[] })
-        .office_process_bpm_phases;
-      const current = computeCurrentBpmPhaseSlug(phases ?? []);
-      return current === faseFilter;
-    });
-  }
+  const levelTuples = afterOrigem.map(
+    (p) => [p.vc_level1, p.vc_level2, p.vc_level3] as [string | null, string | null, string | null]
+  );
+
+  const faseFilter = (query.fase || "") as BpmPhaseSlug | "";
+  const statusFilter = (query.status || "") as OfficeProcessStatus | "";
+
+  let processes = applyProcessosFilters(afterOrigem, {
+    faseFilter,
+    tipo: query.tipo,
+    n1: query.n1,
+    n2: query.n2,
+    n3: query.n3,
+    status: statusFilter,
+    q: query.q,
+  });
+
+  processes = sortOfficeProcesses(processes, query.ordenar);
 
   const total = processes.length;
   const completed = processes.filter((item) => item.status === "completed").length;
   const inProgress = processes.filter((item) => item.status === "in_progress").length;
+
+  const portfolioItems = processes.map((p) => toPortfolioItem(p));
 
   return (
     <PageLayout
@@ -92,40 +160,14 @@ export default async function ProcessosEscritorioPage({
           </Link>
           <Link href="/escritorio/processos/catalogo" className={buttonVariants()}>
             <PlusCircle className="h-4 w-4" />
-            Ver processos não selecionados
-          </Link>
-          <Link href="/escritorio/processos/catalogo" className={buttonVariants()}>
-            <PlusCircle className="h-4 w-4" />
-            Adicionar processo
+            Catálogo e adicionar processo
           </Link>
         </div>
       }
     >
-      <div className="mb-4 flex flex-wrap gap-2">
-        {ORIGEM_OPTIONS.map((opt) => {
-          const active =
-            (opt.value === "todos" && origem === "todos") ||
-            (opt.value !== "todos" && origem === opt.value);
-          return (
-            <Link
-              key={opt.value}
-              href={opt.href}
-              className={cn(
-                buttonVariants({ variant: active ? "default" : "outline", size: "sm" })
-              )}
-            >
-              {opt.label}
-            </Link>
-          );
-        })}
-        {faseFilter ? (
-          <Link href="/escritorio/processos" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-            Limpar filtro de fase
-          </Link>
-        ) : null}
-      </div>
+      <ProcessosFiltersClient query={query} levelTuples={levelTuples} />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Processos ativos (filtro)</CardTitle>
@@ -160,15 +202,15 @@ export default async function ProcessosEscritorioPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {processes.length === 0 ? (
+          {portfolioItems.length === 0 ? (
             <EmptyState
               icon={ClipboardList}
               title="Nenhum processo neste filtro"
               description="Ajuste os filtros acima ou selecione processos no catálogo."
               action={
                 <div className="flex flex-wrap justify-center gap-2">
-                  <Link href="/escritorio/processos" className={buttonVariants()}>
-                    Ver todos
+                  <Link href={buildProcessosHref({ origem: query.origem, vista: query.vista })} className={buttonVariants()}>
+                    Limpar filtros
                   </Link>
                   <Link href="/escritorio/processos/catalogo" className={buttonVariants({ variant: "outline" })}>
                     <PlusCircle className="h-4 w-4" />
@@ -178,113 +220,7 @@ export default async function ProcessosEscritorioPage({
               }
             />
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {processes.map((process) => {
-                const statusMeta =
-                  OFFICE_PROCESS_STATUS_META[process.status as OfficeProcessStatus];
-                const owner = process.owner_profile as { full_name?: string } | null;
-                const phases = (process as { office_process_bpm_phases: { phase: string; stage_status: string }[] })
-                  .office_process_bpm_phases;
-                const faseAtual = formatCurrentBpmPhaseLabel(phases ?? []);
-                const origemLabel =
-                  process.creation_source === "created_in_value_chain"
-                    ? "Criado na cadeia"
-                    : "Catálogo";
-
-                return (
-                  <Card key={process.id} className="border border-border/60">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <CardTitle className="text-base">{process.name}</CardTitle>
-                          <CardDescription>{process.category || "Sem categoria"}</CardDescription>
-                        </div>
-                        <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline">{origemLabel}</Badge>
-                        <span>Fase BPM: {faseAtual}</span>
-                      </div>
-                      {(() => {
-                        const flowcharts =
-                          Array.isArray(process.flowchart_files) && process.flowchart_files.length > 0
-                            ? process.flowchart_files
-                            : process.flowchart_image_url
-                              ? [{ url: process.flowchart_image_url }]
-                              : [];
-                        return flowcharts.length > 0 ? (
-                          <div className="space-y-2">
-                            {flowcharts.slice(0, 2).map((ff: { url: string }, i: number) =>
-                              /\.(png|jpe?g|gif|webp)$/i.test(ff.url) ? (
-                                <img
-                                  key={i}
-                                  src={ff.url}
-                                  alt={`Fluxograma ${i + 1}`}
-                                  className="h-40 w-full rounded-lg border object-contain"
-                                />
-                              ) : (
-                                <a
-                                  key={i}
-                                  href={ff.url}
-                                  download
-                                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                                >
-                                  Baixar fluxograma {flowcharts.length > 1 ? i + 1 : ""}
-                                </a>
-                              )
-                            )}
-                          </div>
-                        ) : null;
-                      })()}
-                      <p className="line-clamp-3 text-sm text-muted-foreground">
-                        {process.description || "Sem descrição cadastrada."}
-                      </p>
-                      <div className="space-y-1 text-sm text-muted-foreground">
-                        <p>
-                          Origem:{" "}
-                          {process.origin === "questionnaire"
-                            ? "Automática"
-                            : process.origin === "value_chain"
-                              ? "Cadeia de valor"
-                              : "Manual"}
-                        </p>
-                        <p>Responsável: {owner?.full_name || "Não definido"}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/escritorio/processos/${process.id}`}
-                          className={buttonVariants({ size: "sm" })}
-                        >
-                          Gerir processo
-                        </Link>
-                        {(() => {
-                          const templates =
-                            Array.isArray(process.template_files) && process.template_files.length > 0
-                              ? process.template_files
-                              : process.template_url
-                                ? [{ url: process.template_url, label: process.template_label }]
-                                : [];
-                          return templates.map((tf: { url: string; label?: string }, i: number) => (
-                            <a
-                              key={i}
-                              href={tf.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              download
-                              className={buttonVariants({ variant: "outline", size: "sm" })}
-                            >
-                              {tf.label || `Baixar template ${templates.length > 1 ? i + 1 : ""}`}
-                            </a>
-                          ));
-                        })()}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+            <ProcessosPortfolioClient items={portfolioItems} query={query} />
           )}
         </CardContent>
       </Card>

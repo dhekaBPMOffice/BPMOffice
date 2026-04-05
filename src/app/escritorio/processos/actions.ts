@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getProfile } from "@/lib/auth";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import {
   buildOfficeProcessSnapshot,
   collectProcessIdsFromAnswers,
@@ -628,4 +628,60 @@ export async function addOfficeProcessAttachment(input: {
 
   revalidatePath(`/escritorio/processos/${officeProcess.id}`);
   return { success: true };
+}
+
+export async function deleteOfficeProcessesBulk(officeProcessIds: string[]) {
+  try {
+    const access = await assertLeaderProfile();
+    if ("error" in access) return { error: access.error };
+
+    const { profile } = access;
+    const officeId = profile.office_id;
+    const uniqueIds = [...new Set(officeProcessIds.map((id) => String(id).trim()).filter(Boolean))];
+    if (uniqueIds.length === 0) {
+      return { error: "Nenhum processo selecionado." };
+    }
+
+    const runDelete = async () => {
+      try {
+        const supabase = await createServiceClient();
+        return supabase
+          .from("office_processes")
+          .delete()
+          .eq("office_id", officeId)
+          .in("id", uniqueIds)
+          .select("id");
+      } catch {
+        const supabase = await createClient();
+        return supabase
+          .from("office_processes")
+          .delete()
+          .eq("office_id", officeId)
+          .in("id", uniqueIds)
+          .select("id");
+      }
+    };
+
+    const { data: deletedRows, error } = await runDelete();
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    const n = deletedRows?.length ?? 0;
+    if (n === 0) {
+      return {
+        error:
+          "Nenhum processo foi eliminado. Confirme que os processos pertencem ao seu escritório ou tente novamente.",
+      };
+    }
+
+    revalidatePath("/escritorio/processos");
+    revalidatePath("/escritorio/processos/visao-geral");
+    revalidatePath("/escritorio/estrategia/cadeia-valor");
+    return { success: true as const, deleted: n };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Erro ao eliminar processos.";
+    return { error: message };
+  }
 }
