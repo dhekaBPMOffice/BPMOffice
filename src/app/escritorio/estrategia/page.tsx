@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -11,7 +10,8 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { IconChip } from "@/components/ui/icon-chip";
 import {
   Target,
-  Link2,
+  Workflow,
+  Compass,
   BarChart3,
   Briefcase,
   FilePlus,
@@ -44,8 +44,8 @@ const sections: Section[] = [
     variant: "teal",
     links: [
       { label: "Objetivos Estratégicos", href: "/escritorio/estrategia/objetivos-estrategicos", icon: Target },
-      { label: "Cadeia de Valor", href: "/escritorio/estrategia/cadeia-valor", icon: Link2 },
-      { label: "Alinhamento Estratégico", href: "/escritorio/estrategia/alinhamento-estrategico", icon: Link2 },
+      { label: "Cadeia de Valor", href: "/escritorio/estrategia/cadeia-valor", icon: Workflow },
+      { label: "Alinhamento Estratégico", href: "/escritorio/estrategia/alinhamento-estrategico", icon: Compass },
     ],
   },
   {
@@ -71,6 +71,11 @@ const sections: Section[] = [
   },
 ];
 
+const linkButtonClass = cn(
+  buttonVariants({ variant: "ghost", size: "default" }),
+  "min-h-10 w-full justify-start gap-2.5 px-5 transition-colors"
+);
+
 export default function EstrategiaPage() {
   return (
     <PageLayout
@@ -78,40 +83,44 @@ export default function EstrategiaPage() {
       description="Planejamento estratégico, cadeia de valor, SWOT e portfólio de serviços."
       icon={Target}
     >
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div
+        className={cn(
+          "grid gap-6 lg:grid-cols-3 lg:items-stretch lg:gap-x-6 lg:gap-y-1.5",
+          "lg:[grid-template-rows:auto_repeat(3,minmax(2.5rem,auto))]"
+        )}
+      >
         {sections.map((section) => (
           <Card
             key={section.title}
-            className="flex flex-col card-hover-shadow hover:-translate-y-0.5"
+            className={cn(
+              "flex flex-col pb-5 card-hover-shadow hover:-translate-y-0.5",
+              "lg:grid lg:row-span-4 lg:[grid-template-rows:subgrid] lg:min-h-0"
+            )}
           >
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                <IconChip variant={section.variant} size="md">
+            <CardHeader className="pb-2">
+              <div className="flex items-start gap-3">
+                <IconChip variant={section.variant} size="md" className="shrink-0">
                   <section.icon className="h-5 w-5 text-white" />
                 </IconChip>
-                <div>
-                  <CardTitle className="text-lg">{section.title}</CardTitle>
-                  <CardDescription className="mt-1">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <CardTitle className="text-lg leading-snug">{section.title}</CardTitle>
+                  <CardDescription className="leading-snug">
                     {section.description}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-2 pt-0">
+            <div className="flex flex-col gap-1.5 lg:contents">
               {section.links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={cn(
-                    buttonVariants({ variant: "ghost", size: "default" }),
-                    "w-full justify-start gap-2.5 transition-colors"
-                  )}
-                >
+                <Link key={link.href} href={link.href} className={linkButtonClass}>
                   <link.icon className="h-4 w-4 shrink-0 text-[var(--identity-primary)]" />
                   {link.label}
                 </Link>
               ))}
-            </CardContent>
+              {section.links.length < 3 ? (
+                <div aria-hidden className="hidden min-h-10 shrink-0 lg:block" />
+              ) : null}
+            </div>
           </Card>
         ))}
       </div>
