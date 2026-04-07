@@ -124,7 +124,7 @@ export default function ConhecimentoPage() {
     <PageLayout
       title="Base de Conhecimento"
       description="Gerencie planos de comunicação, eventos, materiais e modelos."
-      icon={BookOpen}
+      iconName="BookOpen"
       actions={
         <Button onClick={openCreate}>
           <Plus className="h-4 w-4" />

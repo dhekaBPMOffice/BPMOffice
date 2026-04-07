@@ -7,7 +7,7 @@ export default function UserWorkspace() {
     <PageLayout
       title="Área de Trabalho"
       description="Suas demandas e atividades recentes."
-      icon={Briefcase}
+      iconName="Briefcase"
     >
       <Card>
         <CardHeader>

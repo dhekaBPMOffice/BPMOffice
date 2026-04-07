@@ -103,7 +103,21 @@ export function buildOfficeProcessSnapshot(baseProcess: BaseProcess) {
     name: baseProcess.name,
     description: baseProcess.description,
     category: baseProcess.category,
-    template_files: baseProcess.template_files ?? [],
-    flowchart_files: baseProcess.flowchart_files ?? [],
+    // Mantém compatibilidade com dados legados enquanto migração de anexos não for total.
+    template_url: baseProcess.template_url ?? null,
+    template_label: baseProcess.template_label ?? null,
+    flowchart_image_url: baseProcess.flowchart_image_url ?? null,
+    // Copia por valor para evitar qualquer partilha acidental entre snapshots.
+    template_files: Array.isArray(baseProcess.template_files)
+      ? baseProcess.template_files.map((file) => ({
+          url: file.url,
+          ...(file.label ? { label: file.label } : {}),
+        }))
+      : [],
+    flowchart_files: Array.isArray(baseProcess.flowchart_files)
+      ? baseProcess.flowchart_files.map((file) => ({
+          url: file.url,
+        }))
+      : [],
   };
 }

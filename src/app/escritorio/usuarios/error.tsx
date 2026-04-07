@@ -17,7 +17,7 @@ export default function UsuariosError({
   }, [error]);
 
   return (
-    <PageLayout title="Usuários" icon={Users}>
+    <PageLayout title="Usuários" iconName="Users">
       <div className="flex flex-col gap-4 rounded-lg border border-destructive/50 bg-destructive/10 p-6">
         <div className="flex items-center gap-2 text-destructive">
           <AlertCircle className="h-5 w-5" />

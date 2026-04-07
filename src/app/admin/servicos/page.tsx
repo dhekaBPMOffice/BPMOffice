@@ -140,7 +140,7 @@ export default function ServicosPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Catálogo de Serviços" description="Gerencie o catálogo base de serviços da plataforma." icon={Briefcase}>
+      <PageLayout title="Catálogo de Serviços" description="Gerencie o catálogo base de serviços da plataforma." iconName="Briefcase">
         <p className="text-muted-foreground">Carregando...</p>
       </PageLayout>
     );
@@ -154,7 +154,7 @@ export default function ServicosPage() {
     <PageLayout
       title="Catálogo de Serviços"
       description="Gerencie o catálogo base de serviços da plataforma."
-      icon={Briefcase}
+      iconName="Briefcase"
       actions={
         <Button onClick={() => setShowNew(!showNew)}>
           <Plus className="h-4 w-4" />

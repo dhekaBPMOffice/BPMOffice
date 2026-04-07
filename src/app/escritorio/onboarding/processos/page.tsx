@@ -15,7 +15,7 @@ export default async function ProcessOnboardingPage() {
       <PageLayout
         title="Onboarding de Processos"
         description="Seu escritório precisa estar vinculado para continuar."
-        icon={ClipboardList}
+        iconName="ClipboardList"
       >
         <p className="text-destructive">Escritório não encontrado.</p>
       </PageLayout>
@@ -64,7 +64,7 @@ export default async function ProcessOnboardingPage() {
       <PageLayout
         title="Onboarding de Processos"
         description="Nenhum questionário ativo foi configurado."
-        icon={ClipboardList}
+        iconName="ClipboardList"
       >
         <Card>
           <CardHeader>
@@ -87,7 +87,7 @@ export default async function ProcessOnboardingPage() {
     <PageLayout
       title="Onboarding de Processos"
       description="Responda ao questionário para que o sistema monte a estrutura inicial de processos do seu escritório."
-      icon={ClipboardList}
+      iconName="ClipboardList"
     >
       <ProcessOnboardingForm questionnaire={questionnaire} />
     </PageLayout>

@@ -33,7 +33,7 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
 
   if (!profile.office_id) {
     return (
-      <PageLayout title="Demandas" icon={ClipboardList}>
+      <PageLayout title="Demandas" iconName="ClipboardList">
         <p className="text-destructive">Erro: escritório não encontrado.</p>
       </PageLayout>
     );
@@ -55,7 +55,7 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
 
   if (error) {
     return (
-      <PageLayout title="Demandas" icon={ClipboardList}>
+      <PageLayout title="Demandas" iconName="ClipboardList">
         <p className="text-destructive">Erro ao carregar demandas: {error.message}</p>
       </PageLayout>
     );
@@ -107,7 +107,7 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
     <PageLayout
       title="Demandas"
       description="Gerencie as demandas do ciclo BPM."
-      icon={ClipboardList}
+      iconName="ClipboardList"
       actions={
         <Link
           href="/escritorio/demandas/nova"

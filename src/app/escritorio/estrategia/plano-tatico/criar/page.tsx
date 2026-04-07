@@ -10,7 +10,7 @@ export default async function CriarPlanoTaticoPage() {
     <PageLayout
       title="Criar Plano Tático"
       description="Cadastre um novo plano tático alinhado à estratégia com auxílio de IA."
-      icon={Map}
+      iconName="Map"
       backHref="/escritorio/estrategia/plano-tatico"
     >
       {error ? (

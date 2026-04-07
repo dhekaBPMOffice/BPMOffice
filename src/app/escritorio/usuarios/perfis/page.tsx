@@ -159,7 +159,7 @@ export default function PerfisPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Perfis Customizados" description="Carregando..." icon={Shield}>
+      <PageLayout title="Perfis Customizados" description="Carregando..." iconName="Shield">
         <span />
       </PageLayout>
     );
@@ -169,7 +169,7 @@ export default function PerfisPage() {
     <PageLayout
       title="Perfis Customizados"
       description="Crie e gerencie perfis com permissões específicas por recurso."
-      icon={Shield}
+      iconName="Shield"
       actions={
         <Button onClick={openCreate}>
           <Plus className="h-4 w-4" />

@@ -82,7 +82,7 @@ export default function EstrategiaPage() {
     <PageLayout
       title="Estratégia"
       description="Planejamento estratégico, cadeia de valor, SWOT e portfólio de serviços."
-      icon={Target}
+      iconName="Target"
     >
       <div
         className={cn(

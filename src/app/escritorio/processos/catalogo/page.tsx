@@ -14,7 +14,7 @@ export default async function CatalogoComplementarProcessosPage() {
 
   if (!profile.office_id) {
     return (
-      <PageLayout title="Processos não selecionados" icon={ClipboardList}>
+      <PageLayout title="Processos não selecionados" iconName="ClipboardList">
         <p className="text-destructive">Escritório não encontrado.</p>
       </PageLayout>
     );
@@ -46,7 +46,7 @@ export default async function CatalogoComplementarProcessosPage() {
     <PageLayout
       title="Processos não selecionados"
       description="Avalie os processos da estrutura padrão que ainda não fazem parte da lista do escritório."
-      icon={ClipboardList}
+      iconName="ClipboardList"
       backHref="/escritorio/estrategia/cadeia-valor?aba=gestao"
       backLabel="Voltar para Gestão de Processos"
       actions={

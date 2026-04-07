@@ -28,7 +28,7 @@ export default async function LevantamentoPage({
   return (
     <PageLayout
       title={`Levantamento - ${demand.title}`}
-      icon={Search}
+      iconName="Search"
       backHref={`/escritorio/demandas/${id}`}
     >
       <LevantamentoPhase demandId={id} officeId={profile.office_id} />

@@ -41,7 +41,7 @@ export default async function PlanoTaticoPage() {
     <PageLayout
       title="Planos Táticos"
       description="Visualize e gerencie os planos táticos do escritório."
-      icon={Map}
+      iconName="Map"
       backHref="/escritorio/estrategia"
       actions={
         <Link

@@ -18,7 +18,7 @@ export default async function ManualPage() {
     <PageLayout
       title="Manual do Usuário"
       description="Documentação das funcionalidades disponíveis para seu perfil."
-      icon={Book}
+      iconName="Book"
     >
       <div className="space-y-8">
         {firstSteps.length > 0 && <FirstStepsRadial steps={firstSteps} />}

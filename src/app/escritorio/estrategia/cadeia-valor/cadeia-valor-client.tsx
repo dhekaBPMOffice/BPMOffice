@@ -1250,7 +1250,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     <PageLayout
       title="Cadeia de Valor"
       description="Visual operacional para alto volume de processos com navegação rápida e visão executiva."
-      icon={Network}
+      iconName="Network"
       backHref="/escritorio/estrategia"
     >
       <div className="space-y-6">

@@ -92,14 +92,14 @@ export default function IaPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Configuração de IA" description="Configure o provedor, modelo e prompts padrão para as fases do ciclo BPM." icon={Sparkles}>
+      <PageLayout title="Configuração de IA" description="Configure o provedor, modelo e prompts padrão para as fases do ciclo BPM." iconName="Sparkles">
         <p className="text-muted-foreground">Carregando...</p>
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout title="Configuração de IA" description="Configure o provedor, modelo e prompts padrão para as fases do ciclo BPM." icon={Sparkles}>
+    <PageLayout title="Configuração de IA" description="Configure o provedor, modelo e prompts padrão para as fases do ciclo BPM." iconName="Sparkles">
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
           <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">

@@ -55,7 +55,7 @@ export default async function AdminEscritorioProcessosPage({
     <PageLayout
       title={`Processos de ${office.name}`}
       description="Visão administrativa das respostas do onboarding e da lista gerada para o escritório."
-      icon={ClipboardList}
+      iconName="ClipboardList"
       backHref={`/admin/escritorios/${office.id}`}
       backLabel="Voltar para escritório"
       actions={

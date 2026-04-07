@@ -264,7 +264,7 @@ export default function FormBuilderPage() {
       <PageLayout
         title="Formulário"
         description="Carregando..."
-        icon={ClipboardList}
+        iconName="ClipboardList"
         backHref="/admin/formularios"
       >
         <p className="text-muted-foreground">Carregando...</p>
@@ -276,7 +276,7 @@ export default function FormBuilderPage() {
     <PageLayout
       title={form?.title ?? "Formulário"}
       description="Builder estilo Google Forms. Configure perguntas e, se habilitado, vincule processos."
-      icon={ClipboardList}
+      iconName="ClipboardList"
       backHref="/admin/formularios"
       backLabel="Voltar aos formulários"
       actions={

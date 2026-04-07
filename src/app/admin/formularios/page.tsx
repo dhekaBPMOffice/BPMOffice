@@ -87,7 +87,7 @@ export default function FormulariosPage() {
       <PageLayout
         title="Formulários"
         description="Crie e gerencie formulários (incluindo o de ativação de processos)."
-        icon={ClipboardList}
+        iconName="ClipboardList"
       >
         <p className="text-muted-foreground">Carregando...</p>
       </PageLayout>
@@ -98,7 +98,7 @@ export default function FormulariosPage() {
     <PageLayout
       title="Formulários"
       description="Crie e gerencie formulários. Use o de ativação para onboarding de processos ou crie formulários genéricos."
-      icon={ClipboardList}
+      iconName="ClipboardList"
       actions={
         <Button onClick={() => setShowNew(!showNew)}>
           <Plus className="mr-2 h-4 w-4" />

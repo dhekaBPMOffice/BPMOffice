@@ -10,7 +10,7 @@ export default async function NovoUsuarioPage() {
 
   if (!profile.office_id) {
     return (
-      <PageLayout title="Novo Usuário" icon={UserPlus} backHref="/escritorio/usuarios">
+      <PageLayout title="Novo Usuário" iconName="UserPlus" backHref="/escritorio/usuarios">
         <p className="text-destructive">Erro: escritório não encontrado.</p>
       </PageLayout>
     );
@@ -26,7 +26,7 @@ export default async function NovoUsuarioPage() {
     <PageLayout
       title="Novo Usuário"
       description="Crie um novo usuário no escritório."
-      icon={UserPlus}
+      iconName="UserPlus"
       backHref="/escritorio/usuarios"
     >
       <NovoUsuarioForm customRoles={customRoles ?? []} />

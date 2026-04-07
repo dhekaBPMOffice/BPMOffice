@@ -17,7 +17,7 @@ export default async function ProcessosVisaoGeralPage() {
 
   if (!profile.office_id) {
     return (
-      <PageLayout title="Visão geral" icon={BarChart3}>
+      <PageLayout title="Visão geral" iconName="BarChart3">
         <p className="text-destructive">Escritório não encontrado.</p>
       </PageLayout>
     );
@@ -66,7 +66,7 @@ export default async function ProcessosVisaoGeralPage() {
     <PageLayout
       title="Visão geral dos processos"
       description="Indicadores do portfólio do escritório e atalhos para listas filtradas."
-      icon={BarChart3}
+      iconName="BarChart3"
       backHref="/escritorio/estrategia/cadeia-valor?aba=gestao"
       backLabel="Voltar para Gestão de Processos"
     >

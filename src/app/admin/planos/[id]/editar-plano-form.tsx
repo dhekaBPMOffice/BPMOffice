@@ -81,7 +81,7 @@ export function EditarPlanoForm({ plan }: { plan: Plan }) {
     <PageLayout
       title="Editar Plano"
       description={`Alterar dados do plano ${plan.name}.`}
-      icon={CreditCard}
+      iconName="CreditCard"
       backHref="/admin/planos"
       backLabel="Voltar para planos"
     >

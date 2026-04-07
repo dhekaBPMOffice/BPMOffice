@@ -133,7 +133,7 @@ export default function BrandingPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Identidade Visual" description="Carregando..." icon={Palette}>
+      <PageLayout title="Identidade Visual" description="Carregando..." iconName="Palette">
         <span />
       </PageLayout>
     );
@@ -143,7 +143,7 @@ export default function BrandingPage() {
     <PageLayout
       title="Identidade Visual"
       description="Personalize a aparência do escritório na plataforma."
-      icon={Palette}
+      iconName="Palette"
     >
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

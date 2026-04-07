@@ -230,7 +230,7 @@ export default function ModelosDocumentoPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Modelos de Documento" description="Carregando..." icon={FileText}>
+      <PageLayout title="Modelos de Documento" description="Carregando..." iconName="FileText">
         <p className="text-muted-foreground">Carregando...</p>
       </PageLayout>
     );
@@ -240,7 +240,7 @@ export default function ModelosDocumentoPage() {
     <PageLayout
       title="Modelos de Documento"
       description="Configure os modelos de exportação PDF/DOCX para cada tipo de documento do sistema."
-      icon={FileText}
+      iconName="FileText"
     >
       {error && (
         <div className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>

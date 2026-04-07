@@ -86,7 +86,7 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
     <PageLayout
       title={office.name}
       description="Detalhes e configurações do escritório."
-      icon={Building2}
+      iconName="Building2"
       backHref="/admin/escritorios"
       backLabel="Voltar para escritórios"
     >

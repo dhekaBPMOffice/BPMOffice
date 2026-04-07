@@ -87,7 +87,7 @@ export default function QuestionarioProcessosPage() {
     <PageLayout
       title="Questionário de Ativação"
       description="Monte o questionário que definirá automaticamente os processos de cada escritório."
-      icon={ClipboardList}
+      iconName="ClipboardList"
       actions={
         <Button onClick={() => setShowNew((current) => !current)}>
           <Plus className="h-4 w-4" />

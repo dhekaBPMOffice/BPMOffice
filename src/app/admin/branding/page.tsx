@@ -129,14 +129,14 @@ export default function BrandingPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Identidade Visual" description="Configure a identidade visual padrão da plataforma." icon={Palette}>
+      <PageLayout title="Identidade Visual" description="Configure a identidade visual padrão da plataforma." iconName="Palette">
         <p className="text-muted-foreground">Carregando...</p>
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout title="Identidade Visual" description="Configure a identidade visual padrão da plataforma." icon={Palette}>
+    <PageLayout title="Identidade Visual" description="Configure a identidade visual padrão da plataforma." iconName="Palette">
       <Card>
         <CardHeader>
           <CardTitle>Branding Padrão</CardTitle>

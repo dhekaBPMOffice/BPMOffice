@@ -82,7 +82,7 @@ export default function HistoricoPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Histórico de Versões" icon={History} backHref={`/escritorio/estrategia/swot/${planId}`}>
+      <PageLayout title="Histórico de Versões" iconName="History" backHref={`/escritorio/estrategia/swot/${planId}`}>
         <div className="flex items-center justify-center min-h-[50vh]">
           <div className="text-center space-y-2">
             <div className="h-8 w-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
@@ -99,7 +99,7 @@ export default function HistoricoPage() {
     <PageLayout
       title="Histórico de Versões"
       description={`${plan?.name ?? "Plano Estratégico"} · ${plan?.year ?? ""}`}
-      icon={History}
+      iconName="History"
       backHref={`/escritorio/estrategia/swot/${planId}`}
       className="max-w-3xl mx-auto"
     >

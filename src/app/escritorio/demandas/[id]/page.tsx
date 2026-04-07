@@ -24,7 +24,7 @@ export default async function DemandaDetailPage({
 
   if (!profile.office_id) {
     return (
-      <PageLayout title="Demanda" icon={ClipboardList} backHref="/escritorio/demandas">
+      <PageLayout title="Demanda" iconName="ClipboardList" backHref="/escritorio/demandas">
         <p className="text-destructive">Erro: escritório não encontrado.</p>
       </PageLayout>
     );
@@ -81,7 +81,7 @@ export default async function DemandaDetailPage({
     <PageLayout
       title={demand.title}
       description={demand.description ?? undefined}
-      icon={ClipboardList}
+      iconName="ClipboardList"
       backHref="/escritorio/demandas"
       actions={
         <div className="flex flex-wrap items-center gap-2">

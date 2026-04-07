@@ -94,7 +94,7 @@ export default function EscritorioBackupPage() {
     <PageLayout
       title="Backup do Escritório"
       description="Crie backups manuais e configure o agendamento automático."
-      icon={HardDrive}
+      iconName="HardDrive"
     >
       {error && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>

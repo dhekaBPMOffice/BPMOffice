@@ -220,7 +220,7 @@ export default function CapacitacaoPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Capacitação" description="Carregando..." icon={GraduationCap}>
+      <PageLayout title="Capacitação" description="Carregando..." iconName="GraduationCap">
         <span />
       </PageLayout>
     );
@@ -230,7 +230,7 @@ export default function CapacitacaoPage() {
     <PageLayout
       title="Capacitação"
       description="Planos de treinamento e registros de conclusão por usuário."
-      icon={GraduationCap}
+      iconName="GraduationCap"
     >
       {error && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>

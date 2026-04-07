@@ -123,7 +123,7 @@ export default function FrameworksPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Frameworks de Processo" description="Gerencie os frameworks padrão de processos disponíveis na plataforma." icon={Layers}>
+      <PageLayout title="Frameworks de Processo" description="Gerencie os frameworks padrão de processos disponíveis na plataforma." iconName="Layers">
         <p className="text-muted-foreground">Carregando...</p>
       </PageLayout>
     );
@@ -137,7 +137,7 @@ export default function FrameworksPage() {
     <PageLayout
       title="Frameworks de Processo"
       description="Gerencie os frameworks padrão de processos disponíveis na plataforma."
-      icon={Layers}
+      iconName="Layers"
       actions={
         <Button onClick={() => setShowNew(!showNew)}>
           <Plus className="h-4 w-4" />

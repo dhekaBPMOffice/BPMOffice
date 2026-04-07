@@ -28,7 +28,7 @@ export default async function PlanejamentoPage({
   return (
     <PageLayout
       title={`Planejamento - ${demand.title}`}
-      icon={CalendarDays}
+      iconName="CalendarDays"
       backHref={`/escritorio/demandas/${id}`}
     >
       <PlanejamentoPhase demandId={id} officeId={profile.office_id} />

@@ -28,7 +28,7 @@ export default async function ModelagemPage({
   return (
     <PageLayout
       title={`Modelagem - ${demand.title}`}
-      icon={Shapes}
+      iconName="Shapes"
       backHref={`/escritorio/demandas/${id}`}
     >
       <ModelagemPhase demandId={id} officeId={profile.office_id} />

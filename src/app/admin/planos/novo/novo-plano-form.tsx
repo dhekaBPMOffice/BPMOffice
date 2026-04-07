@@ -64,7 +64,7 @@ export function NovoPlanoForm() {
     <PageLayout
       title="Novo Plano"
       description="Cadastre um novo plano comercial na plataforma."
-      icon={CreditCard}
+      iconName="CreditCard"
       backHref="/admin/planos"
       backLabel="Voltar para planos"
     >

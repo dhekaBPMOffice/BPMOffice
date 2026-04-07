@@ -28,7 +28,7 @@ export default async function EncerramentoPage({
   return (
     <PageLayout
       title={`Encerramento - ${demand.title}`}
-      icon={Flag}
+      iconName="Flag"
       backHref={`/escritorio/demandas/${id}`}
     >
       <EncerramentoPhase demandId={id} officeId={profile.office_id} />

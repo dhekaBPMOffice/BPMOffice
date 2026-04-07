@@ -221,7 +221,7 @@ export default function SwotPage() {
     <PageLayout
       title="Análise SWOT (F.O.F.A.)"
       description="Forças, Oportunidades, Fraquezas e Ameaças. Importe uma imagem da matriz, crie uma análise manualmente ou acompanhe o histórico das suas análises."
-      icon={Grid2x2}
+      iconName="Grid2x2"
       backHref="/escritorio/estrategia"
     >
       <div className="space-y-8">

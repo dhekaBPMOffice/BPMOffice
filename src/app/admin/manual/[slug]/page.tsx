@@ -3,7 +3,6 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { markdownToHtml } from "@/lib/manual";
 import { ADMIN_MANUAL_MODULES } from "@/lib/manual/admin-config";
-import { MANUAL_ICON_MAP } from "@/lib/manual/icons";
 import { PageLayout } from "@/components/layout/page-layout";
 import { ChevronLeft } from "lucide-react";
 
@@ -20,13 +19,11 @@ export default async function AdminManualSlugPage({ params }: AdminManualSlugPag
     notFound();
   }
 
-  const Icon = MANUAL_ICON_MAP[module.iconName];
-
   return (
     <PageLayout
       title={module.title}
       description={module.shortDescription}
-      icon={Icon}
+      iconName={module.iconName}
       actions={
         <Link
           href="/admin/manual"

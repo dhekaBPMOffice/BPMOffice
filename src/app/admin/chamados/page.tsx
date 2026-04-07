@@ -43,7 +43,7 @@ export default async function ChamadosPage({ searchParams: searchParamsPromise }
 
   if (error) {
     return (
-      <PageLayout title="Chamados de Suporte" description="Lista de chamados de suporte dos escritórios." icon={Headphones}>
+      <PageLayout title="Chamados de Suporte" description="Lista de chamados de suporte dos escritórios." iconName="Headphones">
         <p className="text-destructive">Erro ao carregar chamados: {error.message}</p>
       </PageLayout>
     );
@@ -81,7 +81,7 @@ export default async function ChamadosPage({ searchParams: searchParamsPromise }
       : (ticket.offices as { name: string } | null)?.name ?? "—";
 
   return (
-    <PageLayout title="Chamados de Suporte" description="Lista de chamados de suporte dos escritórios." icon={Headphones}>
+    <PageLayout title="Chamados de Suporte" description="Lista de chamados de suporte dos escritórios." iconName="Headphones">
       <Card>
         <CardHeader>
           <CardTitle>Lista de Chamados</CardTitle>

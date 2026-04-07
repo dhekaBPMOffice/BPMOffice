@@ -36,7 +36,7 @@ export default async function AdministradoresPage() {
       <PageLayout
         title="Administradores Master"
         description="Gerencie quem tem acesso à área de administração da plataforma."
-        icon={ShieldCheck}
+        iconName="ShieldCheck"
       >
         <p className="text-destructive">Erro ao carregar administradores: {error.message}</p>
       </PageLayout>
@@ -50,7 +50,7 @@ export default async function AdministradoresPage() {
     <PageLayout
       title="Administradores Master"
       description="Gerencie quem tem acesso à área de administração da plataforma."
-      icon={ShieldCheck}
+      iconName="ShieldCheck"
     >
       <div className="space-y-6">
         <Card>

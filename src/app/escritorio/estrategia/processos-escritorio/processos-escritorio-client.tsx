@@ -232,7 +232,7 @@ function ProcessosTab({
     <PageLayout
       title="Processos do Escritório"
       description="Processos vindos do formulário de ativação ou adicionados pelo catálogo complementar. Gerencie, filtre ou acesse a gestão individual de cada processo."
-      icon={ClipboardList}
+      iconName="ClipboardList"
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Link

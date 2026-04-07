@@ -152,7 +152,7 @@ export default function NotificacoesPage() {
   };
 
   return (
-    <PageLayout title="Notificações" description="Envie notificações para os escritórios e visualize o histórico." icon={Bell}>
+    <PageLayout title="Notificações" description="Envie notificações para os escritórios e visualize o histórico." iconName="Bell">
       <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>

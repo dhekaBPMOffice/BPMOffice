@@ -105,7 +105,7 @@ export default function EscritorioNotificacoesPage() {
     <PageLayout
       title="Notificações"
       description="Notificações enviadas para o seu escritório."
-      icon={Bell}
+      iconName="Bell"
     >
       <Card>
         <CardHeader>

@@ -235,7 +235,7 @@ export default function ObjetivosEstrategicosPage() {
     <PageLayout
       title="Objetivos Estratégicos"
       description="Visualize e organize os objetivos; use os botões ao lado para cadastrar ou importar."
-      icon={Target}
+      iconName="Target"
       backHref="/escritorio/estrategia"
       actions={
         <div className="flex flex-wrap items-center justify-end gap-2">

@@ -91,7 +91,7 @@ export default function ConfiguracoesPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Configurações" description="Carregando..." icon={Settings}>
+      <PageLayout title="Configurações" description="Carregando..." iconName="Settings">
         <span />
       </PageLayout>
     );
@@ -101,7 +101,7 @@ export default function ConfiguracoesPage() {
     <PageLayout
       title="Configurações"
       description="Configure IA, notificações e preferências do escritório."
-      icon={Settings}
+      iconName="Settings"
     >
       <form onSubmit={handleSubmit}>
         <Tabs defaultValue="ai">

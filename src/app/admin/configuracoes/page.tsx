@@ -128,14 +128,14 @@ export default function ConfiguracoesPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Configurações Globais" description="Configure parâmetros padrão da plataforma." icon={Settings}>
+      <PageLayout title="Configurações Globais" description="Configure parâmetros padrão da plataforma." iconName="Settings">
         <p className="text-muted-foreground">Carregando...</p>
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout title="Configurações Globais" description="Configure parâmetros padrão da plataforma." icon={Settings}>
+    <PageLayout title="Configurações Globais" description="Configure parâmetros padrão da plataforma." iconName="Settings">
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
           <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">

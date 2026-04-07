@@ -52,7 +52,7 @@ export function FrameworkContent({
     <PageLayout
       title="Framework de Processos"
       description="Selecione quais frameworks de processo estão ativos para o seu escritório."
-      icon={Layers}
+      iconName="Layers"
       backHref="/escritorio/estrategia"
     >
       <div className="space-y-6">

@@ -423,7 +423,7 @@ export default function PortfolioPage() {
       <PageLayout
         title="Portfólio de Serviços"
         description="Carregando..."
-        icon={Briefcase}
+        iconName="Briefcase"
         backHref="/escritorio/estrategia"
       >
         <p className="text-muted-foreground">Carregando...</p>
@@ -435,7 +435,7 @@ export default function PortfolioPage() {
     <PageLayout
       title="Portfólio de Serviços"
       description="Gerencie o catálogo de serviços e visualize demanda x capacidade."
-      icon={Briefcase}
+      iconName="Briefcase"
       backHref="/escritorio/estrategia"
     >
       <div className="space-y-8">

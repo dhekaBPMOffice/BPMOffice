@@ -340,7 +340,7 @@ export default function AdminProcessosPage() {
     <PageLayout
       title="Catálogo de Processos"
       description="Cadastre os processos padrão que poderão ser atribuídos aos escritórios."
-      icon={ClipboardList}
+      iconName="ClipboardList"
       actions={
         <Button onClick={() => setShowNew((current) => !current)}>
           <Plus className="h-4 w-4" />
@@ -356,14 +356,24 @@ export default function AdminProcessosPage() {
 
       {showNew && (
         <Card>
-          <CardHeader>
-            <CardTitle>Novo processo padrão</CardTitle>
-            <CardDescription>
-              Cadastre o processo com descrição, template, fluxograma e checklist sugerido.
-            </CardDescription>
+          <CardHeader className="flex flex-col gap-4 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1.5">
+              <CardTitle>Novo processo padrão</CardTitle>
+              <CardDescription>
+                Cadastre o processo com descrição, template, fluxograma e checklist sugerido.
+              </CardDescription>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowNew(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" form="new-base-process-form" disabled={creating}>
+                {creating ? "Criando…" : "Criar processo"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleCreate} className="grid gap-4 md:grid-cols-2">
+            <form id="new-base-process-form" onSubmit={handleCreate} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Nome</Label>
                 <Input
@@ -396,75 +406,122 @@ export default function AdminProcessosPage() {
               <div className="space-y-2 md:col-span-2">
                 <Label>Arquivos de template</Label>
                 <p className="text-xs text-muted-foreground">
-                  Aceita todos os formatos: PDF, imagens, planilhas, documentos, etc. Adicione 1 ou mais.
+                  PDF, imagens, planilhas, documentos, etc.
                 </p>
                 {templateFilesToAdd.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 rounded-lg border p-2">
-                    <Input
-                      placeholder="Rótulo (opcional)"
-                      value={item.label}
-                      onChange={(e) =>
-                        setTemplateFilesToAdd((prev) =>
-                          prev.map((x, j) => (j === i ? { ...x, label: e.target.value } : x))
-                        )
-                      }
-                      className="flex-1"
-                    />
-                    <span className="text-xs truncate max-w-[140px]">{item.file.name}</span>
+                  <div
+                    key={`${item.file.name}-${item.file.size}-${i}`}
+                    className="flex flex-col gap-2 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:gap-2"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Label className="text-[11px] text-muted-foreground">Rótulo (opcional)</Label>
+                        <Badge variant="warning">Pendente</Badge>
+                      </div>
+                      <Input
+                        placeholder="Rótulo (opcional)"
+                        value={item.label}
+                        onChange={(e) =>
+                          setTemplateFilesToAdd((prev) =>
+                            prev.map((x, j) => (j === i ? { ...x, label: e.target.value } : x))
+                          )
+                        }
+                        aria-label={`Rótulo do ficheiro ${item.file.name}`}
+                      />
+                      <p className="text-xs text-muted-foreground truncate" title={item.file.name}>
+                        Ficheiro local: {item.file.name}
+                      </p>
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
+                      className="shrink-0 self-end sm:self-center"
                       onClick={() => setTemplateFilesToAdd((prev) => prev.filter((_, j) => j !== i))}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 ))}
-                <Input
-                  type="file"
-                  multiple
-                  accept="*/*"
-                  onChange={(e) => {
-                    const files = e.target.files;
-                    if (!files?.length) return;
-                    setTemplateFilesToAdd((prev) => [
-                      ...prev,
-                      ...Array.from(files).map((file) => ({ file, label: "" })),
-                    ]);
-                    e.target.value = "";
-                  }}
-                />
+                <div className="flex gap-2">
+                  <input
+                    id="newProcessTemplateFiles"
+                    type="file"
+                    multiple
+                    accept="*/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      if (!files?.length) return;
+                      setTemplateFilesToAdd((prev) => [
+                        ...prev,
+                        ...Array.from(files).map((file) => ({ file, label: "" })),
+                      ]);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById("newProcessTemplateFiles")?.click()}
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    Adicionar arquivos
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Arquivos do fluxograma</Label>
                 <p className="text-xs text-muted-foreground">
-                  Apenas PNG ou BPM (.png, .bpm, .bpmn, .bpms). Adicione 1 ou mais.
+                  PNG ou BPM (.png, .bpm, .bpmn, .bpms).
                 </p>
                 {flowchartFilesToAdd.map((file, i) => (
-                  <div key={i} className="flex items-center gap-2 rounded-lg border p-2">
-                    <span className="text-sm truncate flex-1">{file.name}</span>
+                  <div
+                    key={`${file.name}-${file.size}-${i}`}
+                    className="flex flex-col gap-2 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:gap-2"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="warning">Pendente</Badge>
+                        <span className="text-sm font-medium truncate">{file.name}</span>
+                      </div>
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
+                      className="shrink-0"
                       onClick={() => setFlowchartFilesToAdd((prev) => prev.filter((_, j) => j !== i))}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 ))}
-                <Input
-                  type="file"
-                  multiple
-                  accept=".png,.bpm,.bpmn,.bpms"
-                  onChange={(e) => {
-                    const files = e.target.files;
-                    if (!files?.length) return;
-                    setFlowchartFilesToAdd((prev) => [...prev, ...Array.from(files)]);
-                    e.target.value = "";
-                  }}
-                />
+                <div className="flex gap-2">
+                  <input
+                    id="newProcessFlowchartFiles"
+                    type="file"
+                    multiple
+                    accept=".png,.bpm,.bpmn,.bpms"
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      if (!files?.length) return;
+                      setFlowchartFilesToAdd((prev) => [...prev, ...Array.from(files)]);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById("newProcessFlowchartFiles")?.click()}
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    Adicionar fluxogramas
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="checklist">Checklist sugerido</Label>
@@ -475,14 +532,6 @@ export default function AdminProcessosPage() {
                   rows={5}
                   placeholder={"Uma ação por linha\nEx: Definir responsável\nEx: Publicar procedimento"}
                 />
-              </div>
-              <div className="flex gap-2 md:col-span-2">
-                <Button type="submit" disabled={creating}>
-                  {creating ? "Criando..." : "Criar processo"}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setShowNew(false)}>
-                  Cancelar
-                </Button>
               </div>
             </form>
           </CardContent>

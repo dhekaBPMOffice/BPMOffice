@@ -247,7 +247,7 @@ export default function AdminObjetivosEscritorioPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Objetivos do Escritório" icon={Target}>
+      <PageLayout title="Objetivos do Escritório" iconName="Target">
         <p className="text-muted-foreground">Carregando...</p>
       </PageLayout>
     );
@@ -256,7 +256,7 @@ export default function AdminObjetivosEscritorioPage() {
   return (
     <PageLayout
       title="Objetivos do Escritório"
-      icon={Target}
+      iconName="Target"
       actions={
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button

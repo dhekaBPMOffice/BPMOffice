@@ -329,7 +329,7 @@ export default function ObjetivosEscritorioPage() {
     <PageLayout
       title="Objetivos do Escritório"
       description="Visualize a lista abaixo; use os botões ao lado para importar, escolher do catálogo ou cadastrar manualmente."
-      icon={Target}
+      iconName="Target"
       backHref="/escritorio/estrategia"
       actions={
         <div className="flex flex-wrap items-center justify-end gap-2">

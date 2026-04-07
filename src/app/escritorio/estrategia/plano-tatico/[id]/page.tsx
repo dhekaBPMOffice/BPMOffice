@@ -24,7 +24,7 @@ export default async function PlanoTaticoDetailPage({ params }: PageProps) {
     <PageLayout
       title={docResult.data.title}
       description="Visualize e gerencie as ações do plano tático."
-      icon={Map}
+      iconName="Map"
       backHref="/escritorio/estrategia/plano-tatico"
     >
       <DocumentDetail

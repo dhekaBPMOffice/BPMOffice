@@ -28,7 +28,7 @@ export default async function ImplantacaoPage({
   return (
     <PageLayout
       title={`Implantação - ${demand.title}`}
-      icon={Rocket}
+      iconName="Rocket"
       backHref={`/escritorio/demandas/${id}`}
     >
       <ImplantacaoPhase demandId={id} officeId={profile.office_id} />

@@ -94,7 +94,7 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
 
   if (error) {
     return (
-      <PageLayout title="Escritórios" description="Gerencie os escritórios da plataforma BPM Office." icon={Building2}>
+      <PageLayout title="Escritórios" description="Gerencie os escritórios da plataforma BPM Office." iconName="Building2">
         <p className="text-destructive">Erro ao carregar escritórios: {error.message}</p>
       </PageLayout>
     );
@@ -191,7 +191,7 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
     <PageLayout
       title="Escritórios"
       description="Gerencie os escritórios da plataforma BPM Office."
-      icon={Building2}
+      iconName="Building2"
       actions={<NovoEscritorioButton />}
     >
       {novoErro && (

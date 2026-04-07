@@ -31,7 +31,7 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
 
   if (!profile.office_id) {
     return (
-      <PageLayout title="Usuários" icon={Users}>
+      <PageLayout title="Usuários" iconName="Users">
         <p className="text-destructive">Erro: escritório não encontrado.</p>
       </PageLayout>
     );
@@ -69,7 +69,7 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
 
   if (error) {
     return (
-      <PageLayout title="Usuários" icon={Users}>
+      <PageLayout title="Usuários" iconName="Users">
         <p className="text-destructive">Erro ao carregar usuários: {error.message}</p>
       </PageLayout>
     );
@@ -114,7 +114,7 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
     <PageLayout
       title="Usuários"
       description="Gerencie os usuários do escritório."
-      icon={Users}
+      iconName="Users"
       actions={
         <div className="flex gap-2">
           <Link

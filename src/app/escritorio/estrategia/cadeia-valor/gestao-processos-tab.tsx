@@ -235,7 +235,7 @@ export function GestaoProcessosTab({ items, stats }: GestaoProcessosTabProps) {
     <PageLayout
       title="Gestão de Processos"
       description="Portfólio completo dos processos do escritório. Adicione, remova ou acesse a gestão individual de cada processo."
-      icon={ClipboardList}
+      iconName="ClipboardList"
       actions={
         <div className="flex flex-wrap gap-2">
           <Link

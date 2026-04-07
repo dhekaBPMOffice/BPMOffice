@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { OFFICE_PROCESS_STATUS_META } from "@/lib/processes";
 import type {
@@ -12,11 +12,14 @@ import type {
 import {
   addOfficeProcessAttachment,
   addOfficeProcessChecklistItem,
+  deleteOfficeProcessAttachment,
   toggleOfficeProcessChecklistItem,
   updateOfficeProcessBpmPhase,
   updateOfficeProcessDetails,
   uploadOfficeAttachmentFile,
+  uploadOfficeProcessMaterialFile,
 } from "../actions";
+import { displayTemplateName, fileNameFromUrl } from "@/lib/process-file-display";
 import {
   BPM_PHASE_LABELS,
   BPM_PHASE_SLUGS,
@@ -38,7 +41,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trash2 } from "lucide-react";
+import { ExternalLink, Trash2 } from "lucide-react";
 
 const ATTACHMENT_TYPES: { value: OfficeProcessAttachmentType; label: string }[] = [
   { value: "template", label: "Template" },
@@ -47,8 +50,61 @@ const ATTACHMENT_TYPES: { value: OfficeProcessAttachmentType; label: string }[] 
   { value: "other", label: "Outro" },
 ];
 
+function FileExtBadge({ name }: { name: string }) {
+  const dot = name.lastIndexOf(".");
+  const ext = dot >= 0 ? name.slice(dot + 1).toUpperCase() : "";
+  if (!ext) return null;
+  return (
+    <span className="inline-flex h-8 shrink-0 items-center rounded bg-muted px-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      {ext}
+    </span>
+  );
+}
+
+/** Normaliza templates a partir de linhas de office_processes ou base_processes (inclui legado template_url). */
+function normalizeTemplateFilesFromRow(row: {
+  template_files?: unknown;
+  template_url?: string | null;
+  template_label?: string | null;
+}): ProcessTemplateFile[] {
+  const arr = row.template_files;
+  if (Array.isArray(arr) && arr.length > 0) {
+    return (arr as { url: string; label?: string }[]).filter((f) => f?.url?.trim());
+  }
+  if (row.template_url?.trim()) {
+    return [{ url: row.template_url.trim(), label: row.template_label ?? undefined }];
+  }
+  return [];
+}
+
+function normalizeFlowchartFilesFromRow(row: {
+  flowchart_files?: unknown;
+  flowchart_image_url?: string | null;
+}): ProcessFlowchartFile[] {
+  const arr = row.flowchart_files;
+  if (Array.isArray(arr) && arr.length > 0) {
+    return (arr as { url: string }[]).filter((f) => f?.url?.trim());
+  }
+  if (row.flowchart_image_url?.trim()) {
+    return [{ url: row.flowchart_image_url.trim() }];
+  }
+  return [];
+}
+
+export type CatalogBaseProcessSnapshot = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  template_files: unknown;
+  flowchart_files: unknown;
+  template_url: string | null;
+  template_label: string | null;
+  flowchart_image_url: string | null;
+} | null;
+
 export function ProcessManagementClient({
   officeProcess,
+  catalogBaseProcess,
   ownerOptions,
   checklistItems,
   attachments,
@@ -60,6 +116,7 @@ export function ProcessManagementClient({
     name: string;
     description: string | null;
     category: string | null;
+    base_process_id?: string | null;
     template_url?: string | null;
     template_label?: string | null;
     flowchart_image_url?: string | null;
@@ -71,6 +128,7 @@ export function ProcessManagementClient({
     owner_profile_id: string | null;
     notes: string | null;
   };
+  catalogBaseProcess: CatalogBaseProcessSnapshot;
   ownerOptions: { id: string; full_name: string }[];
   checklistItems: {
     id: string;
@@ -95,6 +153,9 @@ export function ProcessManagementClient({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<OfficeProcessStatus>(officeProcess.status);
+  const [name, setName] = useState(officeProcess.name);
+  const [description, setDescription] = useState(officeProcess.description ?? "");
+  const [category, setCategory] = useState(officeProcess.category ?? "");
   const [ownerProfileId, setOwnerProfileId] = useState(officeProcess.owner_profile_id ?? "");
   const [notes, setNotes] = useState(officeProcess.notes ?? "");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -108,21 +169,50 @@ export function ProcessManagementClient({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [attachmentUploading, setAttachmentUploading] = useState(false);
 
-  const templateFiles: ProcessTemplateFile[] = useMemo(() => {
-    const arr = officeProcess.template_files;
-    if (Array.isArray(arr) && arr.length > 0) return arr;
-    if (officeProcess.template_url) {
-      return [{ url: officeProcess.template_url, label: officeProcess.template_label ?? undefined }];
-    }
-    return [];
-  }, [officeProcess.template_files, officeProcess.template_url, officeProcess.template_label]);
+  const officeTemplateFiles = useMemo(
+    () => normalizeTemplateFilesFromRow(officeProcess),
+    [officeProcess]
+  );
+  const officeFlowchartFiles = useMemo(
+    () => normalizeFlowchartFilesFromRow(officeProcess),
+    [officeProcess]
+  );
 
-  const flowchartFiles: ProcessFlowchartFile[] = useMemo(() => {
-    const arr = officeProcess.flowchart_files;
-    if (Array.isArray(arr) && arr.length > 0) return arr;
-    if (officeProcess.flowchart_image_url) return [{ url: officeProcess.flowchart_image_url }];
+  const effectiveTemplateFiles = useMemo(() => {
+    if (officeTemplateFiles.length > 0) return officeTemplateFiles;
+    if (catalogBaseProcess) return normalizeTemplateFilesFromRow(catalogBaseProcess);
     return [];
-  }, [officeProcess.flowchart_files, officeProcess.flowchart_image_url]);
+  }, [officeTemplateFiles, catalogBaseProcess]);
+
+  const effectiveFlowchartFiles = useMemo(() => {
+    if (officeFlowchartFiles.length > 0) return officeFlowchartFiles;
+    if (catalogBaseProcess) return normalizeFlowchartFilesFromRow(catalogBaseProcess);
+    return [];
+  }, [officeFlowchartFiles, catalogBaseProcess]);
+
+  const catalogTemplatesForAnexos = useMemo(
+    () => (catalogBaseProcess ? normalizeTemplateFilesFromRow(catalogBaseProcess) : []),
+    [catalogBaseProcess]
+  );
+  const catalogFlowchartsForAnexos = useMemo(
+    () => (catalogBaseProcess ? normalizeFlowchartFilesFromRow(catalogBaseProcess) : []),
+    [catalogBaseProcess]
+  );
+
+  const [editedTemplateFiles, setEditedTemplateFiles] = useState<ProcessTemplateFile[]>(() =>
+    effectiveTemplateFiles.map((t) => ({
+      url: t.url,
+      ...(t.label ? { label: t.label } : {}),
+    }))
+  );
+  const [editedFlowchartFiles, setEditedFlowchartFiles] = useState<ProcessFlowchartFile[]>(() =>
+    effectiveFlowchartFiles.map((f) => ({ url: f.url }))
+  );
+  const [materialUploading, setMaterialUploading] = useState<"template" | "flowchart" | null>(null);
+  const [materialError, setMaterialError] = useState<string | null>(null);
+  const templateFileInputRef = useRef<HTMLInputElement>(null);
+  const flowchartFileInputRef = useRef<HTMLInputElement>(null);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
 
   const [bpmPhaseRows, setBpmPhaseRows] = useState(bpmPhases);
   const [bpmError, setBpmError] = useState<string | null>(null);
@@ -131,6 +221,18 @@ export function ProcessManagementClient({
   useEffect(() => {
     setBpmPhaseRows(bpmPhases);
   }, [bpmPhases]);
+  useEffect(() => {
+    setName(officeProcess.name);
+    setDescription(officeProcess.description ?? "");
+    setCategory(officeProcess.category ?? "");
+    setEditedTemplateFiles(
+      effectiveTemplateFiles.map((t) => ({
+        url: t.url,
+        ...(t.label ? { label: t.label } : {}),
+      }))
+    );
+    setEditedFlowchartFiles(effectiveFlowchartFiles.map((f) => ({ url: f.url })));
+  }, [officeProcess, effectiveTemplateFiles, effectiveFlowchartFiles]);
 
   const currentBpmLabel = useMemo(
     () => formatCurrentBpmPhaseLabel(bpmPhaseRows),
@@ -150,6 +252,11 @@ export function ProcessManagementClient({
 
     const result = await updateOfficeProcessDetails({
       officeProcessId: officeProcess.id,
+      name,
+      description,
+      category,
+      templateFiles: editedTemplateFiles,
+      flowchartFiles: editedFlowchartFiles,
       status,
       ownerProfileId: ownerProfileId || null,
       notes,
@@ -162,6 +269,46 @@ export function ProcessManagementClient({
     }
 
     setSaving(false);
+    router.refresh();
+  }
+
+  async function handleMaterialFileSelected(kind: "template" | "flowchart", files: FileList | null) {
+    const file = files?.[0];
+    if (!file?.size) return;
+    setMaterialError(null);
+    setMaterialUploading(kind);
+    const formData = new FormData();
+    formData.set("officeProcessId", officeProcess.id);
+    formData.set("kind", kind);
+    formData.set("file", file);
+    const result = await uploadOfficeProcessMaterialFile(formData);
+    setMaterialUploading(null);
+    if ("error" in result && result.error) {
+      setMaterialError(result.error);
+      return;
+    }
+    if ("success" in result && result.success && result.url) {
+      if (kind === "template") {
+        setEditedTemplateFiles((prev) => [
+          ...prev,
+          { url: result.url, label: result.filename },
+        ]);
+      } else {
+        setEditedFlowchartFiles((prev) => [...prev, { url: result.url }]);
+      }
+    }
+  }
+
+  async function handleDeleteAttachment(attachmentId: string) {
+    if (!window.confirm("Remover este anexo do processo?")) return;
+    setAttachmentError(null);
+    setDeletingAttachmentId(attachmentId);
+    const result = await deleteOfficeProcessAttachment(attachmentId);
+    setDeletingAttachmentId(null);
+    if ("error" in result && result.error) {
+      setAttachmentError(result.error);
+      return;
+    }
     router.refresh();
   }
 
@@ -345,16 +492,199 @@ export function ProcessManagementClient({
               <CardHeader>
                 <CardTitle>Gestão do processo</CardTitle>
                 <CardDescription>
-                  Atualize o responsável, o status e as observações operacionais.
+                  Atualize os dados do processo no escritório sem impactar o cadastro base.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSaveProcess} className="space-y-4">
                   <div className="space-y-2">
+                    <Label>Nome do processo</Label>
+                    <Input value={name} onChange={(e) => setName(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
                     <Label>Descrição</Label>
-                    <p className="rounded-lg border border-border/60 px-3 py-2 text-sm text-muted-foreground">
-                      {officeProcess.description || "Sem descrição cadastrada."}
-                    </p>
+                    <Textarea
+                      rows={4}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Descreva o objetivo e escopo do processo."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Categoria</Label>
+                    <Input
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      placeholder="Ex.: Operacional, Gerencial, Apoio..."
+                    />
+                  </div>
+                  {materialError ? (
+                    <p className="text-sm text-destructive">{materialError}</p>
+                  ) : null}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label>Templates</Label>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {editedTemplateFiles.length} ficheiro(s)
+                      </span>
+                    </div>
+                    {editedTemplateFiles.length > 0 ? (
+                      <div className="divide-y rounded-lg border">
+                        {editedTemplateFiles.map((tf, i) => {
+                          const displayName = displayTemplateName(tf);
+                          return (
+                            <div
+                              key={`t-${i}-${tf.url}`}
+                              className="flex flex-wrap items-center gap-2 px-3 py-2.5"
+                            >
+                              <FileExtBadge name={displayName} />
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <Label className="sr-only">Rótulo do template</Label>
+                                <Input
+                                  value={tf.label ?? ""}
+                                  placeholder={fileNameFromUrl(tf.url)}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    setEditedTemplateFiles((prev) =>
+                                      prev.map((item, j) =>
+                                        j === i
+                                          ? { url: item.url, ...(v.trim() ? { label: v.trim() } : {}) }
+                                          : item
+                                      )
+                                    );
+                                  }}
+                                  className="h-8 text-sm"
+                                />
+                                <p
+                                  className="truncate text-xs text-muted-foreground"
+                                  title={fileNameFromUrl(tf.url)}
+                                >
+                                  {fileNameFromUrl(tf.url)}
+                                </p>
+                              </div>
+                              <a
+                                href={tf.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={cn(
+                                  buttonVariants({ variant: "ghost", size: "icon" }),
+                                  "shrink-0"
+                                )}
+                                title="Abrir ficheiro"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0"
+                                onClick={() =>
+                                  setEditedTemplateFiles((p) => p.filter((_, j) => j !== i))
+                                }
+                                title="Remover"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Nenhum template.</p>
+                    )}
+                    <input
+                      ref={templateFileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept="*/*"
+                      onChange={(e) => {
+                        void handleMaterialFileSelected("template", e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={materialUploading === "template"}
+                      onClick={() => templateFileInputRef.current?.click()}
+                    >
+                      {materialUploading === "template" ? "A enviar…" : "Adicionar template"}
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label>Fluxogramas</Label>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {editedFlowchartFiles.length} ficheiro(s)
+                      </span>
+                    </div>
+                    {editedFlowchartFiles.length > 0 ? (
+                      <div className="divide-y rounded-lg border">
+                        {editedFlowchartFiles.map((ff, i) => {
+                          const fname = fileNameFromUrl(ff.url);
+                          return (
+                            <div
+                              key={`f-${i}-${ff.url}`}
+                              className="flex flex-wrap items-center gap-2 px-3 py-2.5"
+                            >
+                              <FileExtBadge name={fname} />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium" title={fname}>
+                                  {fname}
+                                </p>
+                              </div>
+                              <a
+                                href={ff.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={cn(
+                                  buttonVariants({ variant: "ghost", size: "icon" }),
+                                  "shrink-0"
+                                )}
+                                title="Abrir ficheiro"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0"
+                                onClick={() =>
+                                  setEditedFlowchartFiles((p) => p.filter((_, j) => j !== i))
+                                }
+                                title="Remover"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Nenhum fluxograma.</p>
+                    )}
+                    <input
+                      ref={flowchartFileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept=".png,.bpm,.bpmn,.bpms"
+                      onChange={(e) => {
+                        void handleMaterialFileSelected("flowchart", e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={materialUploading === "flowchart"}
+                      onClick={() => flowchartFileInputRef.current?.click()}
+                    >
+                      {materialUploading === "flowchart" ? "A enviar…" : "Adicionar fluxograma"}
+                    </Button>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
@@ -400,7 +730,7 @@ export function ProcessManagementClient({
                     </div>
                   )}
                   <Button type="submit" disabled={saving}>
-                    {saving ? "Salvando..." : "Salvar gestão do processo"}
+                    {saving ? "Salvando..." : "Salvar alterações do processo"}
                   </Button>
                 </form>
               </CardContent>
@@ -414,27 +744,32 @@ export function ProcessManagementClient({
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {flowchartFiles.length > 0 ? (
+                {editedFlowchartFiles.length > 0 ? (
                   <div className="space-y-3">
                     <p className="text-sm font-medium">Fluxogramas</p>
-                    {flowchartFiles.map((ff, i) => (
-                      <div key={i} className="space-y-2">
-                        {/\.(png|jpe?g|gif|webp)$/i.test(ff.url) ? (
-                          <img
-                            src={ff.url}
-                            alt={`Fluxograma ${i + 1} de ${officeProcess.name}`}
-                            className="max-h-48 w-full rounded-lg border object-contain"
-                          />
-                        ) : null}
-                        <a
-                          href={ff.url}
-                          download
-                          className={cn(buttonVariants({ variant: "outline" }), "w-full")}
-                        >
-                          Baixar fluxograma {flowchartFiles.length > 1 ? i + 1 : ""}
-                        </a>
-                      </div>
-                    ))}
+                    {editedFlowchartFiles.map((ff, i) => {
+                      const fname = fileNameFromUrl(ff.url);
+                      return (
+                        <div key={`sf-${i}-${ff.url}`} className="space-y-2">
+                          {/\.(png|jpe?g|gif|webp)$/i.test(ff.url) ? (
+                            <img
+                              src={ff.url}
+                              alt={fname}
+                              className="max-h-48 w-full rounded-lg border object-contain"
+                            />
+                          ) : null}
+                          <a
+                            href={ff.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            download
+                            className={cn(buttonVariants({ variant: "outline" }), "w-full text-center")}
+                          >
+                            {fname}
+                          </a>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
@@ -442,19 +777,19 @@ export function ProcessManagementClient({
                   </p>
                 )}
 
-                {templateFiles.length > 0 ? (
+                {editedTemplateFiles.length > 0 ? (
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Templates</p>
-                    {templateFiles.map((tf, i) => (
+                    {editedTemplateFiles.map((tf, i) => (
                       <a
-                        key={i}
+                        key={`st-${i}-${tf.url}`}
                         href={tf.url}
                         target="_blank"
                         rel="noreferrer"
                         download
-                        className={cn(buttonVariants(), "w-full block text-center")}
+                        className={cn(buttonVariants(), "block w-full text-center")}
                       >
-                        {tf.label || `Baixar template ${templateFiles.length > 1 ? i + 1 : ""}`}
+                        {displayTemplateName(tf)}
                       </a>
                     ))}
                   </div>
@@ -588,12 +923,78 @@ export function ProcessManagementClient({
         </TabsContent>
 
         <TabsContent value="anexos" className="mt-4">
-          <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Anexos do processo</CardTitle>
+                <CardTitle>Materiais do catálogo (Processo Base)</CardTitle>
                 <CardDescription>
-                  Links e materiais complementares utilizados na gestão do processo.
+                  Templates e fluxogramas definidos pelo administrador master no catálogo. São independentes dos ficheiros enviados abaixo neste escritório.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!officeProcess.base_process_id ? (
+                  <p className="text-sm text-muted-foreground">
+                    Este processo não está vinculado a um processo do catálogo padrão.
+                  </p>
+                ) : !catalogBaseProcess ? (
+                  <p className="text-sm text-muted-foreground">
+                    Não foi possível carregar o processo base (pode estar inativo ou indisponível). Os processos inativos não são visíveis para o escritório por política de segurança.
+                  </p>
+                ) : catalogTemplatesForAnexos.length === 0 && catalogFlowchartsForAnexos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum template ou fluxograma no catálogo para este processo.
+                  </p>
+                ) : (
+                  <>
+                    {catalogFlowchartsForAnexos.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Fluxogramas</p>
+                        <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                          {catalogFlowchartsForAnexos.map((ff, i) => (
+                            <li key={i}>
+                              <a
+                                href={ff.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary underline-offset-4 hover:underline"
+                              >
+                                {fileNameFromUrl(ff.url)}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {catalogTemplatesForAnexos.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Templates</p>
+                        <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                          {catalogTemplatesForAnexos.map((tf, i) => (
+                            <li key={i}>
+                              <a
+                                href={tf.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary underline-offset-4 hover:underline"
+                              >
+                                {displayTemplateName(tf)}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+            <Card>
+              <CardHeader>
+                <CardTitle>Anexos do escritório</CardTitle>
+                <CardDescription>
+                  Ficheiros enviados aqui no escritório (lista separada do catálogo administrativo). Não altera o Processo Base.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -613,15 +1014,27 @@ export function ProcessManagementClient({
                           {ATTACHMENT_TYPES.find((type) => type.value === attachment.attachment_type)?.label}
                         </p>
                       </div>
-                      <a
-                        href={attachment.attachment_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        download
-                        className={buttonVariants({ variant: "outline", size: "sm" })}
-                      >
-                        Baixar
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={attachment.attachment_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          download
+                          className={buttonVariants({ variant: "outline", size: "sm" })}
+                        >
+                          Baixar
+                        </a>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={deletingAttachmentId === attachment.id}
+                          onClick={() => void handleDeleteAttachment(attachment.id)}
+                          aria-label="Remover anexo"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -700,6 +1113,7 @@ export function ProcessManagementClient({
                 </form>
               </CardContent>
             </Card>
+            </div>
           </div>
         </TabsContent>
 

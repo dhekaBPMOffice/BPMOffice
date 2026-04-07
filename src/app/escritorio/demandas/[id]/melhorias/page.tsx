@@ -28,7 +28,7 @@ export default async function MelhoriasPage({
   return (
     <PageLayout
       title={`Melhorias - ${demand.title}`}
-      icon={Lightbulb}
+      iconName="Lightbulb"
       backHref={`/escritorio/demandas/${id}`}
     >
       <MelhoriasPhase demandId={id} officeId={profile.office_id} />

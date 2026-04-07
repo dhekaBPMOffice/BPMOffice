@@ -27,7 +27,7 @@ export default async function AdminDashboard() {
     <PageLayout
       title="Painel do Administrador"
       description="Visão geral da plataforma BPM Office."
-      icon={LayoutDashboard}
+      iconName="LayoutDashboard"
     >
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" style={{ gap: "var(--spacing-block)" }}>
         {stats.map((stat, idx) => (

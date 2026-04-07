@@ -16,7 +16,7 @@ export default async function OfficeProcessDetailPage({
 
   if (!profile.office_id) {
     return (
-      <PageLayout title="Processo" icon={ClipboardList} backHref="/escritorio/estrategia/cadeia-valor?aba=gestao">
+      <PageLayout title="Processo" iconName="ClipboardList" backHref="/escritorio/estrategia/cadeia-valor?aba=gestao">
         <p className="text-destructive">Escritório não encontrado.</p>
       </PageLayout>
     );
@@ -66,16 +66,39 @@ export default async function OfficeProcessDetailPage({
     notFound();
   }
 
+  let catalogBaseProcess: {
+    id: string;
+    name: string;
+    is_active: boolean;
+    template_files: unknown;
+    flowchart_files: unknown;
+    template_url: string | null;
+    template_label: string | null;
+    flowchart_image_url: string | null;
+  } | null = null;
+
+  if (officeProcess.base_process_id) {
+    const { data: baseRow } = await supabase
+      .from("base_processes")
+      .select(
+        "id, name, is_active, template_files, flowchart_files, template_url, template_label, flowchart_image_url"
+      )
+      .eq("id", officeProcess.base_process_id)
+      .maybeSingle();
+    catalogBaseProcess = baseRow;
+  }
+
   return (
     <PageLayout
       title={officeProcess.name}
       description={officeProcess.category || "Gestão completa do processo do escritório."}
-      icon={ClipboardList}
+      iconName="ClipboardList"
       backHref="/escritorio/estrategia/cadeia-valor?aba=gestao"
       backLabel="Voltar para Gestão de Processos"
     >
       <ProcessManagementClient
         officeProcess={officeProcess}
+        catalogBaseProcess={catalogBaseProcess}
         ownerOptions={ownerOptions ?? []}
         checklistItems={checklistItems ?? []}
         attachments={attachments ?? []}

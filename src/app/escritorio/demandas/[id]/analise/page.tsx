@@ -28,7 +28,7 @@ export default async function AnalisePage({
   return (
     <PageLayout
       title={`Análise - ${demand.title}`}
-      icon={BarChart3}
+      iconName="BarChart3"
       backHref={`/escritorio/demandas/${id}`}
     >
       <AnalisePhase demandId={id} officeId={profile.office_id} />

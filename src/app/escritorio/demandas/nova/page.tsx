@@ -10,7 +10,7 @@ export default async function NovaDemandaPage() {
     <PageLayout
       title="Nova Demanda"
       description="Crie uma nova demanda para o ciclo BPM."
-      icon={ClipboardList}
+      iconName="ClipboardList"
       backHref="/escritorio/demandas"
     >
       <NovaDemandaForm />

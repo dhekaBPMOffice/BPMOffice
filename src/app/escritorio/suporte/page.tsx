@@ -106,7 +106,7 @@ export default function SuportePage() {
     <PageLayout
       title="Suporte"
       description="Abra chamados e acompanhe o status dos seus tickets."
-      icon={LifeBuoy}
+      iconName="LifeBuoy"
     >
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

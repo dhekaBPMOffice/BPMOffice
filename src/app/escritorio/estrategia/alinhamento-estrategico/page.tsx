@@ -255,7 +255,7 @@ export default function AlinhamentoEstrategicoPage() {
     <PageLayout
       title="Alinhamento Estratégico"
       description="Visualize a conexão entre objetivos estratégicos e processos da Cadeia de Valor."
-      icon={Target}
+      iconName="Target"
       backHref="/escritorio/estrategia"
     >
       <div className="space-y-6">

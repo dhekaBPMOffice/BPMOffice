@@ -14,6 +14,8 @@ import type {
   BaseProcess,
   OfficeProcessStatus,
   OfficeProcessAttachmentType,
+  ProcessFlowchartFile,
+  ProcessTemplateFile,
   Profile,
 } from "@/types/database";
 import { BPM_PHASE_LABELS, bpmStageStatusToLabel, type BpmPhaseSlug } from "@/lib/bpm-phases";
@@ -450,6 +452,11 @@ export async function addManualOfficeProcessesBulk(baseProcessIds: string[]) {
 
 export async function updateOfficeProcessDetails(input: {
   officeProcessId: string;
+  name?: string;
+  description?: string | null;
+  category?: string | null;
+  templateFiles?: ProcessTemplateFile[];
+  flowchartFiles?: ProcessFlowchartFile[];
   status: OfficeProcessStatus;
   ownerProfileId?: string | null;
   notes?: string;
@@ -461,11 +468,39 @@ export async function updateOfficeProcessDetails(input: {
   const supabase = await createServiceClient();
   const now = new Date().toISOString();
 
+  const normalizedName = input.name?.trim();
+  if (typeof input.name === "string" && !normalizedName) {
+    return { error: "Nome do processo é obrigatório." };
+  }
+
+  const normalizedTemplateFiles = input.templateFiles?.filter(
+    (file) => typeof file.url === "string" && file.url.trim().length > 0
+  );
+  const normalizedFlowchartFiles = input.flowchartFiles?.filter(
+    (file) => typeof file.url === "string" && file.url.trim().length > 0
+  );
+
   const payload: Record<string, unknown> = {
     status: input.status,
     owner_profile_id: input.ownerProfileId || null,
     notes: input.notes?.trim() || null,
   };
+  if (typeof input.name === "string") payload.name = normalizedName;
+  if (typeof input.description !== "undefined") {
+    payload.description = input.description?.trim() || null;
+  }
+  if (typeof input.category !== "undefined") {
+    payload.category = input.category?.trim() || null;
+  }
+  if (typeof input.templateFiles !== "undefined") {
+    payload.template_files = normalizedTemplateFiles ?? [];
+    payload.template_url = normalizedTemplateFiles?.[0]?.url?.trim() || null;
+    payload.template_label = normalizedTemplateFiles?.[0]?.label?.trim() || null;
+  }
+  if (typeof input.flowchartFiles !== "undefined") {
+    payload.flowchart_files = normalizedFlowchartFiles ?? [];
+    payload.flowchart_image_url = normalizedFlowchartFiles?.[0]?.url?.trim() || null;
+  }
 
   if (input.status === "in_progress" && !officeProcess.started_at) {
     payload.started_at = now;
@@ -496,6 +531,27 @@ export async function updateOfficeProcessDetails(input: {
   }
   if ((officeProcess.notes ?? "") !== (input.notes?.trim() ?? "")) {
     changes.push("anotações atualizadas");
+  }
+  if (typeof input.name === "string" && officeProcess.name !== normalizedName) {
+    changes.push("nome atualizado");
+  }
+  if (
+    typeof input.description !== "undefined" &&
+    (officeProcess.description ?? "") !== (input.description?.trim() ?? "")
+  ) {
+    changes.push("descrição atualizada");
+  }
+  if (
+    typeof input.category !== "undefined" &&
+    (officeProcess.category ?? "") !== (input.category?.trim() ?? "")
+  ) {
+    changes.push("categoria atualizada");
+  }
+  if (typeof input.templateFiles !== "undefined") {
+    changes.push("templates atualizados");
+  }
+  if (typeof input.flowchartFiles !== "undefined") {
+    changes.push("fluxogramas atualizados");
   }
 
   if (changes.length > 0) {
@@ -675,6 +731,37 @@ export async function uploadOfficeAttachmentFile(formData: FormData) {
   return { success: true, url: result.url, filename: result.filename };
 }
 
+/** Upload para templates/fluxogramas do processo do escritório (validação por tipo). */
+export async function uploadOfficeProcessMaterialFile(formData: FormData) {
+  const processAccess = await getOfficeProcessOrError(
+    formData.get("officeProcessId") as string
+  );
+  if ("error" in processAccess) return { error: processAccess.error };
+
+  const kindRaw = formData.get("kind");
+  const kind = kindRaw === "flowchart" ? "flowchart" : kindRaw === "template" ? "template" : null;
+  if (!kind) {
+    return { error: "Tipo de ficheiro inválido (template ou flowchart)." };
+  }
+
+  const file = formData.get("file") as File | null;
+  if (!file?.size) return { error: "Selecione um ficheiro." };
+
+  const supabase = await createServiceClient();
+  const result = await uploadProcessFile(
+    supabase,
+    file,
+    {
+      type: "office_attachment",
+      officeProcessId: processAccess.officeProcess.id,
+    },
+    kind
+  );
+
+  if ("error" in result) return result;
+  return { success: true as const, url: result.url, filename: result.filename };
+}
+
 export async function addOfficeProcessAttachment(input: {
   officeProcessId: string;
   title: string;
@@ -710,6 +797,46 @@ export async function addOfficeProcessAttachment(input: {
     actorProfileId: profile.id,
     eventType: "attachment_added",
     description: `Anexo adicionado ao processo: ${input.title.trim()}.`,
+  });
+
+  revalidatePath(`/escritorio/processos/${officeProcess.id}`);
+  return { success: true };
+}
+
+export async function deleteOfficeProcessAttachment(attachmentId: string) {
+  const access = await assertLeaderProfile();
+  if ("error" in access) return { error: access.error };
+
+  const supabase = await createServiceClient();
+  const { data: attachment, error: attachmentError } = await supabase
+    .from("office_process_attachments")
+    .select("id, office_process_id, title")
+    .eq("id", attachmentId)
+    .single();
+
+  if (attachmentError || !attachment) {
+    return { error: "Anexo não encontrado." };
+  }
+
+  const processAccess = await getOfficeProcessOrError(attachment.office_process_id);
+  if ("error" in processAccess) return { error: processAccess.error };
+
+  const { profile, officeProcess } = processAccess;
+  const { error } = await supabase
+    .from("office_process_attachments")
+    .delete()
+    .eq("id", attachmentId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  await recordOfficeProcessHistory({
+    officeProcessId: officeProcess.id,
+    officeId: officeProcess.office_id,
+    actorProfileId: profile.id,
+    eventType: "attachment_removed",
+    description: `Anexo removido do processo: ${attachment.title}.`,
   });
 
   revalidatePath(`/escritorio/processos/${officeProcess.id}`);

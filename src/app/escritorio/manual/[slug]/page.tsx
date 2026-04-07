@@ -3,7 +3,6 @@ import Link from "next/link";
 import { getProfile } from "@/lib/auth";
 import { getAllowedModuleIds, markdownToHtml } from "@/lib/manual";
 import { MANUAL_MODULES } from "@/lib/manual/config";
-import { MANUAL_ICON_MAP } from "@/lib/manual/icons";
 import { PageLayout } from "@/components/layout/page-layout";
 import { ChevronLeft } from "lucide-react";
 
@@ -25,13 +24,11 @@ export default async function ManualSlugPage({ params }: ManualSlugPageProps) {
     notFound();
   }
 
-  const Icon = MANUAL_ICON_MAP[module.iconName];
-
   return (
     <PageLayout
       title={module.title}
       description={module.shortDescription}
-      icon={Icon}
+      iconName={module.iconName}
       actions={
         <Link
           href="/escritorio/manual"

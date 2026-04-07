@@ -249,7 +249,7 @@ export default function QuestionarioProcessosDetailPage() {
       <PageLayout
         title="Questionário"
         description="Carregando builder."
-        icon={ClipboardList}
+        iconName="ClipboardList"
         backHref="/admin/questionario-processos"
       >
         <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -261,7 +261,7 @@ export default function QuestionarioProcessosDetailPage() {
     <PageLayout
       title={questionnaire?.title ?? "Questionário"}
       description="Builder de questionário de ativação"
-      icon={ClipboardList}
+      iconName="ClipboardList"
       backHref="/admin/questionario-processos"
       backLabel="Voltar"
       actions={

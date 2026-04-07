@@ -11,7 +11,7 @@ export default async function AdminManualPage() {
     <PageLayout
       title="Manual do Administrador"
       description="Documentação das funcionalidades da área de administração master."
-      icon={Book}
+      iconName="Book"
     >
       <div className="space-y-8">
         <FirstStepsRadial steps={ADMIN_FIRST_STEPS} />

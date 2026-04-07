@@ -92,7 +92,7 @@ export default function AdminBackupPage() {
   }
 
   return (
-    <PageLayout title="Backup da Plataforma" description="Crie backups manuais e configure o agendamento automático." icon={HardDrive}>
+    <PageLayout title="Backup da Plataforma" description="Crie backups manuais e configure o agendamento automático." iconName="HardDrive">
 
       {error && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>

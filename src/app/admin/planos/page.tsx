@@ -35,7 +35,7 @@ export default async function PlanosPage({ searchParams: searchParamsPromise }: 
 
   if (error) {
     return (
-      <PageLayout title="Planos" description="Gerencie os planos comerciais da plataforma." icon={CreditCard}>
+      <PageLayout title="Planos" description="Gerencie os planos comerciais da plataforma." iconName="CreditCard">
         <p className="text-destructive">Erro ao carregar planos: {error.message}</p>
       </PageLayout>
     );
@@ -59,7 +59,7 @@ export default async function PlanosPage({ searchParams: searchParamsPromise }: 
     <PageLayout
       title="Planos"
       description="Gerencie os planos comerciais da plataforma."
-      icon={CreditCard}
+      iconName="CreditCard"
       actions={
         <Link href="/admin/planos/novo">
           <Button>
