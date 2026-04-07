@@ -67,8 +67,8 @@ export default async function ProcessosVisaoGeralPage() {
       title="Visão geral dos processos"
       description="Indicadores do portfólio do escritório e atalhos para listas filtradas."
       icon={BarChart3}
-      backHref="/escritorio/processos"
-      backLabel="Voltar para processos"
+      backHref="/escritorio/estrategia/cadeia-valor?aba=gestao"
+      backLabel="Voltar para Gestão de Processos"
     >
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -77,7 +77,7 @@ export default async function ProcessosVisaoGeralPage() {
           </CardHeader>
           <CardContent className="flex flex-wrap items-end justify-between gap-2">
             <p className="text-3xl font-semibold">{total}</p>
-            <Link href="/escritorio/processos" className={buttonVariants({ variant: "outline", size: "sm" })}>
+            <Link href="/escritorio/estrategia/cadeia-valor?aba=gestao" className={buttonVariants({ variant: "outline", size: "sm" })}>
               Ver lista
             </Link>
           </CardContent>
@@ -90,10 +90,10 @@ export default async function ProcessosVisaoGeralPage() {
           <CardContent className="flex flex-wrap items-end justify-between gap-2">
             <p className="text-3xl font-semibold">{byOrigin.catalogo}</p>
             <Link
-              href="/escritorio/processos?origem=catalogo"
+              href="/escritorio/estrategia/cadeia-valor?aba=gestao"
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
-              Filtrar lista
+              Ver lista
             </Link>
           </CardContent>
         </Card>
@@ -105,10 +105,10 @@ export default async function ProcessosVisaoGeralPage() {
           <CardContent className="flex flex-wrap items-end justify-between gap-2">
             <p className="text-3xl font-semibold">{byOrigin.cadeia}</p>
             <Link
-              href="/escritorio/processos?origem=cadeia_somente"
+              href="/escritorio/estrategia/cadeia-valor?aba=gestao"
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
-              Filtrar lista
+              Ver lista
             </Link>
           </CardContent>
         </Card>
@@ -130,7 +130,7 @@ export default async function ProcessosVisaoGeralPage() {
                 <div className="flex items-center justify-between text-sm">
                   <span>{BPM_PHASE_LABELS[slug]}</span>
                   <Link
-                    href={`/escritorio/processos?fase=${slug}`}
+                    href="/escritorio/estrategia/cadeia-valor?aba=gestao"
                     className="font-medium text-primary hover:underline"
                   >
                     {count}

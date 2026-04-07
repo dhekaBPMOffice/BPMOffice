@@ -108,7 +108,7 @@ export async function updateSession(request: NextRequest) {
     if (active === true) {
       if (pathname === "/conta-inativa") {
         const url = request.nextUrl.clone();
-        url.pathname = profile.role === "leader" ? "/escritorio/processos" : "/escritorio/trabalho";
+        url.pathname = profile.role === "leader" ? "/escritorio/estrategia/cadeia-valor" : "/escritorio/trabalho";
         return NextResponse.redirect(url);
       }
       return null;
@@ -187,7 +187,7 @@ export async function updateSession(request: NextRequest) {
           url.pathname = "/admin";
           break;
         case "leader":
-          url.pathname = "/escritorio/processos";
+          url.pathname = "/escritorio/estrategia/cadeia-valor";
           break;
         default:
           url.pathname = "/escritorio/trabalho";
@@ -221,7 +221,7 @@ export async function updateSession(request: NextRequest) {
 
       if (profile.role !== "admin_master" && isAdminRoute) {
         const url = request.nextUrl.clone();
-        url.pathname = "/escritorio/processos";
+        url.pathname = "/escritorio/estrategia/cadeia-valor";
         return NextResponse.redirect(url);
       }
 

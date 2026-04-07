@@ -360,6 +360,7 @@ export async function addManualOfficeProcess(baseProcessId: string) {
 
   revalidatePath("/escritorio/processos");
   revalidatePath("/escritorio/processos/catalogo");
+  revalidatePath("/escritorio/estrategia/cadeia-valor");
   return { success: true };
 }
 
@@ -425,6 +426,7 @@ export async function updateOfficeProcessDetails(input: {
 
   revalidatePath(`/escritorio/processos/${officeProcess.id}`);
   revalidatePath("/escritorio/processos");
+  revalidatePath("/escritorio/estrategia/cadeia-valor");
   return { success: true };
 }
 

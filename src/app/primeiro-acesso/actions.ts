@@ -48,7 +48,7 @@ export async function confirmarPrimeiroAcesso(): Promise<ConfirmarPrimeiroAcesso
         .single();
 
       redirectTo = office?.processes_initialized_at
-        ? "/escritorio/processos"
+        ? "/escritorio/estrategia/cadeia-valor"
         : "/escritorio/onboarding/processos";
     } else {
       redirectTo = "/escritorio/dashboard";

@@ -39,12 +39,12 @@ type Section = {
 const sections: Section[] = [
   {
     title: "Estratégia da Empresa",
-    description: "Objetivos estratégicos e visão da cadeia de valor da organização.",
+    description: "Objetivos estratégicos, cadeia de valor e gestão de processos do escritório.",
     icon: Building2,
     variant: "teal",
     links: [
       { label: "Objetivos Estratégicos", href: "/escritorio/estrategia/objetivos-estrategicos", icon: Target },
-      { label: "Cadeia de Valor", href: "/escritorio/estrategia/cadeia-valor", icon: Workflow },
+      { label: "Cadeia de Valor e Processos", href: "/escritorio/estrategia/cadeia-valor", icon: Workflow },
       { label: "Alinhamento Estratégico", href: "/escritorio/estrategia/alinhamento-estrategico", icon: Compass },
     ],
   },

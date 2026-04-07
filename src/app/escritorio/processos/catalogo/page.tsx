@@ -47,11 +47,11 @@ export default async function CatalogoComplementarProcessosPage() {
       title="Processos não selecionados"
       description="Avalie os processos da estrutura padrão que ainda não fazem parte da lista do escritório."
       icon={ClipboardList}
-      backHref="/escritorio/processos"
-      backLabel="Voltar para Meus Processos"
+      backHref="/escritorio/estrategia/cadeia-valor?aba=gestao"
+      backLabel="Voltar para Gestão de Processos"
       actions={
         <Link
-          href="/escritorio/processos"
+          href="/escritorio/estrategia/cadeia-valor?aba=gestao"
           className={buttonVariants({ variant: "outline" })}
         >
           Voltar para lista

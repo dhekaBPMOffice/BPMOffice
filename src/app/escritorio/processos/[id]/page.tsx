@@ -16,7 +16,7 @@ export default async function OfficeProcessDetailPage({
 
   if (!profile.office_id) {
     return (
-      <PageLayout title="Processo" icon={ClipboardList} backHref="/escritorio/processos">
+      <PageLayout title="Processo" icon={ClipboardList} backHref="/escritorio/estrategia/cadeia-valor?aba=gestao">
         <p className="text-destructive">Escritório não encontrado.</p>
       </PageLayout>
     );
@@ -71,8 +71,8 @@ export default async function OfficeProcessDetailPage({
       title={officeProcess.name}
       description={officeProcess.category || "Gestão completa do processo do escritório."}
       icon={ClipboardList}
-      backHref="/escritorio/processos"
-      backLabel="Voltar para Meus Processos"
+      backHref="/escritorio/estrategia/cadeia-valor?aba=gestao"
+      backLabel="Voltar para Gestão de Processos"
     >
       <ProcessManagementClient
         officeProcess={officeProcess}
