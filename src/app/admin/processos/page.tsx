@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { buildChecklistInput } from "@/lib/processes";
-import type { BaseProcess, ProcessFlowchartFile, ProcessTemplateFile } from "@/types/database";
-import { createBaseProcess, deleteBaseProcess, updateBaseProcess, uploadBaseProcessFile } from "./actions";
+import type { BaseProcess } from "@/types/database";
+import {
+  createBaseProcess,
+  deleteBaseProcess,
+  deleteBaseProcesses,
+  setBaseProcessActive,
+  updateBaseProcess,
+  uploadBaseProcessFile,
+} from "./actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +21,28 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageLayout } from "@/components/layout/page-layout";
-import { ClipboardList, Plus, Trash2 } from "lucide-react";
+import { Select } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ClipboardList, LayoutGrid, LayoutList, Plus, Search, Trash2 } from "lucide-react";
+
+const VIEW_STORAGE_KEY = "admin-processos-view-mode";
+
+type ViewMode = "list" | "card";
+
+type SortOption =
+  | "sort_order"
+  | "name_asc"
+  | "name_desc"
+  | "category_asc"
+  | "created_desc"
+  | "created_asc";
 
 export default function AdminProcessosPage() {
   const [processes, setProcesses] = useState<BaseProcess[]>([]);
@@ -28,6 +56,124 @@ export default function AdminProcessosPage() {
   const [flowchartFilesToAdd, setFlowchartFilesToAdd] = useState<File[]>([]);
   const [checklist, setChecklist] = useState("");
   const [creating, setCreating] = useState(false);
+
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sortOption, setSortOption] = useState<SortOption>("sort_order");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(VIEW_STORAGE_KEY);
+      if (stored === "list" || stored === "card") {
+        setViewMode(stored);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function persistViewMode(mode: ViewMode) {
+    setViewMode(mode);
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, mode);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    processes.forEach((p) => {
+      if (p.category?.trim()) set.add(p.category.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [processes]);
+
+  const displayedProcesses = useMemo(() => {
+    let list = [...processes];
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((p) => {
+        const nameL = p.name.toLowerCase();
+        const cat = (p.category || "").toLowerCase();
+        const desc = (p.description || "").toLowerCase();
+        return nameL.includes(q) || cat.includes(q) || desc.includes(q);
+      });
+    }
+    if (statusFilter === "active") list = list.filter((p) => p.is_active);
+    if (statusFilter === "inactive") list = list.filter((p) => !p.is_active);
+    if (categoryFilter !== "all") {
+      list = list.filter((p) => (p.category || "") === categoryFilter);
+    }
+
+    switch (sortOption) {
+      case "sort_order":
+        list.sort((a, b) => {
+          if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+          return a.name.localeCompare(b.name, "pt-BR");
+        });
+        break;
+      case "name_asc":
+        list.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+        break;
+      case "name_desc":
+        list.sort((a, b) => b.name.localeCompare(a.name, "pt-BR"));
+        break;
+      case "category_asc":
+        list.sort((a, b) => {
+          const ca = (a.category || "").localeCompare(b.category || "", "pt-BR");
+          if (ca !== 0) return ca;
+          return a.name.localeCompare(b.name, "pt-BR");
+        });
+        break;
+      case "created_desc":
+        list.sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        break;
+      case "created_asc":
+        list.sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        break;
+      default:
+        break;
+    }
+
+    return list;
+  }, [processes, searchQuery, statusFilter, categoryFilter, sortOption]);
+
+  const visibleIds = useMemo(() => displayedProcesses.map((p) => p.id), [displayedProcesses]);
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
 
   async function load() {
     setLoading(true);
@@ -86,7 +232,7 @@ export default function AdminProcessosPage() {
         formData.set("baseProcessId", newId);
         formData.set("kind", "template");
         const up = await uploadBaseProcessFile(formData);
-        if ("url" in up) finalTemplates.push({ url: up.url, label: label.trim() || file.name });
+        if ("url" in up && up.url) finalTemplates.push({ url: up.url, label: label.trim() || file.name });
       }
       for (const file of flowchartFilesToAdd) {
         if (!file?.size) continue;
@@ -95,7 +241,7 @@ export default function AdminProcessosPage() {
         formData.set("baseProcessId", newId);
         formData.set("kind", "flowchart");
         const up = await uploadBaseProcessFile(formData);
-        if ("url" in up) finalFlowcharts.push({ url: up.url });
+        if ("url" in up && up.url) finalFlowcharts.push({ url: up.url });
       }
       if (finalTemplates.length > 0 || finalFlowcharts.length > 0) {
         await updateBaseProcess(newId, {
@@ -122,6 +268,26 @@ export default function AdminProcessosPage() {
     load();
   }
 
+  async function handleToggleActive(process: BaseProcess) {
+    const willDeactivate = process.is_active;
+    if (
+      willDeactivate
+        ? !confirm("Inativar este processo no catálogo? Ele deixa de aparecer como opção ativa para novos vínculos.")
+        : !confirm("Reativar este processo no catálogo?")
+    ) {
+      return;
+    }
+
+    setError(null);
+    const result = await setBaseProcessActive(process.id, !process.is_active);
+    if ("error" in result && result.error) {
+      setError(result.error);
+      return;
+    }
+
+    load();
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("Excluir este processo do catálogo?")) return;
 
@@ -132,7 +298,42 @@ export default function AdminProcessosPage() {
       return;
     }
 
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
     load();
+  }
+
+  async function handleBulkDelete() {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `Excluir ${ids.length} processo(s) do catálogo? Esta ação não pode ser desfeita.`
+      )
+    ) {
+      return;
+    }
+
+    setError(null);
+    const result = await deleteBaseProcesses(ids);
+    if ("error" in result && result.error) {
+      setError(result.error);
+      return;
+    }
+
+    clearSelection();
+    load();
+  }
+
+  function templateSummary(process: BaseProcess) {
+    if (Array.isArray(process.template_files) && process.template_files.length > 0) {
+      return `${process.template_files.length} arquivo(s)`;
+    }
+    if (process.template_url) return "1 arquivo";
+    return "Não informado";
   }
 
   return (
@@ -289,11 +490,134 @@ export default function AdminProcessosPage() {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle>Processos cadastrados</CardTitle>
-          <CardDescription>
-            Clique em um processo para editar seus detalhes e a configuração operacional.
-          </CardDescription>
+        <CardHeader className="space-y-4">
+          <div>
+            <CardTitle>Processos cadastrados</CardTitle>
+            <CardDescription>
+              Clique em um processo para editar seus detalhes e a configuração operacional.
+            </CardDescription>
+          </div>
+
+          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
+            <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-2">
+              <span className="text-xs font-medium text-muted-foreground">Visualização</span>
+              <div className="flex rounded-lg border border-border/60 p-0.5">
+                <Button
+                  type="button"
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => persistViewMode("list")}
+                  aria-pressed={viewMode === "list"}
+                >
+                  <LayoutList className="h-4 w-4" />
+                  Lista
+                </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === "card" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => persistViewMode("card")}
+                  aria-pressed={viewMode === "card"}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Cartões
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
+              <Label htmlFor="search-processos" className="text-xs">
+                Buscar
+              </Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="search-processos"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Nome, categoria ou descrição..."
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5 lg:col-span-2">
+              <Label htmlFor="filter-status" className="text-xs">
+                Status
+              </Label>
+              <Select
+                id="filter-status"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
+              >
+                <option value="all">Todos</option>
+                <option value="active">Ativos</option>
+                <option value="inactive">Inativos</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5 lg:col-span-2">
+              <Label htmlFor="filter-category" className="text-xs">
+                Categoria
+              </Label>
+              <Select
+                id="filter-category"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+              >
+                <option value="all">Todas</option>
+                {categoryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
+              <Label htmlFor="sort-processos" className="text-xs">
+                Ordenar por
+              </Label>
+              <Select
+                id="sort-processos"
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value as SortOption)}
+              >
+                <option value="sort_order">Ordem do catálogo</option>
+                <option value="name_asc">Nome (A–Z)</option>
+                <option value="name_desc">Nome (Z–A)</option>
+                <option value="category_asc">Categoria (A–Z)</option>
+                <option value="created_desc">Mais recentes</option>
+                <option value="created_asc">Mais antigos</option>
+              </Select>
+            </div>
+          </div>
+
+          {viewMode === "card" && displayedProcesses.length > 0 && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={toggleSelectAllVisible}
+                className="rounded border-input"
+              />
+              Selecionar todos os processos visíveis (após filtros)
+            </label>
+          )}
+
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+              <span>
+                {selectedIds.size} selecionado{selectedIds.size !== 1 ? "s" : ""}
+              </span>
+              <Button type="button" variant="destructive" size="sm" onClick={handleBulkDelete}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir selecionados
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
+                Limpar seleção
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -304,17 +628,121 @@ export default function AdminProcessosPage() {
               title="Nenhum processo cadastrado"
               description="Crie o primeiro processo padrão para começar a estruturar o onboarding dos escritórios."
             />
+          ) : displayedProcesses.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+              <p className="mb-3">Nenhum processo corresponde aos filtros ou à busca.</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                  setCategoryFilter("all");
+                }}
+              >
+                Limpar filtros
+              </Button>
+            </div>
+          ) : viewMode === "list" ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[44px]">
+                    <span className="sr-only">Selecionar</span>
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      className="rounded border-input"
+                      aria-label="Selecionar todos os processos visíveis"
+                    />
+                  </TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead className="hidden md:table-cell">Categoria</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden lg:table-cell">Checklist</TableHead>
+                  <TableHead className="hidden lg:table-cell">Template</TableHead>
+                  <TableHead className="w-[200px] text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {displayedProcesses.map((process) => (
+                  <TableRow key={process.id}>
+                    <TableCell className="align-middle">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(process.id)}
+                        onChange={() => toggleSelect(process.id)}
+                        className="rounded border-input"
+                        aria-label={`Selecionar ${process.name}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col gap-0.5">
+                        <span>{process.name}</span>
+                        <span className="text-xs font-normal text-muted-foreground md:hidden">
+                          {process.category || "Sem categoria"}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden text-muted-foreground md:table-cell">
+                      {process.category || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={process.is_active ? "success" : "secondary"}>
+                        {process.is_active ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="hidden text-muted-foreground lg:table-cell">
+                      {buildChecklistInput(process.management_checklist).split("\n").filter(Boolean).length}
+                    </TableCell>
+                    <TableCell className="hidden text-muted-foreground lg:table-cell">
+                      {templateSummary(process)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-nowrap items-center justify-end gap-2">
+                        <Link
+                          href={`/admin/processos/${process.id}`}
+                          className={buttonVariants({ size: "sm" })}
+                        >
+                          Abrir
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0"
+                          onClick={() => handleToggleActive(process)}
+                          title={process.is_active ? "Inativar processo" : "Reativar processo"}
+                        >
+                          {process.is_active ? "Inativar" : "Ativar"}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {processes.map((process) => (
+              {displayedProcesses.map((process) => (
                 <Card key={process.id} className="border border-border/60">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <CardTitle className="text-base">{process.name}</CardTitle>
-                        <CardDescription>
-                          {process.category || "Sem categoria"}
-                        </CardDescription>
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(process.id)}
+                          onChange={() => toggleSelect(process.id)}
+                          className="mt-1 rounded border-input"
+                          aria-label={`Selecionar ${process.name}`}
+                        />
+                        <div className="min-w-0">
+                          <CardTitle className="text-base">{process.name}</CardTitle>
+                          <CardDescription>
+                            {process.category || "Sem categoria"}
+                          </CardDescription>
+                        </div>
                       </div>
                       <Badge variant={process.is_active ? "success" : "secondary"}>
                         {process.is_active ? "Ativo" : "Inativo"}
@@ -326,12 +754,13 @@ export default function AdminProcessosPage() {
                       {process.description || "Sem descrição cadastrada."}
                     </p>
                     <div className="space-y-1 text-sm text-muted-foreground">
-                      <p>Checklist: {buildChecklistInput(process.management_checklist).split("\n").filter(Boolean).length}</p>
-                      <p>Template: {Array.isArray(process.template_files) && process.template_files.length > 0
-                        ? `${process.template_files.length} arquivo(s)` : process.template_url
-                        ? "1 arquivo" : "Não informado"}</p>
+                      <p>
+                        Checklist:{" "}
+                        {buildChecklistInput(process.management_checklist).split("\n").filter(Boolean).length}
+                      </p>
+                      <p>Template: {templateSummary(process)}</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-nowrap items-center gap-2">
                       <Link
                         href={`/admin/processos/${process.id}`}
                         className={buttonVariants({ size: "sm" })}
@@ -341,10 +770,11 @@ export default function AdminProcessosPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDelete(process.id)}
+                        className="shrink-0"
+                        onClick={() => handleToggleActive(process)}
+                        title={process.is_active ? "Inativar processo" : "Reativar processo"}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Excluir
+                        {process.is_active ? "Inativar" : "Ativar"}
                       </Button>
                     </div>
                   </CardContent>

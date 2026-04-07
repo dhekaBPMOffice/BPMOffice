@@ -17,6 +17,22 @@ type SaveBaseProcessInput = {
   isActive?: boolean;
 };
 
+/** Mensagem amigável quando ainda existem office_processes apontando para o catálogo (ON DELETE RESTRICT). */
+const MSG_EXCLUSAO_BLOQUEADA_VINCULOS_ESCRITORIOS =
+  "Não é possível excluir este processo do catálogo enquanto ele estiver atribuído a um ou mais escritórios. Remova o vínculo no escritório (processos do escritório) antes de excluir aqui.";
+
+function mapDeleteBaseProcessError(raw: string | undefined): string {
+  if (!raw) return "Não foi possível excluir o processo.";
+  const lower = raw.toLowerCase();
+  if (
+    raw.includes("office_processes_base_process_id_fkey") ||
+    (lower.includes("foreign key") && lower.includes("office_processes"))
+  ) {
+    return MSG_EXCLUSAO_BLOQUEADA_VINCULOS_ESCRITORIOS;
+  }
+  return raw;
+}
+
 async function buildUniqueSlug(baseName: string, currentId?: string) {
   const supabase = await createServiceClient();
   const baseSlug = slugifyProcessName(baseName);
@@ -105,12 +121,42 @@ export async function updateBaseProcess(id: string, input: SaveBaseProcessInput)
   return { success: true };
 }
 
+export async function setBaseProcessActive(id: string, isActive: boolean) {
+  const supabase = await createServiceClient();
+  const { error } = await supabase.from("base_processes").update({ is_active: isActive }).eq("id", id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/admin/processos");
+  revalidatePath(`/admin/processos/${id}`);
+  return { success: true };
+}
+
 export async function deleteBaseProcess(id: string) {
   const supabase = await createServiceClient();
   const { error } = await supabase.from("base_processes").delete().eq("id", id);
 
   if (error) {
-    return { error: error.message };
+    return { error: mapDeleteBaseProcessError(error.message) };
+  }
+
+  revalidatePath("/admin/processos");
+  return { success: true };
+}
+
+export async function deleteBaseProcesses(ids: string[]) {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  if (unique.length === 0) {
+    return { error: "Nenhum processo selecionado." };
+  }
+
+  const supabase = await createServiceClient();
+  const { error } = await supabase.from("base_processes").delete().in("id", unique);
+
+  if (error) {
+    return { error: mapDeleteBaseProcessError(error.message) };
   }
 
   revalidatePath("/admin/processos");

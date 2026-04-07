@@ -115,7 +115,7 @@ export default function AdminProcessoDetailPage() {
       formData.set("kind", "template");
       const upload = await uploadBaseProcessFile(formData);
       if ("error" in upload) {
-        setError(upload.error);
+        setError(upload.error ?? "Erro no upload.");
         setSaving(false);
         return;
       }
@@ -134,7 +134,7 @@ export default function AdminProcessoDetailPage() {
       formData.set("kind", "flowchart");
       const upload = await uploadBaseProcessFile(formData);
       if ("error" in upload) {
-        setError(upload.error);
+        setError(upload.error ?? "Erro no upload.");
         setSaving(false);
         return;
       }
