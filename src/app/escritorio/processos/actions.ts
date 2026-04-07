@@ -7,6 +7,7 @@ import {
   buildOfficeProcessSnapshot,
   collectProcessIdsFromAnswers,
   normalizeChecklist,
+  OFFICE_PROCESS_STATUS_META,
   type QuestionnaireQuestionWithOptions,
 } from "@/lib/processes";
 import type {
@@ -15,7 +16,7 @@ import type {
   OfficeProcessAttachmentType,
   Profile,
 } from "@/types/database";
-import type { BpmPhaseSlug } from "@/lib/bpm-phases";
+import { BPM_PHASE_LABELS, bpmStageStatusToLabel, type BpmPhaseSlug } from "@/lib/bpm-phases";
 import { uploadProcessFile } from "@/lib/process-file-upload";
 
 type LeaderProfile = Profile & {
@@ -361,7 +362,90 @@ export async function addManualOfficeProcess(baseProcessId: string) {
   revalidatePath("/escritorio/processos");
   revalidatePath("/escritorio/processos/catalogo");
   revalidatePath("/escritorio/estrategia/cadeia-valor");
+  revalidatePath("/escritorio/estrategia/processos-escritorio");
   return { success: true };
+}
+
+export async function addManualOfficeProcessesBulk(baseProcessIds: string[]) {
+  const access = await assertLeaderProfile();
+  if ("error" in access) return { error: access.error };
+
+  const uniqueIds = [...new Set(baseProcessIds.filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    return { success: true as const, added: 0 };
+  }
+
+  const { profile } = access;
+  const supabase = await createServiceClient();
+
+  const [{ data: baseRows, error: bpError }, { data: existingRows }] = await Promise.all([
+    supabase.from("base_processes").select("*").in("id", uniqueIds),
+    supabase
+      .from("office_processes")
+      .select("base_process_id")
+      .eq("office_id", profile.office_id)
+      .in("base_process_id", uniqueIds),
+  ]);
+
+  if (bpError) {
+    return { error: bpError.message };
+  }
+
+  const existingSet = new Set(
+    (existingRows ?? []).map((r) => r.base_process_id).filter((id): id is string => id != null)
+  );
+  const baseById = new Map((baseRows ?? []).map((bp) => [bp.id, bp as BaseProcess]));
+
+  const toInsert = uniqueIds
+    .filter((id) => baseById.has(id) && !existingSet.has(id))
+    .map((id) => {
+      const baseProcess = baseById.get(id)!;
+      return {
+        office_id: profile.office_id,
+        ...buildOfficeProcessSnapshot(baseProcess),
+        origin: "manual" as const,
+        creation_source: "from_catalog",
+        status: "not_started" as const,
+        added_by_profile_id: profile.id,
+      };
+    });
+
+  if (toInsert.length === 0) {
+    return { success: true as const, added: 0 };
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("office_processes")
+    .insert(toInsert)
+    .select("id, base_process_id");
+
+  if (insertError || !inserted?.length) {
+    return { error: insertError?.message ?? "Não foi possível adicionar os processos." };
+  }
+
+  for (const row of inserted) {
+    const baseProcess = baseById.get(row.base_process_id as string);
+    if (!baseProcess) continue;
+    await createChecklistItemsForProcess(
+      row.id,
+      profile.id,
+      baseProcess.management_checklist
+    );
+    await recordOfficeProcessHistory({
+      officeProcessId: row.id,
+      officeId: profile.office_id,
+      actorProfileId: profile.id,
+      eventType: "created_manual",
+      description: "Processo adicionado manualmente pelo líder.",
+      metadata: { base_process_id: row.base_process_id },
+    });
+  }
+
+  revalidatePath("/escritorio/processos");
+  revalidatePath("/escritorio/processos/catalogo");
+  revalidatePath("/escritorio/estrategia/cadeia-valor");
+  revalidatePath("/escritorio/estrategia/processos-escritorio");
+  return { success: true as const, added: inserted.length };
 }
 
 export async function updateOfficeProcessDetails(input: {
@@ -405,7 +489,7 @@ export async function updateOfficeProcessDetails(input: {
 
   const changes: string[] = [];
   if (officeProcess.status !== input.status) {
-    changes.push(`status alterado para ${input.status}`);
+    changes.push(`status alterado para ${OFFICE_PROCESS_STATUS_META[input.status].label}`);
   }
   if ((officeProcess.owner_profile_id ?? null) !== (input.ownerProfileId ?? null)) {
     changes.push("responsável atualizado");
@@ -467,7 +551,7 @@ export async function updateOfficeProcessBpmPhase(input: {
     officeId: profile.office_id!,
     actorProfileId: profile.id,
     eventType: "bpm_phase_updated",
-    description: `Fase BPM atualizada: ${input.phase} → ${input.stageStatus}.`,
+    description: `Fase BPM atualizada: ${BPM_PHASE_LABELS[input.phase]} → ${bpmStageStatusToLabel(input.stageStatus)}.`,
     metadata: { phase: input.phase, stage_status: input.stageStatus },
   });
 

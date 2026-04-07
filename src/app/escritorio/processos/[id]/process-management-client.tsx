@@ -25,6 +25,10 @@ import {
   bpmStageStatusToLabel,
   formatCurrentBpmPhaseLabel,
 } from "@/lib/bpm-phases";
+import {
+  getOfficeProcessEventTypeLabel,
+  localizeOfficeProcessHistoryDescription,
+} from "@/lib/office-process-history";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -716,8 +720,10 @@ export function ProcessManagementClient({
                 history.map((event) => (
                   <div key={event.id} className="rounded-lg border border-border/60 p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium">{event.description}</p>
-                      <Badge variant="outline">{event.event_type}</Badge>
+                      <p className="text-sm font-medium">
+                        {localizeOfficeProcessHistoryDescription(event.description)}
+                      </p>
+                      <Badge variant="outline">{getOfficeProcessEventTypeLabel(event.event_type)}</Badge>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {new Date(event.created_at).toLocaleString("pt-BR")}

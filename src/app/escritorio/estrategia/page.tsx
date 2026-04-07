@@ -50,12 +50,13 @@ const sections: Section[] = [
   },
   {
     title: "Escritório de Processos",
-    description: "Análise SWOT, objetivos do escritório e portfólio de serviços.",
+    description: "Análise SWOT, objetivos, processos do escritório e portfólio de serviços.",
     icon: FolderKanban,
     variant: "purple",
     links: [
       { label: "Análise Swot", href: "/escritorio/estrategia/swot", icon: BarChart3 },
       { label: "Objetivos do Escritório", href: "/escritorio/estrategia/objetivos-escritorio", icon: Target },
+      { label: "Processos do Escritório", href: "/escritorio/estrategia/processos-escritorio", icon: ClipboardList },
       { label: "Portfólio de Serviços", href: "/escritorio/estrategia/portfolio", icon: Briefcase },
     ],
   },
@@ -86,7 +87,7 @@ export default function EstrategiaPage() {
       <div
         className={cn(
           "grid gap-6 lg:grid-cols-3 lg:items-stretch lg:gap-x-6 lg:gap-y-1.5",
-          "lg:[grid-template-rows:auto_repeat(3,minmax(2.5rem,auto))]"
+          "lg:[grid-template-rows:auto_repeat(4,minmax(2.5rem,auto))]"
         )}
       >
         {sections.map((section) => (
@@ -94,7 +95,7 @@ export default function EstrategiaPage() {
             key={section.title}
             className={cn(
               "flex flex-col pb-5 card-hover-shadow hover:-translate-y-0.5",
-              "lg:grid lg:row-span-4 lg:[grid-template-rows:subgrid] lg:min-h-0"
+              "lg:grid lg:row-span-5 lg:[grid-template-rows:subgrid] lg:min-h-0"
             )}
           >
             <CardHeader className="pb-2">
@@ -117,9 +118,9 @@ export default function EstrategiaPage() {
                   {link.label}
                 </Link>
               ))}
-              {section.links.length < 3 ? (
-                <div aria-hidden className="hidden min-h-10 shrink-0 lg:block" />
-              ) : null}
+              {Array.from({ length: 4 - section.links.length }, (_, i) => (
+                <div key={`spacer-${i}`} aria-hidden className="hidden min-h-10 shrink-0 lg:block" />
+              ))}
             </div>
           </Card>
         ))}
