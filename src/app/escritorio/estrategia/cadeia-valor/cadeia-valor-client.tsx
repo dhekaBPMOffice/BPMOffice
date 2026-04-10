@@ -79,6 +79,12 @@ import {
   importCadeiaValorFromLocalStorageJson,
   syncAllValueChainProcesses,
 } from "@/app/escritorio/processos/value-chain-actions";
+import {
+  compactLevelsForPersist,
+  draftLevelsForForm,
+  formatNivelLabelFromLevels,
+  type OfficeProcessLevelRow,
+} from "@/lib/office-process-levels";
 
 type ViewMode = "lista" | "hierarquia";
 type CreationMode = "anexar" | "manual" | "ia";
@@ -92,9 +98,8 @@ type SortMode =
 interface ProcessFormData {
   tipo: string;
   macroprocesso: string;
-  nivel1: string;
-  nivel2: string;
-  nivel3: string;
+  niveis: string[];
+  description: string;
   gestorProcesso: string;
   ultimaAtualizacao: string;
   responsavelAtualizacao: string;
@@ -220,9 +225,8 @@ function getDefaultFormData(): ProcessFormData {
   return {
     tipo: "Primário",
     macroprocesso: "",
-    nivel1: "",
-    nivel2: "",
-    nivel3: "",
+    niveis: [""],
+    description: "",
     gestorProcesso: "",
     ultimaAtualizacao: new Date().toISOString().slice(0, 16),
     responsavelAtualizacao: "",
@@ -237,14 +241,32 @@ function normalizeLevel(value: string, fallback: string): string {
   return normalized.length > 0 ? normalized : fallback;
 }
 
-/** Título em destaque na lista: último nível preenchido (3 → 2 → 1), ou macroprocesso se todos vazios. */
+/** Sem níveis explícitos preenchidos: catálogo prioriza macroprocesso; resto prioriza nome do escritório. */
+function segmentsWhenNiveisEmpty(process: ProcessItem): string[] {
+  const isCatalog = process.creationSource === "from_catalog";
+  if (isCatalog) {
+    const macro = process.macroprocesso?.trim();
+    if (macro) return [macro];
+    const nome = process.nomeEscritorio?.trim();
+    if (nome) return [nome];
+    return [];
+  }
+  const nome = process.nomeEscritorio?.trim();
+  if (nome) return [nome];
+  const macro = process.macroprocesso?.trim();
+  if (macro) return [macro];
+  return [];
+}
+
+/** Título em destaque na lista: último nível preenchido; senão fallback coerente com a árvore. */
 function processHighlightTitle(process: ProcessItem): string {
-  const n3 = process.nivel3.trim();
-  const n2 = process.nivel2.trim();
-  const n1 = process.nivel1.trim();
-  if (n3) return n3;
-  if (n2) return n2;
-  if (n1) return n1;
+  const levels = process.niveis ?? [];
+  for (let i = levels.length - 1; i >= 0; i--) {
+    const t = levels[i]?.trim();
+    if (t) return t;
+  }
+  const fallback = segmentsWhenNiveisEmpty(process);
+  if (fallback.length > 0) return fallback[0];
   return normalizeLevel(process.macroprocesso, "Sem Macroprocesso");
 }
 
@@ -280,13 +302,18 @@ function getGeneralStatusVariant(status: GeneralStatus): "outline" | "warning" |
   return "outline";
 }
 
+/** Caminho na arquitetura hierárquica: níveis explícitos; senão `segmentsWhenNiveisEmpty`. */
+function hierarchyPathForTree(process: ProcessItem): string[] {
+  const fromNiveis = (process.niveis ?? [])
+    .map((n) => normalizeLevel(n, ""))
+    .filter(Boolean);
+  if (fromNiveis.length > 0) return fromNiveis;
+  return segmentsWhenNiveisEmpty(process);
+}
+
 function formatProcessPath(process: ProcessItem, macroNome: string): string {
-  const parts = [
-    normalizeLevel(process.nivel1, ""),
-    normalizeLevel(process.nivel2, ""),
-    normalizeLevel(process.nivel3, ""),
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(" › ") : macroNome;
+  const path = hierarchyPathForTree(process);
+  return path.length > 0 ? path.join(" › ") : macroNome;
 }
 
 function buildProcessTree(processes: ProcessItem[]): ProcessTreeNode[] {
@@ -294,11 +321,7 @@ function buildProcessTree(processes: ProcessItem[]): ProcessTreeNode[] {
   const rootByLabel = new Map<string, ProcessTreeNode>();
 
   for (const process of processes) {
-    const path = [
-      normalizeLevel(process.nivel1, ""),
-      normalizeLevel(process.nivel2, ""),
-      normalizeLevel(process.nivel3, ""),
-    ].filter(Boolean);
+    const path = hierarchyPathForTree(process);
     if (path.length === 0) continue;
 
     let parent: ProcessTreeNode | null = null;
@@ -352,12 +375,14 @@ function parseLineToProcess(line: string, fallbackMacro: string): ProcessFormDat
     .map((segment) => segment.trim())
     .filter(Boolean);
 
+  const rest = segments.slice(1);
+  const niveis = rest.length > 0 ? rest : [""];
+
   return {
     tipo: "Primário",
     macroprocesso: segments[0] || fallbackMacro,
-    nivel1: segments[1] || "",
-    nivel2: segments[2] || "",
-    nivel3: segments[3] || "",
+    niveis,
+    description: "",
     gestorProcesso: "Definir gestor",
     ultimaAtualizacao: new Date().toISOString().slice(0, 16),
     responsavelAtualizacao: "Extração por anexo (revisar)",
@@ -368,12 +393,12 @@ function parseLineToProcess(line: string, fallbackMacro: string): ProcessFormDat
 }
 
 function structuredRowToFormData(row: ValueChainStructuredRow): ProcessFormData {
+  const niv = compactLevelsForPersist([row.nivel1, row.nivel2, row.nivel3]);
   return {
     tipo: row.tipo,
     macroprocesso: row.macroprocesso,
-    nivel1: row.nivel1,
-    nivel2: row.nivel2,
-    nivel3: row.nivel3,
+    niveis: niv.length > 0 ? niv : [""],
+    description: "",
     gestorProcesso: "Definir gestor",
     ultimaAtualizacao: new Date().toISOString().slice(0, 16),
     responsavelAtualizacao: "Extração por planilha (revisar)",
@@ -412,39 +437,32 @@ function buildAISuggestions(answers: Record<AIQuestionId, string>): ProcessFormD
       ? "Planejamento e execução da produção"
       : "Execução da operação principal";
 
-  const rows: Array<Pick<ProcessFormData, "tipo" | "macroprocesso" | "nivel1" | "nivel2" | "nivel3">> = [
+  const rows: Array<Pick<ProcessFormData, "tipo" | "macroprocesso" | "niveis">> = [
     {
       tipo: "Gerencial",
       macroprocesso: "Direcionamento Estratégico",
-      nivel1: "Gestão Estratégica",
-      nivel2: "Desdobramento de Objetivos",
-      nivel3: "Monitoramento de Indicadores",
+      niveis: ["Gestão Estratégica", "Desdobramento de Objetivos", "Monitoramento de Indicadores"],
     },
     {
       tipo: "Primário",
       macroprocesso: "Operação do Negócio",
-      nivel1: operacaoBase,
-      nivel2: "Execução do Processo-Fim",
-      nivel3: "Controle de Qualidade",
+      niveis: [operacaoBase, "Execução do Processo-Fim", "Controle de Qualidade"],
     },
     {
       tipo: "Primário",
       macroprocesso: "Relacionamento com Clientes",
-      nivel1: "Gestão de Canais e Jornada",
-      nivel2: "Atendimento e Retenção",
-      nivel3: "Tratativa de Demandas",
+      niveis: ["Gestão de Canais e Jornada", "Atendimento e Retenção", "Tratativa de Demandas"],
     },
     {
       tipo: "Apoio",
       macroprocesso: "Sustentação da Operação",
-      nivel1: "Gestão de Pessoas e Capacitação",
-      nivel2: "Suporte Administrativo",
-      nivel3: "Infraestrutura e Sistemas",
+      niveis: ["Gestão de Pessoas e Capacitação", "Suporte Administrativo", "Infraestrutura e Sistemas"],
     },
   ];
 
   return rows.map((row) => ({
     ...row,
+    description: "",
     gestorProcesso: "Definir gestor",
     ultimaAtualizacao: new Date().toISOString().slice(0, 16),
     responsavelAtualizacao: "IA (revisão pendente)",
@@ -637,7 +655,8 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
   useEffect(() => {
     if (!hydrated || syncPaused) return;
     const handle = setTimeout(() => {
-      void syncAllValueChainProcesses(processes);
+      const toSync = processes.filter((p) => p.creationSource !== "from_catalog");
+      void syncAllValueChainProcesses(toSync);
     }, 2000);
     return () => clearTimeout(handle);
   }, [hydrated, processes, syncPaused]);
@@ -703,9 +722,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
       return [
         process.tipo,
         process.macroprocesso,
-        process.nivel1,
-        process.nivel2,
-        process.nivel3,
+        ...(process.niveis ?? []),
         process.gestorProcesso,
         process.responsavelAtualizacao,
         process.statusGeral,
@@ -813,10 +830,12 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     setEditingId(process.id);
     setFormData({
       tipo: process.tipo,
-      macroprocesso: process.macroprocesso,
-      nivel1: process.nivel1,
-      nivel2: process.nivel2,
-      nivel3: process.nivel3,
+      macroprocesso: process.macroprocesso?.trim() || "",
+      niveis: draftLevelsForForm(
+        { vc_levels: process.niveis ?? [] } as OfficeProcessLevelRow,
+        process.nomeEscritorio ?? null
+      ),
+      description: process.description ?? "",
       gestorProcesso: process.gestorProcesso,
       ultimaAtualizacao: process.ultimaAtualizacao,
       responsavelAtualizacao: process.responsavelAtualizacao,
@@ -864,6 +883,25 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     }));
   }
 
+  function updateFormNivel(index: number, value: string) {
+    setFormData((current) => ({
+      ...current,
+      niveis: current.niveis.map((x, i) => (i === index ? value : x)),
+    }));
+  }
+
+  function addFormNivel() {
+    setFormData((current) => ({ ...current, niveis: [...current.niveis, ""] }));
+  }
+
+  function removeFormNivel(index: number) {
+    setFormData((current) => ({
+      ...current,
+      niveis:
+        current.niveis.length > 1 ? current.niveis.filter((_, i) => i !== index) : [""],
+    }));
+  }
+
   async function handleFileUpload(event: ChangeEvent<HTMLInputElement>) {
     clearMessages();
     const files = event.target.files;
@@ -887,9 +925,11 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
       }));
 
       const extractedByFile = await Promise.all(fileList.map((file) => extractProcessesFromAttachment(file)));
-      const extractedProcesses: ProcessItem[] = extractedByFile
-        .flat()
-        .map((process) => ({ id: crypto.randomUUID(), ...process }));
+      const extractedProcesses: ProcessItem[] = extractedByFile.flat().map((fd) => ({
+        id: crypto.randomUUID(),
+        ...fd,
+        niveis: compactLevelsForPersist(fd.niveis?.length ? fd.niveis : [""]),
+      }));
 
       setProcesses((prev) => [...extractedProcesses, ...prev]);
       setSuccess(
@@ -1002,13 +1042,24 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
       return;
     }
 
+    const niveisPersist = compactLevelsForPersist(
+      formData.niveis.length ? formData.niveis : [""]
+    );
+
     if (editingId) {
       setProcesses((prev) =>
-        prev.map((process) => (process.id === editingId ? { ...process, ...formData } : process))
+        prev.map((process) =>
+          process.id === editingId
+            ? { ...process, ...formData, niveis: niveisPersist }
+            : process
+        )
       );
       setSuccess("Processo atualizado com sucesso.");
     } else {
-      setProcesses((prev) => [{ id: crypto.randomUUID(), ...formData }, ...prev]);
+      setProcesses((prev) => [
+        { id: crypto.randomUUID(), ...formData, niveis: niveisPersist },
+        ...prev,
+      ]);
       setSuccess("Processo adicionado com sucesso.");
     }
 
@@ -1027,7 +1078,11 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     }
 
     const suggestions = buildAISuggestions(aiAnswers);
-    const generated = suggestions.map((item) => ({ id: crypto.randomUUID(), ...item }));
+    const generated = suggestions.map((item) => ({
+      id: crypto.randomUUID(),
+      ...item,
+      niveis: compactLevelsForPersist(item.niveis.length ? item.niveis : [""]),
+    }));
     setProcesses((prev) => [...generated, ...prev]);
     setSuccess(`${generated.length} processos sugeridos por IA incluídos. Revise e ajuste como quiser.`);
     setManageDialogOpen(false);
@@ -1037,9 +1092,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     const headers = [
       "Tipo",
       "Macroprocesso",
-      "Nível 1",
-      "Nível 2",
-      "Nível 3",
+      "Caminho dos níveis",
       "Gestor do processo",
       "Última atualização",
       "Responsável pela atualização",
@@ -1050,10 +1103,10 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
 
     const rows = filteredSortedProcesses.map((process) => [
       process.tipo,
-      process.macroprocesso,
-      process.nivel1,
-      process.nivel2,
-      process.nivel3,
+      process.macroprocesso?.trim() || "",
+      formatNivelLabelFromLevels(process.niveis ?? []) ??
+        process.nomeEscritorio?.trim() ??
+        "",
       process.gestorProcesso,
       process.ultimaAtualizacao,
       process.responsavelAtualizacao,
@@ -1510,8 +1563,9 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                         <div className="space-y-1">
                           <p className="font-medium">{processHighlightTitle(process)}</p>
                           <p className="text-xs text-muted-foreground">
-                            {normalizeLevel(process.nivel1, "Sem Nível 1")} • {normalizeLevel(process.nivel2, "Sem Nível 2")} •{" "}
-                            {normalizeLevel(process.nivel3, "Sem Nível 3")}
+                            {formatNivelLabelFromLevels(process.niveis ?? []) ??
+                              process.nomeEscritorio?.trim() ??
+                              "Sem níveis"}
                           </p>
                         </div>
                       </TableCell>
@@ -1822,34 +1876,59 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                       Níveis do processo (opcional)
                     </p>
                     <div className="space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="form-n1-cadeia">Nível 1</Label>
-                        <Input
-                          id="form-n1-cadeia"
-                          value={formData.nivel1}
-                          onChange={(event) => handleBasicFieldChange("nivel1", event.target.value)}
-                          className="w-full"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="form-n2-cadeia">Nível 2</Label>
-                        <Input
-                          id="form-n2-cadeia"
-                          value={formData.nivel2}
-                          onChange={(event) => handleBasicFieldChange("nivel2", event.target.value)}
-                          className="w-full"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="form-n3-cadeia">Nível 3</Label>
-                        <Input
-                          id="form-n3-cadeia"
-                          value={formData.nivel3}
-                          onChange={(event) => handleBasicFieldChange("nivel3", event.target.value)}
-                          className="w-full"
-                        />
-                      </div>
+                      {formData.niveis.map((nv, idx) => (
+                        <div
+                          key={idx}
+                          className="flex flex-col gap-2 sm:flex-row sm:items-end"
+                        >
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <Label htmlFor={`form-nivel-cadeia-${idx}`}>
+                              Nível {idx + 1}
+                            </Label>
+                            <Input
+                              id={`form-nivel-cadeia-${idx}`}
+                              value={nv}
+                              onChange={(event) => updateFormNivel(idx, event.target.value)}
+                              className="w-full"
+                              placeholder={idx === 0 ? "Ex.: Macroárea" : "Subdivisão da hierarquia"}
+                            />
+                          </div>
+                          {idx > 0 ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0"
+                              onClick={() => removeFormNivel(idx)}
+                            >
+                              Remover
+                            </Button>
+                          ) : null}
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={addFormNivel}
+                      >
+                        <Plus className="h-4 w-4" aria-hidden />
+                        Adicionar nível
+                      </Button>
                     </div>
+                  </div>
+
+                  <div className="space-y-2 min-w-0">
+                    <Label htmlFor="form-desc-cadeia">Descrição</Label>
+                    <Textarea
+                      id="form-desc-cadeia"
+                      rows={3}
+                      value={formData.description}
+                      onChange={(event) => handleBasicFieldChange("description", event.target.value)}
+                      placeholder="Objetivo e escopo do processo (opcional)."
+                      className="w-full min-w-0"
+                    />
                   </div>
                 </div>
 

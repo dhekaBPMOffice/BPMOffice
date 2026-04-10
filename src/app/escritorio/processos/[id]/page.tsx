@@ -91,7 +91,11 @@ export default async function OfficeProcessDetailPage({
   return (
     <PageLayout
       title={officeProcess.name}
-      description={officeProcess.category || "Gestão completa do processo do escritório."}
+      description={
+        officeProcess.vc_tipo_label?.trim() ||
+        officeProcess.category?.trim() ||
+        "Gestão completa do processo do escritório."
+      }
       iconName="ClipboardList"
       backHref="/escritorio/estrategia/cadeia-valor?aba=gestao"
       backLabel="Voltar para Gestão de Processos"

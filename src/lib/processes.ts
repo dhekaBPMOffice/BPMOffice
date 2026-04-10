@@ -119,5 +119,7 @@ export function buildOfficeProcessSnapshot(baseProcess: BaseProcess) {
           url: file.url,
         }))
       : [],
+    vc_macroprocesso: baseProcess.vc_macroprocesso ?? null,
+    vc_levels: Array.isArray(baseProcess.vc_levels) ? [...baseProcess.vc_levels] : [],
   };
 }

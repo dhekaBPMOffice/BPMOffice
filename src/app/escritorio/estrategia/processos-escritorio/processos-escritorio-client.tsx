@@ -47,6 +47,14 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { cn } from "@/lib/utils";
 import { BPM_PHASE_LABELS, BPM_PHASE_SLUGS } from "@/lib/bpm-phases";
 import {
+  applyVcLevelFilters,
+  clearVcLevelFilters,
+  hasAnyVcLevelFilter,
+  maxVcFilterDepthFromItems,
+  setVcLevelFilterAt,
+  vcLevelOptionsAtDepth,
+} from "@/lib/vc-level-filters";
+import {
   addManualOfficeProcessesBulk,
   deleteOfficeProcessesBulk,
 } from "@/app/escritorio/processos/actions";
@@ -74,15 +82,6 @@ const SORT_OPTIONS = [
   { value: "name_desc", label: "Nome (Z–A)" },
 ];
 
-function uniqueSorted(values: (string | null | undefined)[]): string[] {
-  const set = new Set<string>();
-  for (const v of values) {
-    const t = v?.trim();
-    if (t) set.add(t);
-  }
-  return [...set].sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }));
-}
-
 type ProcessosEscritorioClientProps = {
   gestaoProps: GestaoProcessosTabProps;
   catalogItems: CatalogoItem[];
@@ -108,9 +107,7 @@ function ProcessosTab({
   const [fase, setFase] = useState("");
   const [tipo, setTipo] = useState("");
   const [status, setStatus] = useState("");
-  const [n1, setN1] = useState("");
-  const [n2, setN2] = useState("");
-  const [n3, setN3] = useState("");
+  const [levelFilters, setLevelFilters] = useState<string[]>(clearVcLevelFilters);
   const [sort, setSort] = useState("name_asc");
   const [vista, setVista] = useState<"lista" | "grade">("lista");
 
@@ -122,20 +119,10 @@ function ProcessosTab({
   const selectAllRef = useRef<HTMLInputElement>(null);
   const liveRef = useRef<HTMLDivElement>(null);
 
-  const n1Options = useMemo(() => uniqueSorted(items.map((i) => i.vcLevel1)), [items]);
-  const n2Options = useMemo(() => {
-    const filtered = n1 ? items.filter((i) => (i.vcLevel1 ?? "").trim() === n1.trim()) : items;
-    return uniqueSorted(filtered.map((i) => i.vcLevel2));
-  }, [items, n1]);
-  const n3Options = useMemo(() => {
-    let filtered = items;
-    if (n1) filtered = filtered.filter((i) => (i.vcLevel1 ?? "").trim() === n1.trim());
-    if (n2) filtered = filtered.filter((i) => (i.vcLevel2 ?? "").trim() === n2.trim());
-    return uniqueSorted(filtered.map((i) => i.vcLevel3));
-  }, [items, n1, n2]);
+  const maxVcFilterDepth = useMemo(() => maxVcFilterDepthFromItems(items), [items]);
 
   const filteredItems = useMemo(() => {
-    let out = items;
+    let out = applyVcLevelFilters(items, levelFilters);
     const q = search.trim().toLowerCase();
     if (q) {
       out = out.filter(
@@ -147,9 +134,6 @@ function ProcessosTab({
     if (status) out = out.filter((i) => i.statusRaw === status);
     if (tipo) out = out.filter((i) => i.vcProcessType === tipo);
     if (fase) out = out.filter((i) => i.faseBpmSlug === fase);
-    if (n1) out = out.filter((i) => (i.vcLevel1 ?? "").trim() === n1.trim());
-    if (n2) out = out.filter((i) => (i.vcLevel2 ?? "").trim() === n2.trim());
-    if (n3) out = out.filter((i) => (i.vcLevel3 ?? "").trim() === n3.trim());
 
     const copy = [...out];
     copy.sort((a, b) => {
@@ -157,7 +141,7 @@ function ProcessosTab({
       return sort === "name_desc" ? -cmp : cmp;
     });
     return copy;
-  }, [items, search, status, tipo, fase, n1, n2, n3, sort]);
+  }, [items, search, status, tipo, fase, levelFilters, sort]);
 
   const ids = useMemo(() => filteredItems.map((i) => i.id), [filteredItems]);
   const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
@@ -216,16 +200,15 @@ function ProcessosTab({
     }
   }
 
-  const hasActiveFilters = !!search.trim() || !!fase || !!tipo || !!status || !!n1 || !!n2 || !!n3;
+  const hasActiveFilters =
+    !!search.trim() || !!fase || !!tipo || !!status || hasAnyVcLevelFilter(levelFilters);
 
   function clearFilters() {
     setSearch("");
     setFase("");
     setTipo("");
     setStatus("");
-    setN1("");
-    setN2("");
-    setN3("");
+    setLevelFilters(clearVcLevelFilters());
   }
 
   return (
@@ -288,60 +271,30 @@ function ProcessosTab({
               ))}
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="pe-n1">Nível 1</Label>
-            <Select
-              id="pe-n1"
-              value={n1}
-              onChange={(e) => {
-                setN1(e.target.value);
-                setN2("");
-                setN3("");
-              }}
-            >
-              <option value="">Todos</option>
-              {n1Options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="pe-n2">Nível 2</Label>
-            <Select
-              id="pe-n2"
-              value={n2}
-              onChange={(e) => {
-                setN2(e.target.value);
-                setN3("");
-              }}
-              disabled={n2Options.length === 0}
-            >
-              <option value="">Todos</option>
-              {n2Options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="pe-n3">Nível 3</Label>
-            <Select
-              id="pe-n3"
-              value={n3}
-              onChange={(e) => setN3(e.target.value)}
-              disabled={n3Options.length === 0}
-            >
-              <option value="">Todos</option>
-              {n3Options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </Select>
-          </div>
+          {Array.from({ length: maxVcFilterDepth }, (_, depth) => {
+            const opts = vcLevelOptionsAtDepth(items, depth, levelFilters);
+            const disabled = depth > 0 && opts.length === 0;
+            return (
+              <div key={`pe-n-${depth}`} className="space-y-1.5">
+                <Label htmlFor={`pe-n${depth + 1}`}>Nível {depth + 1}</Label>
+                <Select
+                  id={`pe-n${depth + 1}`}
+                  value={levelFilters[depth] ?? ""}
+                  onChange={(e) =>
+                    setLevelFilters((prev) => setVcLevelFilterAt(prev, depth, e.target.value))
+                  }
+                  disabled={disabled}
+                >
+                  <option value="">Todos</option>
+                  {opts.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            );
+          })}
           <div className="space-y-1.5">
             <Label htmlFor="pe-status">Estado do processo</Label>
             <Select id="pe-status" value={status} onChange={(e) => setStatus(e.target.value)}>

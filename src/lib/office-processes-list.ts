@@ -4,6 +4,7 @@ import {
   type BpmPhaseSlug,
 } from "@/lib/bpm-phases";
 import type { OfficeProcessStatus } from "@/types/database";
+import { levelsFromRow, type OfficeProcessLevelRow } from "@/lib/office-process-levels";
 
 export type ProcessosSortKey =
   | "selected_at_desc"
@@ -123,6 +124,7 @@ export type OfficeProcessRowForList = {
   template_label: string | null;
   vc_process_type: string | null;
   vc_tipo_label: string | null;
+  vc_levels?: unknown;
   vc_level1: string | null;
   vc_level2: string | null;
   vc_level3: string | null;
@@ -144,10 +146,7 @@ function tipoRank(vcProcessType: string | null): number {
 }
 
 function nivelSortKey(p: OfficeProcessRowForList): string {
-  const a = (p.vc_level1 ?? "").trim();
-  const b = (p.vc_level2 ?? "").trim();
-  const c = (p.vc_level3 ?? "").trim();
-  return [a, b, c].join("\u0000");
+  return levelsFromRow(p as OfficeProcessLevelRow).join("\u0000");
 }
 
 function faseIndex(slug: BpmPhaseSlug | null): number {
@@ -232,13 +231,13 @@ export function applyProcessosFilters<T extends OfficeProcessRowForList>(
     return (a ?? "").trim() === b.trim();
   };
   if (opts.n1) {
-    out = out.filter((p) => trimEq(p.vc_level1, opts.n1));
+    out = out.filter((p) => trimEq(levelsFromRow(p as OfficeProcessLevelRow)[0] ?? null, opts.n1));
   }
   if (opts.n2) {
-    out = out.filter((p) => trimEq(p.vc_level2, opts.n2));
+    out = out.filter((p) => trimEq(levelsFromRow(p as OfficeProcessLevelRow)[1] ?? null, opts.n2));
   }
   if (opts.n3) {
-    out = out.filter((p) => trimEq(p.vc_level3, opts.n3));
+    out = out.filter((p) => trimEq(levelsFromRow(p as OfficeProcessLevelRow)[2] ?? null, opts.n3));
   }
   if (opts.faseFilter) {
     out = out.filter((p) => {

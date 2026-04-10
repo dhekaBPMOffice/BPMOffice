@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -13,10 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { saveValueChainOfficeProcess } from "@/app/escritorio/processos/value-chain-actions";
 import type { ValueChainProcessPayload } from "@/lib/value-chain-mappers";
 import { BPM_STAGES, type StageStatus } from "@/types/cadeia-valor";
+import { compactLevelsForPersist } from "@/lib/office-process-levels";
 
 const TIPO_OPTIONS = ["Primário", "Gerencial", "Apoio"] as const;
 
@@ -35,28 +37,26 @@ export function CriarProcessoDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [nome, setNome] = useState("");
   const [macroprocesso, setMacroprocesso] = useState("");
   const [tipo, setTipo] = useState<string>("Primário");
-  const [nivel1, setNivel1] = useState("");
-  const [nivel2, setNivel2] = useState("");
-  const [nivel3, setNivel3] = useState("");
+  const [niveis, setNiveis] = useState<string[]>([""]);
+  const [description, setDescription] = useState("");
 
   function resetForm() {
-    setNome("");
     setMacroprocesso("");
     setTipo("Primário");
-    setNivel1("");
-    setNivel2("");
-    setNivel3("");
+    setNiveis([""]);
+    setDescription("");
     setError(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmedName = nome.trim();
-    if (!trimmedName) {
-      setError("O nome do processo é obrigatório.");
+
+    const levels = compactLevelsForPersist(niveis.length ? niveis : [""]);
+    const macroTrim = macroprocesso.trim();
+    if (!macroTrim && !levels[0]) {
+      setError("Preencha o macroprocesso e/ou o nível 1.");
       return;
     }
 
@@ -65,10 +65,9 @@ export function CriarProcessoDialog({
 
     const payload: ValueChainProcessPayload = {
       tipo,
-      macroprocesso: macroprocesso.trim() || trimmedName,
-      nivel1: nivel1.trim(),
-      nivel2: nivel2.trim(),
-      nivel3: nivel3.trim(),
+      macroprocesso: macroTrim,
+      niveis: levels,
+      description: description.trim() || null,
       gestorProcesso: "",
       prioridade: "Média",
       statusGeral: "Não iniciado",
@@ -98,6 +97,20 @@ export function CriarProcessoDialog({
     onOpenChange(next);
   }
 
+  function updateNivel(index: number, value: string) {
+    setNiveis((prev) => prev.map((x, i) => (i === index ? value : x)));
+  }
+
+  function addNivel() {
+    setNiveis((prev) => [...prev, ""]);
+  }
+
+  function removeNivel(index: number) {
+    setNiveis((prev) =>
+      prev.length > 1 ? prev.filter((_, i) => i !== index) : [""]
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg">
@@ -111,23 +124,13 @@ export function CriarProcessoDialog({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="cp-nome">Nome do processo *</Label>
-            <Input
-              id="cp-nome"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex.: Gestão de contratos"
-              autoFocus
-            />
-          </div>
-
-          <div className="space-y-1.5">
             <Label htmlFor="cp-macro">Macroprocesso</Label>
             <Input
               id="cp-macro"
               value={macroprocesso}
               onChange={(e) => setMacroprocesso(e.target.value)}
               placeholder="Ex.: Gestão Administrativa"
+              autoFocus
             />
           </div>
 
@@ -146,31 +149,47 @@ export function CriarProcessoDialog({
             </Select>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="cp-n1">Nível 1</Label>
-              <Input
-                id="cp-n1"
-                value={nivel1}
-                onChange={(e) => setNivel1(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cp-n2">Nível 2</Label>
-              <Input
-                id="cp-n2"
-                value={nivel2}
-                onChange={(e) => setNivel2(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cp-n3">Nível 3</Label>
-              <Input
-                id="cp-n3"
-                value={nivel3}
-                onChange={(e) => setNivel3(e.target.value)}
-              />
-            </div>
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">Níveis</p>
+            {niveis.map((nv, idx) => (
+              <div key={idx} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Label htmlFor={`cp-nivel-${idx}`}>Nível {idx + 1}</Label>
+                  <Input
+                    id={`cp-nivel-${idx}`}
+                    value={nv}
+                    onChange={(e) => updateNivel(idx, e.target.value)}
+                    placeholder={idx === 0 ? "Ex.: primeira subdivisão" : "Subdivisão"}
+                  />
+                </div>
+                {idx > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => removeNivel(idx)}
+                  >
+                    Remover
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={addNivel}>
+              <Plus className="h-4 w-4" aria-hidden />
+              Adicionar nível
+            </Button>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="cp-desc">Descrição</Label>
+            <Textarea
+              id="cp-desc"
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Objetivo e escopo (opcional)."
+            />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

@@ -7,6 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import { buildChecklistInput } from "@/lib/processes";
 import type { BaseProcess, ProcessFlowchartFile, ProcessTemplateFile } from "@/types/database";
 import { deleteBaseProcess, updateBaseProcess, uploadBaseProcessFile } from "../actions";
+import {
+  draftLevelsForForm,
+  type OfficeProcessLevelRow,
+} from "@/lib/office-process-levels";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -20,6 +24,7 @@ import {
   ClipboardList,
   ExternalLink,
   Pencil,
+  Plus,
   Trash2,
   Upload,
   X,
@@ -142,8 +147,9 @@ export default function AdminProcessoDetailPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
+  const [tipo, setTipo] = useState("");
+  const [vcMacro, setVcMacro] = useState("");
+  const [vcLevelsDraft, setVcLevelsDraft] = useState<string[]>([""]);
   const [description, setDescription] = useState("");
   const [templateFiles, setTemplateFiles] = useState<ProcessTemplateFile[]>([]);
   const [flowchartFiles, setFlowchartFiles] = useState<ProcessFlowchartFile[]>([]);
@@ -181,8 +187,14 @@ export default function AdminProcessoDetailPage() {
 
     const baseProcess = data as BaseProcess;
     setProcess(baseProcess);
-    setName(baseProcess.name);
-    setCategory(baseProcess.category ?? "");
+    setTipo(baseProcess.category ?? "");
+    setVcMacro(baseProcess.vc_macroprocesso ?? "");
+    setVcLevelsDraft(
+      draftLevelsForForm(
+        { vc_levels: baseProcess.vc_levels ?? [] } as OfficeProcessLevelRow,
+        null
+      )
+    );
     setDescription(baseProcess.description ?? "");
     setTemplateFiles(getTemplateFiles(baseProcess));
     setFlowchartFiles(getFlowchartFiles(baseProcess));
@@ -208,8 +220,9 @@ export default function AdminProcessoDetailPage() {
   const formSnapshot = useMemo(
     () =>
       JSON.stringify({
-        name,
-        category,
+        tipo,
+        vcMacro,
+        vcLevelsDraft,
         description,
         templateFiles,
         flowchartFiles,
@@ -229,8 +242,9 @@ export default function AdminProcessoDetailPage() {
         isActive,
       }),
     [
-      name,
-      category,
+      tipo,
+      vcMacro,
+      vcLevelsDraft,
       description,
       templateFiles,
       flowchartFiles,
@@ -343,8 +357,9 @@ export default function AdminProcessoDetailPage() {
 
     setSaveProgressLabel("Gravando…");
     const result = await updateBaseProcess(processId, {
-      name,
-      category,
+      category: tipo,
+      vcMacroprocesso: vcMacro,
+      vcLevels: vcLevelsDraft,
       description,
       templateFiles: finalTemplates,
       flowchartFiles: finalFlowcharts,
@@ -474,19 +489,71 @@ export default function AdminProcessoDetailPage() {
               <CardHeader className="space-y-1">
                 <CardTitle>Identificação</CardTitle>
                 <CardDescription>
-                  Nome, categoria e descrição usados no catálogo e na página de gestão do processo.
+                  Tipo, macroprocesso, níveis e descrição usados no catálogo e na gestão do processo no escritório.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Nome</Label>
-                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+                    <Label htmlFor="tipo-base">Tipo</Label>
+                    <Input
+                      id="tipo-base"
+                      value={tipo}
+                      onChange={(e) => setTipo(e.target.value)}
+                      placeholder="Ex.: Primário, Apoio, Governança…"
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="category">Categoria</Label>
-                    <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} />
+                    <Label htmlFor="vc-macro-base">Macroprocesso</Label>
+                    <Input
+                      id="vc-macro-base"
+                      value={vcMacro}
+                      onChange={(e) => setVcMacro(e.target.value)}
+                      placeholder="Opcional se o nível 1 identificar o processo"
+                    />
                   </div>
+                </div>
+                <div className="space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Níveis do processo
+                  </p>
+                  {vcLevelsDraft.map((val, idx) => (
+                    <div key={idx} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <Label htmlFor={`vc-n-base-${idx}`}>Nível {idx + 1}</Label>
+                        <Input
+                          id={`vc-n-base-${idx}`}
+                          value={val}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setVcLevelsDraft((prev) => prev.map((x, j) => (j === idx ? v : x)));
+                          }}
+                          placeholder={idx === 0 ? "Ex.: área ou nome do processo" : "Subdivisão"}
+                        />
+                      </div>
+                      {idx > 0 ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0"
+                          onClick={() => setVcLevelsDraft((prev) => prev.filter((_, j) => j !== idx))}
+                        >
+                          Remover
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setVcLevelsDraft((prev) => [...prev, ""])}
+                  >
+                    <Plus className="h-4 w-4" aria-hidden />
+                    Adicionar nível
+                  </Button>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Descrição</Label>

@@ -6,6 +6,11 @@ import {
   computeCurrentBpmPhaseSlug,
 } from "@/lib/bpm-phases";
 import { formatVcProcessTypeLabel } from "@/lib/office-processes-list";
+import {
+  formatNivelLabelFromLevels,
+  levelsFromRow,
+  type OfficeProcessLevelRow,
+} from "@/lib/office-process-levels";
 import { ProcessosEscritorioClient } from "./processos-escritorio-client";
 import type { GestaoProcessItem } from "../cadeia-valor/gestao-processos-tab";
 import type { OfficeProcessBpmPhase, OfficeProcessStatus } from "@/types/database";
@@ -70,14 +75,8 @@ export default async function ProcessosEscritorioPage() {
     const phases = p.office_process_bpm_phases ?? [];
     const faseBpmLabel = formatCurrentBpmPhaseLabel(phases);
     const faseBpmSlug = computeCurrentBpmPhaseSlug(phases);
-    const nivelParts = [
-      p.vc_level1 as string | null,
-      p.vc_level2 as string | null,
-      p.vc_level3 as string | null,
-    ]
-      .map((x) => x?.trim())
-      .filter(Boolean) as string[];
-    const nivelLabel = nivelParts.length ? nivelParts.join(" › ") : null;
+    const vcLevels = levelsFromRow(p as OfficeProcessLevelRow);
+    const nivelLabel = formatNivelLabelFromLevels(vcLevels);
     const tipoLabel = formatVcProcessTypeLabel(
       p.vc_process_type as string | null,
       p.vc_tipo_label as string | null
@@ -120,9 +119,7 @@ export default async function ProcessosEscritorioPage() {
       nivelLabel,
       ownerName: owner?.full_name ?? null,
       vcProcessType: (p.vc_process_type as string | null) ?? null,
-      vcLevel1: (p.vc_level1 as string | null) ?? null,
-      vcLevel2: (p.vc_level2 as string | null) ?? null,
-      vcLevel3: (p.vc_level3 as string | null) ?? null,
+      vcLevels,
       flowcharts,
       templates,
     };

@@ -1,6 +1,7 @@
 import { BPM_PHASE_LABELS, BPM_PHASE_SLUGS, type BpmPhaseSlug } from "@/lib/bpm-phases";
 import type { ProcessItem } from "@/types/cadeia-valor";
 import type { OfficeProcessBpmPhase } from "@/types/database";
+import { levelsFromRow, type OfficeProcessLevelRow } from "@/lib/office-process-levels";
 
 type ProcessTypePt = "Primário" | "Apoio" | "Gerencial";
 type BPMStagePt =
@@ -18,9 +19,10 @@ export type ValueChainProcessPayload = {
   /** Texto livre; valores canónicos "Primário" | "Apoio" | "Gerencial" preenchem também vc_process_type. */
   tipo: string;
   macroprocesso: string;
-  nivel1: string;
-  nivel2: string;
-  nivel3: string;
+  /** Hierarquia de níveis (variável). Opcional em import legado — normalizar antes de gravar. */
+  niveis?: string[];
+  /** `office_processes.description`. */
+  description?: string | null;
   gestorProcesso: string;
   prioridade: "Alta" | "Média" | "Baixa";
   statusGeral: "Não iniciado" | "Em andamento" | "Concluído" | "Em acompanhamento";
@@ -70,9 +72,10 @@ export function dbRowToProcessItem(
     id: row.id as string,
     tipo: p.tipo,
     macroprocesso: p.macroprocesso,
-    nivel1: p.nivel1,
-    nivel2: p.nivel2,
-    nivel3: p.nivel3,
+    niveis: p.niveis ?? [],
+    description: p.description ?? null,
+    nomeEscritorio: (row.name as string | undefined) ?? null,
+    creationSource: (row.creation_source as ProcessItem["creationSource"]) ?? null,
     gestorProcesso: p.gestorProcesso,
     prioridade: p.prioridade,
     statusGeral: p.statusGeral,
@@ -90,9 +93,8 @@ export function processItemToPayload(
     id: item.id,
     tipo: item.tipo,
     macroprocesso: item.macroprocesso,
-    nivel1: item.nivel1,
-    nivel2: item.nivel2,
-    nivel3: item.nivel3,
+    niveis: item.niveis ?? [],
+    description: item.description?.trim() || null,
     gestorProcesso: item.gestorProcesso,
     prioridade: item.prioridade,
     statusGeral: item.statusGeral,
@@ -123,13 +125,15 @@ export function mapOfficeProcessToValueChainPayload(
   const tipoDisplay =
     label.length > 0 ? label : mapTipoFromDb(row.vc_process_type as string | null);
 
+  const lr = row as OfficeProcessLevelRow;
+  const niveis = levelsFromRow(lr);
+
   return {
     id: row.id as string,
     tipo: tipoDisplay,
     macroprocesso: (row.vc_macroprocesso as string) || "",
-    nivel1: (row.vc_level1 as string) || "",
-    nivel2: (row.vc_level2 as string) || "",
-    nivel3: (row.vc_level3 as string) || "",
+    niveis: niveis.length ? niveis : [],
+    description: (row.description as string | null | undefined) ?? null,
     gestorProcesso: (row.vc_gestor_label as string) || "",
     prioridade: ((row.vc_priority as string) || "Média") as ValueChainProcessPayload["prioridade"],
     statusGeral: ((row.vc_general_status as string) || "Não iniciado") as ValueChainProcessPayload["statusGeral"],

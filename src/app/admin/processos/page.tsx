@@ -49,8 +49,9 @@ export default function AdminProcessosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
+  const [tipo, setTipo] = useState("");
+  const [vcMacro, setVcMacro] = useState("");
+  const [vcLevelsDraft, setVcLevelsDraft] = useState<string[]>([""]);
   const [description, setDescription] = useState("");
   const [templateFilesToAdd, setTemplateFilesToAdd] = useState<{ file: File; label: string }[]>([]);
   const [flowchartFilesToAdd, setFlowchartFilesToAdd] = useState<File[]>([]);
@@ -205,8 +206,9 @@ export default function AdminProcessosPage() {
     setCreating(true);
 
     const result = await createBaseProcess({
-      name,
-      category,
+      category: tipo,
+      vcMacroprocesso: vcMacro,
+      vcLevels: vcLevelsDraft,
       description,
       templateFiles: [],
       flowchartFiles: [],
@@ -245,8 +247,9 @@ export default function AdminProcessosPage() {
       }
       if (finalTemplates.length > 0 || finalFlowcharts.length > 0) {
         await updateBaseProcess(newId, {
-          name,
-          category,
+          category: tipo,
+          vcMacroprocesso: vcMacro,
+          vcLevels: vcLevelsDraft,
           description,
           templateFiles: finalTemplates,
           flowchartFiles: finalFlowcharts,
@@ -257,8 +260,9 @@ export default function AdminProcessosPage() {
       }
     }
 
-    setName("");
-    setCategory("");
+    setTipo("");
+    setVcMacro("");
+    setVcLevelsDraft([""]);
     setDescription("");
     setTemplateFilesToAdd([]);
     setFlowchartFilesToAdd([]);
@@ -375,23 +379,64 @@ export default function AdminProcessosPage() {
           <CardContent>
             <form id="new-base-process-form" onSubmit={handleCreate} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Nome</Label>
+                <Label htmlFor="tipo-new">Tipo</Label>
                 <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: Gestão de Portfólio de Processos"
-                  required
+                  id="tipo-new"
+                  value={tipo}
+                  onChange={(e) => setTipo(e.target.value)}
+                  placeholder="Ex.: Primário, Apoio, Governança…"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="category">Categoria</Label>
+                <Label htmlFor="vc-macro-new">Macroprocesso</Label>
                 <Input
-                  id="category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder="Ex: Governança"
+                  id="vc-macro-new"
+                  value={vcMacro}
+                  onChange={(e) => setVcMacro(e.target.value)}
+                  placeholder="Opcional se o nível 1 identificar o processo"
                 />
+              </div>
+              <div className="space-y-3 md:col-span-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Níveis do processo
+                </p>
+                {vcLevelsDraft.map((val, idx) => (
+                  <div key={idx} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <Label htmlFor={`vc-n-new-${idx}`}>Nível {idx + 1}</Label>
+                      <Input
+                        id={`vc-n-new-${idx}`}
+                        value={val}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setVcLevelsDraft((prev) => prev.map((x, j) => (j === idx ? v : x)));
+                        }}
+                        placeholder={idx === 0 ? "Ex.: nome ou área do processo" : "Subdivisão"}
+                      />
+                    </div>
+                    {idx > 0 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => setVcLevelsDraft((prev) => prev.filter((_, j) => j !== idx))}
+                      >
+                        Remover
+                      </Button>
+                    ) : null}
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setVcLevelsDraft((prev) => [...prev, ""])}
+                >
+                  <Plus className="h-4 w-4" aria-hidden />
+                  Adicionar nível
+                </Button>
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="description">Descrição</Label>

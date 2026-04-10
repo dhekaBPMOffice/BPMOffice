@@ -20,9 +20,14 @@ export interface ProcessItem {
   /** Categoria livre (ex.: importação de planilha); valores canónicos incluem Primário, Apoio, Gerencial. */
   tipo: string;
   macroprocesso: string;
-  nivel1: string;
-  nivel2: string;
-  nivel3: string;
+  /** Hierarquia de níveis (ordem: macro → detalhe). */
+  niveis: string[];
+  /** Nome do processo no escritório (BD); usado na árvore quando `niveis` está vazio. */
+  nomeEscritorio?: string | null;
+  /** Texto livre em `office_processes.description`. */
+  description?: string | null;
+  /** Origem em `office_processes`; controla sync automático (catálogo não é regravado em debounce). */
+  creationSource?: "from_catalog" | "created_in_value_chain" | null;
   gestorProcesso: string;
   ultimaAtualizacao: string;
   responsavelAtualizacao: string;

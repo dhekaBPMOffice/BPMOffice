@@ -11,6 +11,24 @@ import {
   type ValueChainProcessPayload,
 } from "@/lib/value-chain-mappers";
 import type { ProcessItem } from "@/types/cadeia-valor";
+import { officeProcessAppearsOnCadeiaGestaoList } from "@/lib/value-chain-process-filters";
+import {
+  compactLevelsForPersist,
+  mirrorFirstThreeLegacyColumns,
+} from "@/lib/office-process-levels";
+
+/** Import JSON legado (nivel1–3) ou array `niveis`. */
+function niveisFromPayload(payload: ValueChainProcessPayload): string[] {
+  const raw = payload as ValueChainProcessPayload & {
+    nivel1?: string;
+    nivel2?: string;
+    nivel3?: string;
+  };
+  if (Array.isArray(raw.niveis)) {
+    return compactLevelsForPersist(raw.niveis);
+  }
+  return compactLevelsForPersist([raw.nivel1 ?? "", raw.nivel2 ?? "", raw.nivel3 ?? ""]);
+}
 
 async function assertLeader() {
   const profile = await getProfile();
@@ -28,17 +46,21 @@ export async function saveValueChainOfficeProcess(payload: ValueChainProcessPayl
   const supabase = await createServiceClient();
   const now = new Date().toISOString();
 
+  const levels = niveisFromPayload(payload);
+  const legacyLv = mirrorFirstThreeLegacyColumns(levels);
+
   const baseRow = {
     office_id: profile.office_id,
-    name: payload.macroprocesso?.trim() || payload.nivel1?.trim() || "Processo",
-    description: null as string | null,
+    name: payload.macroprocesso?.trim() || levels[0]?.trim() || "Processo",
+    description: payload.description?.trim() || null,
     category: null as string | null,
     vc_tipo_label: payload.tipo.trim() || null,
     vc_process_type: deriveVcProcessTypeFromLabel(payload.tipo),
     vc_macroprocesso: payload.macroprocesso?.trim() || null,
-    vc_level1: payload.nivel1?.trim() || null,
-    vc_level2: payload.nivel2?.trim() || null,
-    vc_level3: payload.nivel3?.trim() || null,
+    vc_levels: levels,
+    vc_level1: legacyLv.vc_level1,
+    vc_level2: legacyLv.vc_level2,
+    vc_level3: legacyLv.vc_level3,
     vc_priority: payload.prioridade,
     vc_gestor_label: payload.gestorProcesso?.trim() || null,
     vc_general_status: payload.statusGeral,
@@ -127,18 +149,6 @@ export async function saveValueChainOfficeProcess(payload: ValueChainProcessPayl
   return { success: true, id: officeProcessId };
 }
 
-/** Mesma regra da query em cadeia-valor/page.tsx: o processo aparece na lista se qualquer condição for verdadeira. */
-function rowAppearsOnValueChainPage(row: {
-  creation_source: string | null;
-  value_chain_id: string | null;
-  vc_macroprocesso: string | null;
-}): boolean {
-  if (row.value_chain_id) return true;
-  const macro = row.vc_macroprocesso?.trim();
-  if (macro) return true;
-  return row.creation_source === "created_in_value_chain";
-}
-
 type DeleteVcRowOutcome =
   | { kind: "ok" }
   | { kind: "missing" }
@@ -160,7 +170,7 @@ async function deleteOneValueChainOfficeRow(
 
   if (fetchErr) return { kind: "db_error", message: fetchErr.message };
   if (!row) return { kind: "missing" };
-  if (!rowAppearsOnValueChainPage(row)) return { kind: "not_in_vc" };
+  if (!officeProcessAppearsOnCadeiaGestaoList(row)) return { kind: "not_in_vc" };
 
   if (row.creation_source === "created_in_value_chain") {
     const { error } = await supabase.from("office_processes").delete().eq("id", officeProcessId);
@@ -171,6 +181,7 @@ async function deleteOneValueChainOfficeRow(
       .update({
         value_chain_id: null,
         vc_macroprocesso: null,
+        vc_levels: [],
         vc_level1: null,
         vc_level2: null,
         vc_level3: null,

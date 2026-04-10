@@ -20,6 +20,11 @@ import type {
 } from "@/types/database";
 import { BPM_PHASE_LABELS, bpmStageStatusToLabel, type BpmPhaseSlug } from "@/lib/bpm-phases";
 import { uploadProcessFile } from "@/lib/process-file-upload";
+import {
+  compactLevelsForPersist,
+  levelsFromRow,
+  mirrorFirstThreeLegacyColumns,
+} from "@/lib/office-process-levels";
 
 type LeaderProfile = Profile & {
   role: "leader";
@@ -452,6 +457,7 @@ export async function addManualOfficeProcessesBulk(baseProcessIds: string[]) {
 
 export async function updateOfficeProcessDetails(input: {
   officeProcessId: string;
+  /** Legado: preferir derivar `name` a partir de macroprocesso + níveis. */
   name?: string;
   description?: string | null;
   category?: string | null;
@@ -460,6 +466,12 @@ export async function updateOfficeProcessDetails(input: {
   status: OfficeProcessStatus;
   ownerProfileId?: string | null;
   notes?: string;
+  /** Macroprocesso na cadeia de valor (coluna `vc_macroprocesso`). */
+  vcMacroprocesso?: string | null;
+  /** Tipo na cadeia (canónico); `null` limpa tipo e rótulo livre. */
+  vcProcessType?: "primario" | "apoio" | "gerencial" | null;
+  /** Lista de níveis (ordem hierárquica). */
+  vcLevels?: string[];
 }) {
   const processAccess = await getOfficeProcessOrError(input.officeProcessId);
   if ("error" in processAccess) return { error: processAccess.error };
@@ -469,9 +481,6 @@ export async function updateOfficeProcessDetails(input: {
   const now = new Date().toISOString();
 
   const normalizedName = input.name?.trim();
-  if (typeof input.name === "string" && !normalizedName) {
-    return { error: "Nome do processo é obrigatório." };
-  }
 
   const normalizedTemplateFiles = input.templateFiles?.filter(
     (file) => typeof file.url === "string" && file.url.trim().length > 0
@@ -485,7 +494,28 @@ export async function updateOfficeProcessDetails(input: {
     owner_profile_id: input.ownerProfileId || null,
     notes: input.notes?.trim() || null,
   };
-  if (typeof input.name === "string") payload.name = normalizedName;
+
+  if (typeof input.vcMacroprocesso !== "undefined") {
+    payload.vc_macroprocesso = input.vcMacroprocesso?.trim() || null;
+  }
+
+  if (typeof input.vcMacroprocesso !== "undefined" || typeof input.vcLevels !== "undefined") {
+    const macro =
+      typeof input.vcMacroprocesso !== "undefined"
+        ? (input.vcMacroprocesso?.trim() ?? "")
+        : String(officeProcess.vc_macroprocesso ?? "").trim();
+    const levels =
+      typeof input.vcLevels !== "undefined"
+        ? compactLevelsForPersist(input.vcLevels)
+        : levelsFromRow(officeProcess);
+    const derived = (macro || levels[0] || "Processo").trim() || "Processo";
+    payload.name = derived;
+  } else if (typeof input.name === "string") {
+    if (!normalizedName) {
+      return { error: "Identificação do processo é obrigatória (macroprocesso e/ou níveis)." };
+    }
+    payload.name = normalizedName;
+  }
   if (typeof input.description !== "undefined") {
     payload.description = input.description?.trim() || null;
   }
@@ -513,6 +543,19 @@ export async function updateOfficeProcessDetails(input: {
     payload.completed_at = null;
   }
 
+  if (typeof input.vcProcessType !== "undefined") {
+    payload.vc_process_type = input.vcProcessType;
+    payload.vc_tipo_label = null;
+  }
+  if (typeof input.vcLevels !== "undefined") {
+    const compacted = compactLevelsForPersist(input.vcLevels);
+    payload.vc_levels = compacted;
+    const legacy = mirrorFirstThreeLegacyColumns(compacted);
+    payload.vc_level1 = legacy.vc_level1;
+    payload.vc_level2 = legacy.vc_level2;
+    payload.vc_level3 = legacy.vc_level3;
+  }
+
   const { error } = await supabase
     .from("office_processes")
     .update(payload)
@@ -532,8 +575,15 @@ export async function updateOfficeProcessDetails(input: {
   if ((officeProcess.notes ?? "") !== (input.notes?.trim() ?? "")) {
     changes.push("anotações atualizadas");
   }
-  if (typeof input.name === "string" && officeProcess.name !== normalizedName) {
-    changes.push("nome atualizado");
+  if (typeof payload.name === "string" && officeProcess.name !== payload.name) {
+    changes.push("nome do processo atualizado");
+  }
+  if (typeof input.vcMacroprocesso !== "undefined") {
+    const prev = String(officeProcess.vc_macroprocesso ?? "").trim();
+    const next = (input.vcMacroprocesso?.trim() ?? "") || "";
+    if (prev !== next) {
+      changes.push("macroprocesso atualizado");
+    }
   }
   if (
     typeof input.description !== "undefined" &&
@@ -553,6 +603,20 @@ export async function updateOfficeProcessDetails(input: {
   if (typeof input.flowchartFiles !== "undefined") {
     changes.push("fluxogramas atualizados");
   }
+  if (typeof input.vcProcessType !== "undefined") {
+    const prev = (officeProcess.vc_process_type as string | null) ?? null;
+    const next = input.vcProcessType;
+    if (prev !== next) {
+      changes.push("tipo (cadeia de valor) atualizado");
+    }
+  }
+  if (typeof input.vcLevels !== "undefined") {
+    const prev = levelsFromRow(officeProcess as Parameters<typeof levelsFromRow>[0]);
+    const next = compactLevelsForPersist(input.vcLevels);
+    if (JSON.stringify(prev) !== JSON.stringify(next)) {
+      changes.push("níveis (cadeia de valor) atualizados");
+    }
+  }
 
   if (changes.length > 0) {
     await recordOfficeProcessHistory({
@@ -567,6 +631,7 @@ export async function updateOfficeProcessDetails(input: {
   revalidatePath(`/escritorio/processos/${officeProcess.id}`);
   revalidatePath("/escritorio/processos");
   revalidatePath("/escritorio/estrategia/cadeia-valor");
+  revalidatePath("/escritorio/estrategia/processos-escritorio");
   return { success: true };
 }
 

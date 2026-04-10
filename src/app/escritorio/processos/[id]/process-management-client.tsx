@@ -41,7 +41,8 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, Trash2 } from "lucide-react";
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
+import { compactLevelsForPersist, draftLevelsForForm } from "@/lib/office-process-levels";
 
 const ATTACHMENT_TYPES: { value: OfficeProcessAttachmentType; label: string }[] = [
   { value: "template", label: "Template" },
@@ -116,6 +117,7 @@ export function ProcessManagementClient({
     name: string;
     description: string | null;
     category: string | null;
+    vc_macroprocesso?: string | null;
     base_process_id?: string | null;
     template_url?: string | null;
     template_label?: string | null;
@@ -127,6 +129,11 @@ export function ProcessManagementClient({
     status: OfficeProcessStatus;
     owner_profile_id: string | null;
     notes: string | null;
+    vc_process_type?: string | null;
+    vc_levels?: unknown;
+    vc_level1?: string | null;
+    vc_level2?: string | null;
+    vc_level3?: string | null;
   };
   catalogBaseProcess: CatalogBaseProcessSnapshot;
   ownerOptions: { id: string; full_name: string }[];
@@ -153,11 +160,18 @@ export function ProcessManagementClient({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<OfficeProcessStatus>(officeProcess.status);
-  const [name, setName] = useState(officeProcess.name);
   const [description, setDescription] = useState(officeProcess.description ?? "");
-  const [category, setCategory] = useState(officeProcess.category ?? "");
+  const [vcMacro, setVcMacro] = useState(officeProcess.vc_macroprocesso ?? "");
   const [ownerProfileId, setOwnerProfileId] = useState(officeProcess.owner_profile_id ?? "");
   const [notes, setNotes] = useState(officeProcess.notes ?? "");
+  const [vcTipo, setVcTipo] = useState<"" | "primario" | "apoio" | "gerencial">(() => {
+    const t = officeProcess.vc_process_type;
+    if (t === "primario" || t === "apoio" || t === "gerencial") return t;
+    return "";
+  });
+  const [vcLevelsDraft, setVcLevelsDraft] = useState<string[]>(() =>
+    draftLevelsForForm(officeProcess, officeProcess.name)
+  );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [newChecklistTitle, setNewChecklistTitle] = useState("");
@@ -222,9 +236,11 @@ export function ProcessManagementClient({
     setBpmPhaseRows(bpmPhases);
   }, [bpmPhases]);
   useEffect(() => {
-    setName(officeProcess.name);
     setDescription(officeProcess.description ?? "");
-    setCategory(officeProcess.category ?? "");
+    setVcMacro(officeProcess.vc_macroprocesso ?? "");
+    const t = officeProcess.vc_process_type;
+    setVcTipo(t === "primario" || t === "apoio" || t === "gerencial" ? t : "");
+    setVcLevelsDraft(draftLevelsForForm(officeProcess, officeProcess.name));
     setEditedTemplateFiles(
       effectiveTemplateFiles.map((t) => ({
         url: t.url,
@@ -248,18 +264,25 @@ export function ProcessManagementClient({
   async function handleSaveProcess(e: React.FormEvent) {
     e.preventDefault();
     setSaveError(null);
+    const levelsCompact = compactLevelsForPersist(vcLevelsDraft);
+    const macroTrim = vcMacro.trim();
+    if (!macroTrim && !levelsCompact[0]) {
+      setSaveError("Preencha o macroprocesso e/ou o nível 1.");
+      return;
+    }
     setSaving(true);
 
     const result = await updateOfficeProcessDetails({
       officeProcessId: officeProcess.id,
-      name,
       description,
-      category,
+      vcMacroprocesso: macroTrim || null,
       templateFiles: editedTemplateFiles,
       flowchartFiles: editedFlowchartFiles,
       status,
       ownerProfileId: ownerProfileId || null,
       notes,
+      vcProcessType: vcTipo === "" ? null : vcTipo,
+      vcLevels: vcLevelsDraft,
     });
 
     if ("error" in result && result.error) {
@@ -498,10 +521,6 @@ export function ProcessManagementClient({
               <CardContent>
                 <form onSubmit={handleSaveProcess} className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Nome do processo</Label>
-                    <Input value={name} onChange={(e) => setName(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
                     <Label>Descrição</Label>
                     <Textarea
                       rows={4}
@@ -510,13 +529,84 @@ export function ProcessManagementClient({
                       placeholder="Descreva o objetivo e escopo do processo."
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Categoria</Label>
-                    <Input
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      placeholder="Ex.: Operacional, Gerencial, Apoio..."
-                    />
+                  <div className="space-y-4 border-t border-border/60 pt-4">
+                    <div>
+                      <p className="text-sm font-medium">Tipo e hierarquia (cadeia de valor)</p>
+                      <p className="text-xs text-muted-foreground">
+                        O nome do processo nas listas é derivado do macroprocesso e dos níveis.
+                        Classificação usada na estratégia; pode ser alterada em qualquer momento.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="vc-tipo">Tipo</Label>
+                      <Select
+                        id="vc-tipo"
+                        value={vcTipo}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setVcTipo(
+                            v === "primario" || v === "apoio" || v === "gerencial" ? v : ""
+                          );
+                        }}
+                      >
+                        <option value="">Não definido</option>
+                        <option value="primario">Primário</option>
+                        <option value="apoio">Apoio</option>
+                        <option value="gerencial">Gerencial</option>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="vc-macro">Macroprocesso</Label>
+                      <Input
+                        id="vc-macro"
+                        value={vcMacro}
+                        onChange={(e) => setVcMacro(e.target.value)}
+                        placeholder="Opcional: agrupa o processo num macro (ex.: Operações)"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      {vcLevelsDraft.map((val, idx) => (
+                        <div key={idx} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <Label htmlFor={`vc-n-${idx}`}>Nível {idx + 1}</Label>
+                            <Input
+                              id={`vc-n-${idx}`}
+                              value={val}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setVcLevelsDraft((prev) => prev.map((x, j) => (j === idx ? v : x)));
+                              }}
+                              placeholder={
+                                idx === 0 ? "Ex.: Macroárea" : "Ex.: subdivisão da hierarquia"
+                              }
+                            />
+                          </div>
+                          {idx > 0 ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0"
+                              onClick={() =>
+                                setVcLevelsDraft((prev) => prev.filter((_, j) => j !== idx))
+                              }
+                            >
+                              Remover
+                            </Button>
+                          ) : null}
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => setVcLevelsDraft((prev) => [...prev, ""])}
+                      >
+                        <Plus className="h-4 w-4" aria-hidden />
+                        Adicionar nível
+                      </Button>
+                    </div>
                   </div>
                   {materialError ? (
                     <p className="text-sm text-destructive">{materialError}</p>

@@ -47,15 +47,34 @@ interface ProcessItem {
   id: string;
   tipo: ProcessType;
   macroprocesso: string;
-  nivel1: string;
-  nivel2: string;
-  nivel3: string;
+  niveis: string[];
   gestorProcesso: string;
   ultimaAtualizacao: string;
   responsavelAtualizacao: string;
   prioridade: Priority;
   statusGeral: GeneralStatus;
   etapas: Record<BPMStage, StageStatus>;
+}
+
+function normalizeProcessFromStorage(raw: unknown): ProcessItem {
+  const r = raw as ProcessItem & {
+    nivel1?: string;
+    nivel2?: string;
+    nivel3?: string;
+  };
+  if (Array.isArray(r.niveis)) return r;
+  const legacy = [r.nivel1, r.nivel2, r.nivel3]
+    .map((s) => (typeof s === "string" ? s.trim() : ""))
+    .filter(Boolean);
+  return { ...r, niveis: legacy };
+}
+
+function niveisToLegacyFields(niveis: string[]) {
+  return {
+    nivel1: niveis[0] ?? "",
+    nivel2: niveis[1] ?? "",
+    nivel3: niveis[2] ?? "",
+  };
 }
 
 interface AlignmentData {
@@ -83,7 +102,8 @@ export default function AlinhamentoEstrategicoPage() {
       try {
         const storedProcesses = localStorage.getItem(STORAGE_KEY_PROCESSES);
         if (storedProcesses) {
-          setProcesses(JSON.parse(storedProcesses) as ProcessItem[]);
+          const parsed = JSON.parse(storedProcesses) as unknown[];
+          setProcesses(parsed.map(normalizeProcessFromStorage));
         }
       } catch {
         setProcesses([]);
@@ -131,9 +151,7 @@ export default function AlinhamentoEstrategicoPage() {
     return processes.filter((process) => {
       const composite = [
         process.macroprocesso,
-        process.nivel1,
-        process.nivel2,
-        process.nivel3,
+        ...(process.niveis ?? []),
         process.gestorProcesso,
       ]
         .join(" ")
@@ -189,6 +207,9 @@ export default function AlinhamentoEstrategicoPage() {
       });
 
       if (deleteError) {
+        const { nivel1, nivel2, nivel3 } = niveisToLegacyFields(
+          process.niveis ?? []
+        );
         // reverte em caso de erro
         setLinks((current) => [
           ...current,
@@ -198,15 +219,18 @@ export default function AlinhamentoEstrategicoPage() {
             objective_id: objective.id,
             process_local_id: process.id,
             process_macroprocesso: process.macroprocesso,
-            process_nivel1: process.nivel1,
-            process_nivel2: process.nivel2,
-            process_nivel3: process.nivel3,
+            process_nivel1: nivel1,
+            process_nivel2: nivel2,
+            process_nivel3: nivel3,
             created_at: new Date().toISOString(),
           },
         ]);
         setError(deleteError);
       }
     } else {
+      const { nivel1, nivel2, nivel3 } = niveisToLegacyFields(
+        process.niveis ?? []
+      );
       // otimista: adiciona localmente
       const optimistic: StrategicObjectiveProcessLink = {
         id: crypto.randomUUID(),
@@ -214,9 +238,9 @@ export default function AlinhamentoEstrategicoPage() {
         objective_id: objective.id,
         process_local_id: process.id,
         process_macroprocesso: process.macroprocesso,
-        process_nivel1: process.nivel1,
-        process_nivel2: process.nivel2,
-        process_nivel3: process.nivel3,
+        process_nivel1: nivel1,
+        process_nivel2: nivel2,
+        process_nivel3: nivel3,
         created_at: new Date().toISOString(),
       };
 
@@ -228,9 +252,9 @@ export default function AlinhamentoEstrategicoPage() {
           process: {
             localId: process.id,
             macroprocesso: process.macroprocesso,
-            nivel1: process.nivel1,
-            nivel2: process.nivel2,
-            nivel3: process.nivel3,
+            nivel1,
+            nivel2,
+            nivel3,
           },
         });
 
@@ -387,9 +411,8 @@ export default function AlinhamentoEstrategicoPage() {
                               {process.macroprocesso || "Sem Macroprocesso"}
                             </p>
                             <p className="text-xs text-muted-foreground line-clamp-2">
-                              {[process.nivel1, process.nivel2, process.nivel3]
-                                .filter(Boolean)
-                                .join(" • ") || "Sem detalhamento de níveis"}
+                              {(process.niveis ?? []).filter(Boolean).join(" • ") ||
+                                "Sem detalhamento de níveis"}
                             </p>
                             <p className="text-[11px] text-muted-foreground">
                               Gestor: {process.gestorProcesso || "Não definido"}
@@ -480,9 +503,8 @@ export default function AlinhamentoEstrategicoPage() {
                               {process.macroprocesso || "Sem Macroprocesso"}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {[process.nivel1, process.nivel2, process.nivel3]
-                                .filter(Boolean)
-                                .join(" • ") || "Sem detalhamento de níveis"}
+                              {(process.niveis ?? []).filter(Boolean).join(" • ") ||
+                                "Sem detalhamento de níveis"}
                             </p>
                           </div>
                           <Badge variant="outline">

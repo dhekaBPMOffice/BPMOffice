@@ -152,7 +152,10 @@ export interface BaseProcess {
   name: string;
   slug: string;
   description: string | null;
+  /** Rótulo de tipo (UI: "Tipo"); legado "categoria". */
   category: string | null;
+  vc_macroprocesso?: string | null;
+  vc_levels?: string[];
   template_url: string | null;
   template_label: string | null;
   flowchart_image_url: string | null;
@@ -260,6 +263,8 @@ export interface OfficeProcess {
   updated_at: string;
   value_chain_id: string | null;
   vc_macroprocesso: string | null;
+  /** Níveis hierárquicos (fonte de verdade); vc_level1–3 espelham os 3 primeiros. */
+  vc_levels: string[];
   vc_level1: string | null;
   vc_level2: string | null;
   vc_level3: string | null;

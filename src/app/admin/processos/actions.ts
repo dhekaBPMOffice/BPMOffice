@@ -5,17 +5,31 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { normalizeChecklist, slugifyProcessName } from "@/lib/processes";
 import type { ProcessFlowchartFile, ProcessTemplateFile } from "@/types/database";
 import { uploadProcessFile } from "@/lib/process-file-upload";
+import { compactLevelsForPersist } from "@/lib/office-process-levels";
 
 type SaveBaseProcessInput = {
-  name: string;
+  /** Legado / derivado no cliente; se vazio, o servidor usa macroprocesso + níveis. */
+  name?: string;
   description?: string;
+  /** Tipo (UI); coluna `category` na BD. */
   category?: string;
+  vcMacroprocesso?: string | null;
+  vcLevels?: string[];
   templateFiles?: ProcessTemplateFile[];
   flowchartFiles?: ProcessFlowchartFile[];
   managementChecklist?: string[];
   sortOrder?: number;
   isActive?: boolean;
 };
+
+function resolveBaseProcessName(input: SaveBaseProcessInput): string {
+  const macro = input.vcMacroprocesso?.trim() ?? "";
+  const levels = compactLevelsForPersist(input.vcLevels ?? []);
+  if (macro || levels.length > 0) {
+    return macro || levels[0] || "Processo";
+  }
+  return input.name?.trim() ?? "";
+}
 
 /** Mensagem amigável quando ainda existem office_processes apontando para o catálogo (ON DELETE RESTRICT). */
 const MSG_EXCLUSAO_BLOQUEADA_VINCULOS_ESCRITORIOS =
@@ -58,20 +72,24 @@ async function buildUniqueSlug(baseName: string, currentId?: string) {
 }
 
 export async function createBaseProcess(input: SaveBaseProcessInput) {
-  if (!input.name?.trim()) {
-    return { error: "Nome do processo é obrigatório." };
+  const displayName = resolveBaseProcessName(input);
+  if (!displayName.trim()) {
+    return { error: "Preencha o macroprocesso ou o nível 1." };
   }
 
   const supabase = await createServiceClient();
-  const slug = await buildUniqueSlug(input.name);
+  const slug = await buildUniqueSlug(displayName);
+  const vcLevels = compactLevelsForPersist(input.vcLevels ?? []);
 
   const { data, error } = await supabase
     .from("base_processes")
     .insert({
-      name: input.name.trim(),
+      name: displayName,
       slug,
       description: input.description?.trim() || null,
       category: input.category?.trim() || null,
+      vc_macroprocesso: input.vcMacroprocesso?.trim() || null,
+      vc_levels: vcLevels,
       template_files: input.templateFiles ?? [],
       flowchart_files: input.flowchartFiles ?? [],
       management_checklist: normalizeChecklist(input.managementChecklist),
@@ -90,20 +108,24 @@ export async function createBaseProcess(input: SaveBaseProcessInput) {
 }
 
 export async function updateBaseProcess(id: string, input: SaveBaseProcessInput) {
-  if (!input.name?.trim()) {
-    return { error: "Nome do processo é obrigatório." };
+  const displayName = resolveBaseProcessName(input);
+  if (!displayName.trim()) {
+    return { error: "Preencha o macroprocesso ou o nível 1." };
   }
 
   const supabase = await createServiceClient();
-  const slug = await buildUniqueSlug(input.name, id);
+  const slug = await buildUniqueSlug(displayName, id);
+  const vcLevels = compactLevelsForPersist(input.vcLevels ?? []);
 
   const { error } = await supabase
     .from("base_processes")
     .update({
-      name: input.name.trim(),
+      name: displayName,
       slug,
       description: input.description?.trim() || null,
       category: input.category?.trim() || null,
+      vc_macroprocesso: input.vcMacroprocesso?.trim() || null,
+      vc_levels: vcLevels,
       template_files: input.templateFiles ?? [],
       flowchart_files: input.flowchartFiles ?? [],
       management_checklist: normalizeChecklist(input.managementChecklist),

@@ -7,6 +7,12 @@ import {
   computeCurrentBpmPhaseSlug,
 } from "@/lib/bpm-phases";
 import { formatVcProcessTypeLabel } from "@/lib/office-processes-list";
+import {
+  formatNivelLabelFromLevels,
+  levelsFromRow,
+  type OfficeProcessLevelRow,
+} from "@/lib/office-process-levels";
+import { OFFICE_PROCESSES_CADEIA_GESTAO_POSTGREST_OR } from "@/lib/value-chain-process-filters";
 import { CadeiaValorTabs } from "./cadeia-valor-tabs";
 import type { GestaoProcessItem } from "./gestao-processos-tab";
 import type { OfficeProcessBpmPhase, OfficeProcessStatus } from "@/types/database";
@@ -23,39 +29,18 @@ export default async function CadeiaValorPage() {
     );
   }
 
-  const [{ data: cadeiaData }, { data: allData }] = await Promise.all([
-    supabase
-      .from("office_processes")
-      .select("*, office_process_bpm_phases (*)")
-      .eq("office_id", profile.office_id)
-      .or(
-        "value_chain_id.not.is.null,vc_macroprocesso.not.is.null,creation_source.eq.created_in_value_chain"
-      )
-      .order("updated_at", { ascending: false }),
-    supabase
-      .from("office_processes")
-      .select(
-        `*, owner_profile:owner_profile_id (id, full_name), office_process_bpm_phases (phase, stage_status)`
-      )
-      .eq("office_id", profile.office_id)
-      .or(
-        "value_chain_id.not.is.null,vc_macroprocesso.not.is.null,creation_source.eq.created_in_value_chain"
-      )
-      .order("selected_at", { ascending: false }),
-  ]);
+  const { data: allData } = await supabase
+    .from("office_processes")
+    .select(
+      `*, owner_profile:owner_profile_id (id, full_name), office_process_bpm_phases (phase, stage_status)`
+    )
+    .eq("office_id", profile.office_id)
+    .or(OFFICE_PROCESSES_CADEIA_GESTAO_POSTGREST_OR)
+    .order("selected_at", { ascending: false });
 
   type RowWithPhases = Record<string, unknown> & {
     office_process_bpm_phases: OfficeProcessBpmPhase[] | null;
   };
-
-  const cadeiaRows = (cadeiaData ?? []) as RowWithPhases[];
-  const cadeiaProcesses = cadeiaRows.map((row) =>
-    dbRowToProcessItem(row, row.office_process_bpm_phases ?? [])
-  );
-  const processListKey = cadeiaRows
-    .map((r) => r.id as string)
-    .sort()
-    .join("|");
 
   const allRows = (allData ?? []) as Array<
     Record<string, unknown> & {
@@ -63,6 +48,15 @@ export default async function CadeiaValorPage() {
       office_process_bpm_phases: Array<{ phase: string; stage_status: string }> | null;
     }
   >;
+
+  const cadeiaRows = allRows as RowWithPhases[];
+  const cadeiaProcesses = cadeiaRows.map((row) =>
+    dbRowToProcessItem(row, row.office_process_bpm_phases ?? [])
+  );
+  const processListKey = cadeiaRows
+    .map((r) => r.id as string)
+    .sort()
+    .join("|");
 
   const gestaoItems: GestaoProcessItem[] = allRows.map((p) => {
     const statusMeta =
@@ -72,10 +66,8 @@ export default async function CadeiaValorPage() {
     const phases = p.office_process_bpm_phases ?? [];
     const faseBpmLabel = formatCurrentBpmPhaseLabel(phases);
     const faseBpmSlug = computeCurrentBpmPhaseSlug(phases);
-    const nivelParts = [p.vc_level1 as string | null, p.vc_level2 as string | null, p.vc_level3 as string | null]
-      .map((x) => x?.trim())
-      .filter(Boolean) as string[];
-    const nivelLabel = nivelParts.length ? nivelParts.join(" › ") : null;
+    const vcLevels = levelsFromRow(p as OfficeProcessLevelRow);
+    const nivelLabel = formatNivelLabelFromLevels(vcLevels);
     const tipoLabel = formatVcProcessTypeLabel(
       p.vc_process_type as string | null,
       p.vc_tipo_label as string | null
@@ -118,9 +110,7 @@ export default async function CadeiaValorPage() {
       nivelLabel,
       ownerName: owner?.full_name ?? null,
       vcProcessType: (p.vc_process_type as string | null) ?? null,
-      vcLevel1: (p.vc_level1 as string | null) ?? null,
-      vcLevel2: (p.vc_level2 as string | null) ?? null,
-      vcLevel3: (p.vc_level3 as string | null) ?? null,
+      vcLevels,
       flowcharts,
       templates,
     };
@@ -130,8 +120,8 @@ export default async function CadeiaValorPage() {
   const completed = gestaoItems.filter((i) => i.statusRaw === "completed").length;
   const inProgress = gestaoItems.filter((i) => i.statusRaw === "in_progress").length;
 
-  const hasProcesses = cadeiaProcesses.length > 0;
-  const initialTab = hasProcesses ? "gestao" : "configuracao";
+  const hasGestaoProcesses = gestaoItems.length > 0;
+  const initialTab = hasGestaoProcesses ? "gestao" : "configuracao";
 
   return (
     <CadeiaValorTabs
