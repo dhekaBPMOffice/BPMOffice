@@ -1,6 +1,8 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { AlertTriangle } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -12,16 +14,21 @@ import {
   Cell,
 } from "recharts";
 
-const SAMPLE_DATA = [
-  { name: "Baixa", value: 12, color: "var(--criticality-low)" },
-  { name: "Média", value: 8, color: "var(--criticality-medium)" },
-  { name: "Alta", value: 5, color: "var(--criticality-high)" },
-  { name: "Crítica", value: 2, color: "var(--criticality-critical)" },
-];
+interface CriticalityDatum {
+  name: string;
+  value: number;
+  color: string;
+}
 
-export function CriticalityChart() {
+interface CriticalityChartProps {
+  data: CriticalityDatum[];
+}
+
+export function CriticalityChart({ data }: CriticalityChartProps) {
+  const hasData = data.some((item) => item.value > 0);
+
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border-border/60 shadow-none">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold text-foreground">
           Termômetro de Criticidade
@@ -31,49 +38,57 @@ export function CriticalityChart() {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="h-[280px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={SAMPLE_DATA}
-              layout="vertical"
-              margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" opacity={0.3} />
-              <XAxis type="number" tick={{ fontSize: 12 }} className="text-muted-foreground" />
-              <YAxis
-                type="category"
-                dataKey="name"
-                width={60}
-                tick={{ fontSize: 12 }}
-                className="text-muted-foreground"
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--color-card)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-block)",
-                  color: "var(--color-foreground)",
-                }}
-                formatter={(value) => [value ?? 0, "Processos"]}
-                labelFormatter={(label) => `Criticidade: ${label}`}
-              />
-              <Bar
-                dataKey="value"
-                radius={[0, 6, 6, 0]}
-                barSize={28}
-                strokeWidth={1.5}
+        {!hasData ? (
+          <EmptyState
+            icon={AlertTriangle}
+            title="Sem criticidade registrada"
+            description="A distribuição será exibida assim que houver análises com nível de criticidade preenchido."
+          />
+        ) : (
+          <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={data}
+                layout="vertical"
+                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
               >
-                {SAMPLE_DATA.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={entry.color}
-                    stroke={entry.color}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" opacity={0.3} />
+                <XAxis type="number" tick={{ fontSize: 12 }} className="text-muted-foreground" />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={60}
+                  tick={{ fontSize: 12 }}
+                  className="text-muted-foreground"
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "var(--color-card)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-block)",
+                    color: "var(--color-foreground)",
+                  }}
+                  formatter={(value) => [value ?? 0, "Processos"]}
+                  labelFormatter={(label) => `Criticidade: ${label}`}
+                />
+                <Bar
+                  dataKey="value"
+                  radius={[0, 6, 6, 0]}
+                  barSize={28}
+                  strokeWidth={1.5}
+                >
+                  {data.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.color}
+                      stroke={entry.color}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
