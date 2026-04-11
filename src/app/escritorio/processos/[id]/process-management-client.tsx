@@ -47,12 +47,17 @@ import {
   initialTipoLabelFromOfficeProcess,
   mergeProcessTypeOptionsForSelect,
 } from "@/lib/process-type-options";
+import {
+  activeTabPhaseProgress,
+  computeRhythmFromLastEventAt,
+  computeSecondaryHighlightTabId,
+  computeWorkspaceInsightHints,
+} from "@/lib/workspace-journey";
 import { ProcessTypeSelect } from "@/components/processes/process-type-select";
 import { ProcessWorkspaceShell } from "./process-workspace-shell";
 import { ProcessWorkspaceOperationalHeader } from "./process-workspace-operational-header";
-import { ProcessWorkspaceCycleNav } from "./process-workspace-cycle-nav";
+import { ProcessWorkspaceJourneyBar } from "./process-workspace-journey-bar";
 import { ProcessWorkspaceFormSection } from "./process-workspace-form-section";
-import { ProcessWorkspacePlaceholderCard } from "./process-workspace-placeholder-card";
 import { ProcessWorkspaceSidebar } from "./process-workspace-sidebar";
 import { ProcessWorkspaceStageLayout } from "./process-workspace-stage-layout";
 import type { LucideIcon } from "lucide-react";
@@ -65,7 +70,6 @@ import {
   LayoutDashboard,
   Lightbulb,
   Plus,
-  Target,
   Trash2,
   Workflow,
 } from "lucide-react";
@@ -90,6 +94,8 @@ type WorkspaceTabDefinition = {
   id: WorkspaceTabId;
   label: string;
   description: string;
+  /** Objetivo operacional curto da aba (bloco no painel principal). */
+  stageObjective: string;
   icon: LucideIcon;
   phases: BpmPhaseSlug[];
 };
@@ -148,6 +154,8 @@ const WORKSPACE_TABS: WorkspaceTabDefinition[] = [
     id: "visao-geral",
     label: "Visão Geral",
     description: "Hub executivo, contexto e continuidade do trabalho.",
+    stageObjective:
+      "Situar o processo, o estado geral e os próximos passos antes de mergulhar nas etapas.",
     icon: LayoutDashboard,
     phases: [],
   },
@@ -155,6 +163,7 @@ const WORKSPACE_TABS: WorkspaceTabDefinition[] = [
     id: "levantamento",
     label: "Levantamento",
     description: "Descoberta do processo, insumos iniciais e controles operacionais.",
+    stageObjective: "Capturar o essencial do processo, donos e pontos de controle iniciais.",
     icon: ClipboardList,
     phases: ["levantamento"],
   },
@@ -162,6 +171,7 @@ const WORKSPACE_TABS: WorkspaceTabDefinition[] = [
     id: "diagnostico",
     label: "Diagnóstico",
     description: "Leitura da situação atual, análises e registro de hipóteses.",
+    stageObjective: "Caracterizar o as-is, validar hipóteses e registrar achados com clareza.",
     icon: FileText,
     phases: ["validacao", "descritivo"],
   },
@@ -169,6 +179,7 @@ const WORKSPACE_TABS: WorkspaceTabDefinition[] = [
     id: "modelagem",
     label: "Modelagem",
     description: "Estrutura do processo, templates e fluxogramas de apoio.",
+    stageObjective: "Estruturar o processo de forma clara, partilhável e reproduzível.",
     icon: Workflow,
     phases: ["modelagem"],
   },
@@ -176,6 +187,7 @@ const WORKSPACE_TABS: WorkspaceTabDefinition[] = [
     id: "melhorias",
     label: "Melhorias",
     description: "Condução de melhorias, priorização e implantação.",
+    stageObjective: "Priorizar mudanças e conduzir a implantação com risco controlado.",
     icon: Lightbulb,
     phases: ["proposicao_melhorias", "implantacao"],
   },
@@ -183,6 +195,7 @@ const WORKSPACE_TABS: WorkspaceTabDefinition[] = [
     id: "acompanhamento",
     label: "Acompanhamento",
     description: "Evolução do ciclo BPM, monitoramento e histórico do processo.",
+    stageObjective: "Monitorar aderência, resultados e aprendizados na operação.",
     icon: Activity,
     phases: ["acompanhamento"],
   },
@@ -190,6 +203,7 @@ const WORKSPACE_TABS: WorkspaceTabDefinition[] = [
     id: "conhecimento",
     label: "Conhecimento / Documentos",
     description: "Repositório operacional de anexos, materiais e referências.",
+    stageObjective: "Manter referências e artefactos acessíveis para toda a equipa.",
     icon: BookOpen,
     phases: [],
   },
@@ -393,6 +407,49 @@ function ProcessManagementClientInner({
         ? "Importado do catálogo como cópia independente"
         : "A partir do catálogo";
 
+  const secondaryHighlightTabId = useMemo(
+    () =>
+      computeSecondaryHighlightTabId(
+        WORKSPACE_TABS,
+        activeTab,
+        currentWorkspaceTab,
+        bpmPhaseRows
+      ),
+    [activeTab, currentWorkspaceTab, bpmPhaseRows]
+  );
+
+  const workspaceInsightHints = useMemo(
+    () =>
+      computeWorkspaceInsightHints({
+        checklistCompleted: completedCount,
+        checklistTotal: checklistItems.length,
+        completedBpmCount,
+        totalBpmPhases: BPM_PHASE_SLUGS.length,
+        lastEventAtIso: latestHistoryEvent?.created_at ?? null,
+      }),
+    [completedCount, checklistItems.length, completedBpmCount, latestHistoryEvent?.created_at]
+  );
+
+  const rhythmFromHistory = useMemo(
+    () => computeRhythmFromLastEventAt(latestHistoryEvent?.created_at ?? null),
+    [latestHistoryEvent?.created_at]
+  );
+
+  const activeTabMiniProgress = useMemo(
+    () => activeTabPhaseProgress(currentTabDefinition.phases, bpmPhaseRows),
+    [currentTabDefinition.phases, bpmPhaseRows]
+  );
+
+  const recentHistoryTimeline = useMemo(
+    () =>
+      history.slice(0, 5).map((ev) => ({
+        id: ev.id,
+        relative: formatRelativeDate(ev.created_at),
+        summary: localizeOfficeProcessHistoryDescription(ev.description),
+      })),
+    [history]
+  );
+
   function onTabChange(value: string) {
     if (!WORKSPACE_TABS.some((tab) => tab.id === value)) return;
     const params = new URLSearchParams(searchParams.toString());
@@ -587,18 +644,12 @@ function ProcessManagementClientInner({
     <ProcessWorkspaceSidebar
       statusLabel={statusMeta.label}
       statusVariant={statusMeta.variant}
-      lastEventSummary={
-        latestHistoryEvent
-          ? localizeOfficeProcessHistoryDescription(latestHistoryEvent.description)
-          : null
-      }
-      lastEventRelative={
-        latestHistoryEvent ? formatRelativeDate(latestHistoryEvent.created_at) : null
-      }
+      recentEvents={recentHistoryTimeline}
       onViewFullHistory={() => onTabChange("acompanhamento")}
       checklistSummary={`${completedCount}/${checklistItems.length} itens no checklist`}
       attachmentsCount={attachments.length}
       materialsCount={editedTemplateFiles.length + editedFlowchartFiles.length}
+      insightHints={workspaceInsightHints}
     />
   );
 
@@ -629,29 +680,39 @@ function ProcessManagementClientInner({
         onOpenDocuments={() => onTabChange("conhecimento")}
         onOpenChecklist={() => onTabChange("levantamento")}
         meta={{ ownerName, originLabel }}
+        liveSignals={{
+          rhythm: rhythmFromHistory,
+          activeTabLabel: currentTabDefinition.label,
+          miniProgress: activeTabMiniProgress,
+          insightLines: workspaceInsightHints,
+        }}
       />
 
       <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-8">
-        <ProcessWorkspaceCycleNav
+        <ProcessWorkspaceJourneyBar
           tabs={WORKSPACE_TABS.map((t) => ({
             id: t.id,
             label: t.label,
             icon: t.icon,
+            phases: t.phases,
           }))}
           activeTab={activeTab}
+          secondaryHighlightTabId={secondaryHighlightTabId}
+          bpmPhaseRows={bpmPhaseRows}
         />
 
         <div className="min-w-0 space-y-8">
-          <TabsContent value="visao-geral" className="mt-0 space-y-8">
+          <TabsContent value="visao-geral" className="mt-0 space-y-8 motion-safe:transition-opacity motion-safe:duration-300">
             <ProcessWorkspaceStageLayout
               moduleTitle={currentTabDefinition.label}
               moduleDescription={currentTabDefinition.description}
+              stageObjective={currentTabDefinition.stageObjective}
               contextHint={creationHint}
               sidebar={workspaceSidebar}
               workPanelClassName="space-y-8"
             >
               <div className="grid gap-8 xl:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.85fr)]">
-                <Card className="border-border/80 shadow-[var(--shadow-card)]">
+                <Card className="border-border/80 shadow-[var(--shadow-card)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
                   <CardHeader className="pb-4">
                     <CardTitle>Dados centrais do processo</CardTitle>
                     <CardDescription className="leading-relaxed">
@@ -797,17 +858,7 @@ function ProcessManagementClientInner({
                 </Card>
 
                 <div className="flex flex-col gap-8">
-                  <ProcessWorkspacePlaceholderCard
-                    icon={Target}
-                    title="Mapa da workspace"
-                    description="A página já foi preparada para crescer por etapa, mantendo navegação consistente em toda a edição do processo."
-                    bullets={[
-                      "Cada módulo concentra um tipo de trabalho do ciclo BPM.",
-                      "A etapa atual fica sempre acessível pela navegação superior.",
-                      "O próximo passo é destacado automaticamente a partir do progresso BPM.",
-                    ]}
-                  />
-                  <Card className="border-border/80 bg-card shadow-[var(--shadow-card)]">
+                  <Card className="border-border/80 bg-card shadow-[var(--shadow-card)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
                     <CardHeader className="pb-3">
                       <CardTitle>Resumo preservado</CardTitle>
                       <CardDescription className="leading-relaxed">
@@ -845,10 +896,11 @@ function ProcessManagementClientInner({
             </ProcessWorkspaceStageLayout>
           </TabsContent>
 
-          <TabsContent value="levantamento" className="mt-0 space-y-8">
+          <TabsContent value="levantamento" className="mt-0 space-y-8 motion-safe:transition-opacity motion-safe:duration-300">
             <ProcessWorkspaceStageLayout
               moduleTitle={currentTabDefinition.label}
               moduleDescription={currentTabDefinition.description}
+              stageObjective={currentTabDefinition.stageObjective}
               contextHint={creationHint}
               sidebar={workspaceSidebar}
             >
@@ -930,26 +982,16 @@ function ProcessManagementClientInner({
                       </form>
                     </CardContent>
                   </Card>
-
-                  <ProcessWorkspacePlaceholderCard
-                    icon={ClipboardList}
-                    title="Placeholder do levantamento"
-                    description="Espaço preparado para expandir esta etapa com formulários, roteiros, entrevistas e captura estruturada de evidências."
-                    bullets={[
-                      "Central de levantamento futura poderá consumir esta mesma organização.",
-                      "Os insumos atuais do processo continuam disponíveis sem duplicação.",
-                      "A etapa já nasce pronta para comportar recursos mais guiados depois.",
-                    ]}
-                  />
                 </div>
               </div>
             </ProcessWorkspaceStageLayout>
           </TabsContent>
 
-          <TabsContent value="diagnostico" className="mt-0 space-y-8">
+          <TabsContent value="diagnostico" className="mt-0 space-y-8 motion-safe:transition-opacity motion-safe:duration-300">
             <ProcessWorkspaceStageLayout
               moduleTitle={currentTabDefinition.label}
               moduleDescription={currentTabDefinition.description}
+              stageObjective={currentTabDefinition.stageObjective}
               contextHint={creationHint}
               sidebar={workspaceSidebar}
             >
@@ -985,16 +1027,6 @@ function ProcessManagementClientInner({
                 </Card>
 
                 <div className="space-y-6">
-                  <ProcessWorkspacePlaceholderCard
-                    icon={FileText}
-                    title="Espaço de análise futura"
-                    description="Área preparada para consolidar causas, gargalos, evidências e leitura da situação atual do processo."
-                    bullets={[
-                      "Pode evoluir para quadros analíticos e critérios de diagnóstico.",
-                      "Pode alimentar uma futura central global de diagnósticos.",
-                      "Mantém o contexto histórico do processo sempre ao lado da análise.",
-                    ]}
-                  />
                   <Card>
                     <CardHeader>
                       <CardTitle>Sinais já disponíveis</CardTitle>
@@ -1016,10 +1048,11 @@ function ProcessManagementClientInner({
             </ProcessWorkspaceStageLayout>
           </TabsContent>
 
-          <TabsContent value="modelagem" className="mt-0 space-y-8">
+          <TabsContent value="modelagem" className="mt-0 space-y-8 motion-safe:transition-opacity motion-safe:duration-300">
             <ProcessWorkspaceStageLayout
               moduleTitle={currentTabDefinition.label}
               moduleDescription={currentTabDefinition.description}
+              stageObjective={currentTabDefinition.stageObjective}
               contextHint={creationHint}
               sidebar={workspaceSidebar}
             >
@@ -1298,26 +1331,16 @@ function ProcessManagementClientInner({
                       )}
                     </CardContent>
                   </Card>
-
-                  <ProcessWorkspacePlaceholderCard
-                    icon={Workflow}
-                    title="Expansão futura da modelagem"
-                    description="A estrutura já está pronta para receber recursos adicionais desta etapa."
-                    bullets={[
-                      "Mapa to-be, padrões de desenho e validações futuras podem entrar aqui.",
-                      "Os arquivos atuais já ocupam o espaço definitivo da etapa.",
-                      "A organização facilita alimentar uma central global de modelagem depois.",
-                    ]}
-                  />
                 </div>
               </div>
             </ProcessWorkspaceStageLayout>
           </TabsContent>
 
-          <TabsContent value="melhorias" className="mt-0 space-y-8">
+          <TabsContent value="melhorias" className="mt-0 space-y-8 motion-safe:transition-opacity motion-safe:duration-300">
             <ProcessWorkspaceStageLayout
               moduleTitle={currentTabDefinition.label}
               moduleDescription={currentTabDefinition.description}
+              stageObjective={currentTabDefinition.stageObjective}
               contextHint={creationHint}
               sidebar={workspaceSidebar}
             >
@@ -1347,17 +1370,6 @@ function ProcessManagementClientInner({
                         <p className="mt-2 text-sm font-medium text-foreground">{currentBpmLabel}</p>
                       </div>
                     </div>
-
-                    <ProcessWorkspacePlaceholderCard
-                      icon={Lightbulb}
-                      title="Bloco de melhorias preparado"
-                      description="Nesta fase, por enquanto, a arquitetura prioriza navegação e contexto, deixando o espaço pronto para recursos específicos."
-                      bullets={[
-                        "Quadros de oportunidades, backlog e priorização podem ocupar este módulo.",
-                        "A implantação pode ser acompanhada aqui sem quebrar o fluxo da workspace.",
-                        "O modelo já conversa com futuras centrais de melhorias do escritório.",
-                      ]}
-                    />
                   </CardContent>
                 </Card>
 
@@ -1382,10 +1394,11 @@ function ProcessManagementClientInner({
             </ProcessWorkspaceStageLayout>
           </TabsContent>
 
-          <TabsContent value="acompanhamento" className="mt-0 space-y-8">
+          <TabsContent value="acompanhamento" className="mt-0 space-y-8 motion-safe:transition-opacity motion-safe:duration-300">
             <ProcessWorkspaceStageLayout
               moduleTitle={currentTabDefinition.label}
               moduleDescription={currentTabDefinition.description}
+              stageObjective={currentTabDefinition.stageObjective}
               contextHint={creationHint}
               sidebar={workspaceSidebar}
               workPanelClassName="space-y-8"
@@ -1472,10 +1485,11 @@ function ProcessManagementClientInner({
             </ProcessWorkspaceStageLayout>
           </TabsContent>
 
-          <TabsContent value="conhecimento" className="mt-0 space-y-8">
+          <TabsContent value="conhecimento" className="mt-0 space-y-8 motion-safe:transition-opacity motion-safe:duration-300">
             <ProcessWorkspaceStageLayout
               moduleTitle={currentTabDefinition.label}
               moduleDescription={currentTabDefinition.description}
+              stageObjective={currentTabDefinition.stageObjective}
               contextHint={creationHint}
               sidebar={workspaceSidebar}
             >
@@ -1622,17 +1636,6 @@ function ProcessManagementClientInner({
                       </form>
                     </CardContent>
                   </Card>
-
-                  <ProcessWorkspacePlaceholderCard
-                    icon={BookOpen}
-                    title="Hub de conhecimento"
-                    description="O módulo está preparado para crescer como biblioteca viva do processo."
-                    bullets={[
-                      "Pode evoluir para organização por categoria, versão e referência cruzada.",
-                      "Os materiais atuais já ocupam a base do futuro repositório.",
-                      "A estrutura também favorece uma futura central global de conhecimento.",
-                    ]}
-                  />
                 </div>
               </div>
             </ProcessWorkspaceStageLayout>

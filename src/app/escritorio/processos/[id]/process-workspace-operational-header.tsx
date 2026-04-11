@@ -1,7 +1,8 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { ArrowRight, ClipboardList, FileText, Info } from "lucide-react";
+import { ArrowRight, ClipboardList, FileText, Info, Sparkles } from "lucide-react";
 
 export type ProcessWorkspaceOperationalHeaderProps = {
   processName: string;
@@ -25,7 +26,19 @@ export type ProcessWorkspaceOperationalHeaderProps = {
     ownerName: string;
     originLabel: string;
   };
+  liveSignals: {
+    rhythm: { label: string; tone: "fresh" | "idle" | "empty"; idleRoughLabel?: string };
+    activeTabLabel: string;
+    miniProgress: { percent: number; completed: number; total: number } | null;
+    insightLines: string[];
+  };
 };
+
+function rhythmBadgeVariant(tone: "fresh" | "idle" | "empty"): "success" | "warning" | "outline" {
+  if (tone === "fresh") return "success";
+  if (tone === "idle") return "warning";
+  return "outline";
+}
 
 export function ProcessWorkspaceOperationalHeader({
   processName,
@@ -43,11 +56,14 @@ export function ProcessWorkspaceOperationalHeader({
   onOpenDocuments,
   onOpenChecklist,
   meta,
+  liveSignals,
 }: ProcessWorkspaceOperationalHeaderProps) {
+  const rhythmVariant = rhythmBadgeVariant(liveSignals.rhythm.tone);
+
   return (
     <div
       className={cn(
-        "w-full rounded-xl border border-border/80 bg-card shadow-[var(--shadow-card)]",
+        "w-full rounded-xl border border-border/80 bg-card shadow-[var(--shadow-card)] transition-shadow duration-200",
         "border-l-[4px] border-l-[var(--identity-primary)]"
       )}
     >
@@ -60,6 +76,52 @@ export function ProcessWorkspaceOperationalHeader({
               Etapa atual:{" "}
               <span className="font-semibold text-[var(--identity-primary)]">{currentBpmLabel}</span>
             </p>
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-3 sm:px-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={rhythmVariant}>{liveSignals.rhythm.label}</Badge>
+              {liveSignals.rhythm.idleRoughLabel ? (
+                <span className="text-xs text-muted-foreground">{liveSignals.rhythm.idleRoughLabel}</span>
+              ) : null}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Aba aberta:</span>{" "}
+                {liveSignals.activeTabLabel}
+              </p>
+              {liveSignals.miniProgress ? (
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Progresso nesta etapa
+                  </span>
+                  <div className="h-1.5 min-w-[72px] flex-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-[var(--identity-primary)] transition-[width] duration-300 ease-out"
+                      style={{ width: `${liveSignals.miniProgress.percent}%` }}
+                    />
+                  </div>
+                  <span className="shrink-0 tabular-nums text-xs font-medium text-foreground">
+                    {liveSignals.miniProgress.completed}/{liveSignals.miniProgress.total}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Esta vista não tem sub-fases BPM dedicadas.</p>
+              )}
+            </div>
+            {liveSignals.insightLines.length > 0 ? (
+              <div className="flex gap-2 border-border/50 border-t pt-2">
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[var(--identity-primary)]" aria-hidden />
+                <ul className="space-y-1 text-xs leading-relaxed text-muted-foreground">
+                  {liveSignals.insightLines.slice(0, 2).map((line, i) => (
+                    <li key={i} className="flex gap-1.5">
+                      <span className="text-[var(--identity-primary)]">·</span>
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
 
           {primaryPendingChecklist ? (
@@ -109,7 +171,7 @@ export function ProcessWorkspaceOperationalHeader({
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-[var(--identity-primary)] transition-[width]"
+                className="h-full rounded-full bg-[var(--identity-primary)] transition-[width] duration-500 ease-out"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>

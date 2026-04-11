@@ -12,7 +12,7 @@ export function ProcessWorkspaceWorkPanel({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border/80 bg-card p-4 shadow-[var(--shadow-card)] sm:p-6",
+        "rounded-2xl border border-border/80 bg-card p-4 shadow-[var(--shadow-card)] transition-shadow duration-200 ease-out hover:shadow-md sm:p-6",
         className
       )}
     >
