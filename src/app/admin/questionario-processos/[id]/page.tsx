@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -27,6 +27,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageLayout } from "@/components/layout/page-layout";
+import { ProcessSelector } from "@/components/admin/process-selector";
 import {
   ChevronDown,
   ChevronRight,
@@ -710,6 +711,7 @@ function QuestionCard({
               <ProcessSelector
                 processes={processes}
                 selectedIds={questionLinkedProcessIds}
+                emptyMessage="Cadastre processos em /admin/processos antes de fazer vínculos."
                 onToggle={(processId, checked) =>
                   setQuestionLinkedProcessIds((current) =>
                     checked
@@ -892,6 +894,7 @@ function OptionRow({
               <ProcessSelector
                 processes={processes}
                 selectedIds={option.linkedProcessIds}
+                emptyMessage="Cadastre processos em /admin/processos antes de fazer vínculos."
                 onToggle={(processId, checked) =>
                   onChange((c) => ({
                     ...c,
@@ -925,48 +928,3 @@ function ChoiceMarker({
   );
 }
 
-function ProcessSelector({
-  processes,
-  selectedIds,
-  onToggle,
-}: {
-  processes: BaseProcess[];
-  selectedIds: string[];
-  onToggle: (processId: string, checked: boolean) => void;
-}) {
-  const sortedProcesses = useMemo(
-    () =>
-      processes
-        .slice()
-        .sort(
-          (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)
-        ),
-    [processes]
-  );
-
-  if (sortedProcesses.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Cadastre processos em /admin/processos antes de fazer vínculos.
-      </p>
-    );
-  }
-
-  return (
-    <div className="grid gap-1 md:grid-cols-2">
-      {sortedProcesses.map((process) => (
-        <label
-          key={process.id}
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent/30"
-        >
-          <input
-            type="checkbox"
-            checked={selectedIds.includes(process.id)}
-            onChange={(e) => onToggle(process.id, e.target.checked)}
-          />
-          <span className="truncate">{process.name}</span>
-        </label>
-      ))}
-    </div>
-  );
-}

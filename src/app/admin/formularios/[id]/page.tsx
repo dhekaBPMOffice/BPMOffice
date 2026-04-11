@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageLayout } from "@/components/layout/page-layout";
+import { ProcessSelector } from "@/components/admin/process-selector";
 import {
   ArrowDown,
   ArrowUp,
@@ -900,42 +901,3 @@ type OptionDraft = {
   isExpanded?: boolean;
 };
 
-function ProcessSelector({
-  processes,
-  selectedIds,
-  onToggle,
-}: {
-  processes: BaseProcess[];
-  selectedIds: string[];
-  onToggle: (id: string, checked: boolean) => void;
-}) {
-  if (processes.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Cadastre processos em /admin/processos primeiro.
-      </p>
-    );
-  }
-  return (
-    <div className="grid gap-2 md:grid-cols-2">
-      {processes.map((p) => (
-        <label
-          key={p.id}
-          className="flex items-start gap-2 rounded-md p-2 text-sm hover:bg-accent/30"
-        >
-          <input
-            type="checkbox"
-            checked={selectedIds.includes(p.id)}
-            onChange={(e) => onToggle(p.id, e.target.checked)}
-          />
-          <span>
-            <span className="block font-medium">{p.name}</span>
-            <span className="block text-muted-foreground">
-              {p.category || "Sem categoria"}
-            </span>
-          </span>
-        </label>
-      ))}
-    </div>
-  );
-}
