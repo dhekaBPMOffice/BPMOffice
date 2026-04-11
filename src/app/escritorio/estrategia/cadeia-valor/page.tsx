@@ -12,7 +12,6 @@ import {
   levelsFromRow,
   type OfficeProcessLevelRow,
 } from "@/lib/office-process-levels";
-import { OFFICE_PROCESSES_CADEIA_GESTAO_POSTGREST_OR } from "@/lib/value-chain-process-filters";
 import { CadeiaValorTabs } from "./cadeia-valor-tabs";
 import type { GestaoProcessItem } from "./gestao-processos-tab";
 import type { OfficeProcessBpmPhase, OfficeProcessStatus } from "@/types/database";
@@ -35,7 +34,6 @@ export default async function CadeiaValorPage() {
       `*, owner_profile:owner_profile_id (id, full_name), office_process_bpm_phases (phase, stage_status)`
     )
     .eq("office_id", profile.office_id)
-    .or(OFFICE_PROCESSES_CADEIA_GESTAO_POSTGREST_OR)
     .order("selected_at", { ascending: false });
 
   type RowWithPhases = Record<string, unknown> & {

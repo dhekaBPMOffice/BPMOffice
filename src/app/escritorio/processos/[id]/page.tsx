@@ -67,28 +67,6 @@ export default async function OfficeProcessDetailPage({
     notFound();
   }
 
-  let catalogBaseProcess: {
-    id: string;
-    name: string;
-    is_active: boolean;
-    template_files: unknown;
-    flowchart_files: unknown;
-    template_url: string | null;
-    template_label: string | null;
-    flowchart_image_url: string | null;
-  } | null = null;
-
-  if (officeProcess.base_process_id) {
-    const { data: baseRow } = await supabase
-      .from("base_processes")
-      .select(
-        "id, name, is_active, template_files, flowchart_files, template_url, template_label, flowchart_image_url"
-      )
-      .eq("id", officeProcess.base_process_id)
-      .maybeSingle();
-    catalogBaseProcess = baseRow;
-  }
-
   const { data: officeCfg } = await supabase
     .from("office_config")
     .select("process_type_options")
@@ -114,7 +92,6 @@ export default async function OfficeProcessDetailPage({
       <ProcessManagementClient
         officeProcess={officeProcess}
         processTypeOptions={processTypeOptions}
-        catalogBaseProcess={catalogBaseProcess}
         ownerOptions={ownerOptions ?? []}
         checklistItems={checklistItems ?? []}
         attachments={attachments ?? []}

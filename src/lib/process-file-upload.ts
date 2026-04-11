@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const PROCESS_FILES_BUCKET = "process-files";
+export const PROCESS_FILES_BUCKET = "process-files";
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 
 const TEMPLATE_BLOCKED_EXTENSIONS = new Set([
@@ -38,6 +38,63 @@ const COMMON_MIME_TYPES: Record<string, string> = {
 function getExtension(filename: string): string {
   const lastDot = filename.lastIndexOf(".");
   return lastDot >= 0 ? filename.slice(lastDot + 1).toLowerCase() : "";
+}
+
+function sanitizeFilename(filename: string): string {
+  return filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function buildProcessScopePath(scope: ProcessFileUploadScope): string {
+  return scope.type === "base_process"
+    ? `base/${scope.baseProcessId}`
+    : `office/${scope.officeProcessId}`;
+}
+
+function buildProcessFilePath(scope: ProcessFileUploadScope, filename: string) {
+  return `${buildProcessScopePath(scope)}/${Date.now()}-${sanitizeFilename(filename)}`;
+}
+
+function resolveMimeType(filename: string, fallback?: string): string {
+  const ext = getExtension(filename);
+  return COMMON_MIME_TYPES[ext] ?? (fallback || "application/octet-stream");
+}
+
+function getProcessFilePublicUrl(supabase: SupabaseClient, filePath: string) {
+  const { data } = supabase.storage.from(PROCESS_FILES_BUCKET).getPublicUrl(filePath);
+  return data.publicUrl;
+}
+
+function getFilenameFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    const segment = pathname.split("/").filter(Boolean).pop() ?? "arquivo";
+    return decodeURIComponent(segment);
+  } catch {
+    const segment = url.split("/").pop() ?? "arquivo";
+    try {
+      return decodeURIComponent(segment);
+    } catch {
+      return segment;
+    }
+  }
+}
+
+function extractPublicStorageLocation(url: string): { bucket: string; path: string } | null {
+  try {
+    const pathname = new URL(url).pathname;
+    const marker = "/storage/v1/object/public/";
+    const idx = pathname.indexOf(marker);
+    if (idx < 0) return null;
+    const rest = pathname.slice(idx + marker.length);
+    const [bucket, ...pathParts] = rest.split("/").filter(Boolean);
+    if (!bucket || pathParts.length === 0) return null;
+    return {
+      bucket: decodeURIComponent(bucket),
+      path: decodeURIComponent(pathParts.join("/")),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function isBucketAlreadyExistsError(error: unknown) {
@@ -81,11 +138,11 @@ export type ProcessFileUploadResult =
   | { url: string; filename: string }
   | { error: string };
 
-function validateFileForKind(
-  file: File,
+function validateFilenameForKind(
+  filename: string,
   kind: ProcessFileKind
 ): { ok: true } | { error: string } {
-  const ext = getExtension(file.name);
+  const ext = getExtension(filename);
 
   if (kind === "template") {
     if (TEMPLATE_BLOCKED_EXTENSIONS.has(ext)) {
@@ -113,6 +170,13 @@ function validateFileForKind(
   return { error: "Tipo de arquivo inválido." };
 }
 
+function validateFileForKind(
+  file: File,
+  kind: ProcessFileKind
+): { ok: true } | { error: string } {
+  return validateFilenameForKind(file.name, kind);
+}
+
 /**
  * Faz upload de arquivo para o bucket de processos.
  * - template: aceita qualquer formato (exceto executáveis e scripts).
@@ -137,15 +201,8 @@ export async function uploadProcessFile(
   const ensured = await ensureProcessFilesBucket(supabase);
   if (ensured?.error) return { error: ensured.error };
 
-  const scopePath =
-    scope.type === "base_process"
-      ? `base/${scope.baseProcessId}`
-      : `office/${scope.officeProcessId}`;
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const filePath = `${scopePath}/${Date.now()}-${safeName}`;
-
-  const ext = getExtension(file.name);
-  const mimeType = COMMON_MIME_TYPES[ext] ?? (file.type || "application/octet-stream");
+  const filePath = buildProcessFilePath(scope, file.name);
+  const mimeType = resolveMimeType(file.name, file.type);
 
   const { error: uploadError } = await supabase.storage
     .from(PROCESS_FILES_BUCKET)
@@ -158,6 +215,88 @@ export async function uploadProcessFile(
     return { error: uploadError.message };
   }
 
-  const { data } = supabase.storage.from(PROCESS_FILES_BUCKET).getPublicUrl(filePath);
-  return { url: data.publicUrl, filename: file.name };
+  return { url: getProcessFilePublicUrl(supabase, filePath), filename: file.name };
+}
+
+export async function duplicateProcessFileFromUrl(
+  supabase: SupabaseClient,
+  input: {
+    sourceUrl: string;
+    scope: ProcessFileUploadScope;
+    kind: ProcessFileKind;
+    filename?: string;
+  }
+): Promise<ProcessFileUploadResult> {
+  const sourceUrl = input.sourceUrl.trim();
+  if (!sourceUrl) {
+    return { error: "URL de origem do arquivo é obrigatória." };
+  }
+
+  const filename = (input.filename?.trim() || getFilenameFromUrl(sourceUrl) || "arquivo").trim();
+  const validation = validateFilenameForKind(filename, input.kind);
+  if (!("ok" in validation)) {
+    return validation;
+  }
+
+  const ensured = await ensureProcessFilesBucket(supabase);
+  if (ensured?.error) return { error: ensured.error };
+
+  const targetPath = buildProcessFilePath(input.scope, filename);
+  const sourceLocation = extractPublicStorageLocation(sourceUrl);
+
+  if (sourceLocation?.bucket === PROCESS_FILES_BUCKET) {
+    const storage = supabase.storage.from(PROCESS_FILES_BUCKET) as any;
+    const { error: copyError } = await storage.copy(sourceLocation.path, targetPath);
+    if (!copyError) {
+      return {
+        url: getProcessFilePublicUrl(supabase, targetPath),
+        filename,
+      };
+    }
+  }
+
+  const response = await fetch(sourceUrl);
+  if (!response.ok) {
+    return {
+      error: `Não foi possível copiar o arquivo de origem (${response.status} ${response.statusText}).`,
+    };
+  }
+
+  const blob = await response.blob();
+  if (blob.size > MAX_FILE_SIZE_BYTES) {
+    return { error: `Arquivo muito grande. Máximo: ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB` };
+  }
+
+  const { error: uploadError } = await supabase.storage
+    .from(PROCESS_FILES_BUCKET)
+    .upload(targetPath, blob, {
+      contentType: resolveMimeType(filename, blob.type),
+      upsert: false,
+    });
+
+  if (uploadError) {
+    return { error: uploadError.message };
+  }
+
+  return {
+    url: getProcessFilePublicUrl(supabase, targetPath),
+    filename,
+  };
+}
+
+export async function deleteProcessFilesByPublicUrls(
+  supabase: SupabaseClient,
+  urls: string[]
+) {
+  const paths = urls
+    .map((url) => extractPublicStorageLocation(url))
+    .filter(
+      (location): location is { bucket: string; path: string } =>
+        location?.bucket === PROCESS_FILES_BUCKET && Boolean(location.path)
+    )
+    .map((location) => location.path);
+
+  if (paths.length === 0) return;
+
+  await supabase.storage.from(PROCESS_FILES_BUCKET).remove(paths);
 }

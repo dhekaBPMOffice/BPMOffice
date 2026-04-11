@@ -1,8 +1,8 @@
 /**
- * Filtros PostgREST (.or) para listas da Cadeia de Valor.
- * Inclui processos ligados à cadeia e processos do catálogo (`from_catalog`).
- * A aba Configuração usa o mesmo conjunto que a Gestão; o sync em debounce do cliente
- * ignora `from_catalog` para não regravar linhas do catálogo automaticamente.
+ * Filtros auxiliares para saber se um processo entra na “cadeia” (macro, VC ou criado na cadeia).
+ * A lista da aba Gestão em `cadeia-valor/page.tsx` carrega todos os `office_processes` do escritório
+ * (portfólio completo); o sync em debounce do cliente ignora `from_catalog` para não regravar
+ * linhas do catálogo automaticamente.
  */
 
 export const OFFICE_PROCESSES_CADEIA_CONFIG_POSTGREST_OR =
@@ -11,7 +11,7 @@ export const OFFICE_PROCESSES_CADEIA_CONFIG_POSTGREST_OR =
 export const OFFICE_PROCESSES_CADEIA_GESTAO_POSTGREST_OR =
   `${OFFICE_PROCESSES_CADEIA_CONFIG_POSTGREST_OR},creation_source.eq.from_catalog`;
 
-/** Espelha a query da aba Gestão em cadeia-valor/page.tsx (remoções / validações no servidor). */
+/** Espelha a regra usada antes do portfólio completo; ainda útil para remoções / validações no servidor. */
 export function officeProcessAppearsOnCadeiaGestaoList(row: {
   creation_source: string | null;
   value_chain_id: string | null;

@@ -89,6 +89,7 @@ export async function saveValueChainOfficeProcess(payload: ValueChainProcessPayl
         ...(officeProcessId && !existingRow ? { id: officeProcessId } : {}),
         ...baseRow,
         base_process_id: null,
+        imported_from_base_process_id: null,
         creation_source: "created_in_value_chain",
         origin: "value_chain",
         status: "not_started",

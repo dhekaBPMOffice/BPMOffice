@@ -97,21 +97,9 @@ function normalizeFlowchartFilesFromRow(row: {
   return [];
 }
 
-export type CatalogBaseProcessSnapshot = {
-  id: string;
-  name: string;
-  is_active: boolean;
-  template_files: unknown;
-  flowchart_files: unknown;
-  template_url: string | null;
-  template_label: string | null;
-  flowchart_image_url: string | null;
-} | null;
-
 export function ProcessManagementClient({
   officeProcess,
   processTypeOptions,
-  catalogBaseProcess,
   ownerOptions,
   checklistItems,
   attachments,
@@ -125,7 +113,7 @@ export function ProcessManagementClient({
     category: string | null;
     vc_macroprocesso?: string | null;
     vc_tipo_label?: string | null;
-    base_process_id?: string | null;
+    imported_from_base_process_id?: string | null;
     template_url?: string | null;
     template_label?: string | null;
     flowchart_image_url?: string | null;
@@ -144,7 +132,6 @@ export function ProcessManagementClient({
   };
   /** Lista configurável (Configurações do escritório). */
   processTypeOptions: string[];
-  catalogBaseProcess: CatalogBaseProcessSnapshot;
   ownerOptions: { id: string; full_name: string }[];
   checklistItems: {
     id: string;
@@ -199,35 +186,14 @@ export function ProcessManagementClient({
     [officeProcess]
   );
 
-  const effectiveTemplateFiles = useMemo(() => {
-    if (officeTemplateFiles.length > 0) return officeTemplateFiles;
-    if (catalogBaseProcess) return normalizeTemplateFilesFromRow(catalogBaseProcess);
-    return [];
-  }, [officeTemplateFiles, catalogBaseProcess]);
-
-  const effectiveFlowchartFiles = useMemo(() => {
-    if (officeFlowchartFiles.length > 0) return officeFlowchartFiles;
-    if (catalogBaseProcess) return normalizeFlowchartFilesFromRow(catalogBaseProcess);
-    return [];
-  }, [officeFlowchartFiles, catalogBaseProcess]);
-
-  const catalogTemplatesForAnexos = useMemo(
-    () => (catalogBaseProcess ? normalizeTemplateFilesFromRow(catalogBaseProcess) : []),
-    [catalogBaseProcess]
-  );
-  const catalogFlowchartsForAnexos = useMemo(
-    () => (catalogBaseProcess ? normalizeFlowchartFilesFromRow(catalogBaseProcess) : []),
-    [catalogBaseProcess]
-  );
-
   const [editedTemplateFiles, setEditedTemplateFiles] = useState<ProcessTemplateFile[]>(() =>
-    effectiveTemplateFiles.map((t) => ({
+    officeTemplateFiles.map((t) => ({
       url: t.url,
       ...(t.label ? { label: t.label } : {}),
     }))
   );
   const [editedFlowchartFiles, setEditedFlowchartFiles] = useState<ProcessFlowchartFile[]>(() =>
-    effectiveFlowchartFiles.map((f) => ({ url: f.url }))
+    officeFlowchartFiles.map((f) => ({ url: f.url }))
   );
   const [materialUploading, setMaterialUploading] = useState<"template" | "flowchart" | null>(null);
   const [materialError, setMaterialError] = useState<string | null>(null);
@@ -248,13 +214,13 @@ export function ProcessManagementClient({
     setVcTipoLabel(initialTipoLabelFromOfficeProcess(officeProcess));
     setVcLevelsDraft(draftLevelsForForm(officeProcess, officeProcess.name));
     setEditedTemplateFiles(
-      effectiveTemplateFiles.map((t) => ({
+      officeTemplateFiles.map((t) => ({
         url: t.url,
         ...(t.label ? { label: t.label } : {}),
       }))
     );
-    setEditedFlowchartFiles(effectiveFlowchartFiles.map((f) => ({ url: f.url })));
-  }, [officeProcess, effectiveTemplateFiles, effectiveFlowchartFiles]);
+    setEditedFlowchartFiles(officeFlowchartFiles.map((f) => ({ url: f.url })));
+  }, [officeFlowchartFiles, officeProcess, officeTemplateFiles]);
 
   const currentBpmLabel = useMemo(
     () => formatCurrentBpmPhaseLabel(bpmPhaseRows),
@@ -461,7 +427,9 @@ export function ProcessManagementClient({
   const creationHint =
     officeProcess.creation_source === "created_in_value_chain"
       ? "Criado na cadeia de valor"
-      : "A partir do catálogo";
+      : officeProcess.imported_from_base_process_id
+        ? "Importado do catálogo como cópia independente"
+        : "A partir do catálogo";
 
   return (
     <div className="space-y-6">
@@ -1015,77 +983,12 @@ export function ProcessManagementClient({
 
         <TabsContent value="anexos" className="mt-4">
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Materiais do catálogo (Processo Base)</CardTitle>
-                <CardDescription>
-                  Templates e fluxogramas definidos pelo administrador master no catálogo. São independentes dos ficheiros enviados abaixo neste escritório.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {!officeProcess.base_process_id ? (
-                  <p className="text-sm text-muted-foreground">
-                    Este processo não está vinculado a um processo do catálogo padrão.
-                  </p>
-                ) : !catalogBaseProcess ? (
-                  <p className="text-sm text-muted-foreground">
-                    Não foi possível carregar o processo base (pode estar inativo ou indisponível). Os processos inativos não são visíveis para o escritório por política de segurança.
-                  </p>
-                ) : catalogTemplatesForAnexos.length === 0 && catalogFlowchartsForAnexos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum template ou fluxograma no catálogo para este processo.
-                  </p>
-                ) : (
-                  <>
-                    {catalogFlowchartsForAnexos.length > 0 ? (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Fluxogramas</p>
-                        <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
-                          {catalogFlowchartsForAnexos.map((ff, i) => (
-                            <li key={i}>
-                              <a
-                                href={ff.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-primary underline-offset-4 hover:underline"
-                              >
-                                {fileNameFromUrl(ff.url)}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                    {catalogTemplatesForAnexos.length > 0 ? (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Templates</p>
-                        <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
-                          {catalogTemplatesForAnexos.map((tf, i) => (
-                            <li key={i}>
-                              <a
-                                href={tf.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-primary underline-offset-4 hover:underline"
-                              >
-                                {displayTemplateName(tf)}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
             <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
             <Card>
               <CardHeader>
                 <CardTitle>Anexos do escritório</CardTitle>
                 <CardDescription>
-                  Ficheiros enviados aqui no escritório (lista separada do catálogo administrativo). Não altera o Processo Base.
+                  Ficheiros próprios desta cópia do processo no escritório. Alterações aqui não impactam o catálogo administrativo.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">

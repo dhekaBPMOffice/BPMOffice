@@ -243,7 +243,10 @@ export interface OfficeQuestionnaireAnswer {
 export interface OfficeProcess {
   id: string;
   office_id: string;
+  /** Legado; mantido nulo para processos importados desacoplados. */
   base_process_id: string | null;
+  /** Processo base usado como origem da importação inicial. */
+  imported_from_base_process_id: string | null;
   creation_source: OfficeProcessCreationSource;
   name: string;
   description: string | null;

@@ -19,7 +19,11 @@ import type {
   Profile,
 } from "@/types/database";
 import { BPM_PHASE_LABELS, bpmStageStatusToLabel, type BpmPhaseSlug } from "@/lib/bpm-phases";
-import { uploadProcessFile } from "@/lib/process-file-upload";
+import {
+  deleteProcessFilesByPublicUrls,
+  duplicateProcessFileFromUrl,
+  uploadProcessFile,
+} from "@/lib/process-file-upload";
 import {
   compactLevelsForPersist,
   levelsFromRow,
@@ -110,6 +114,203 @@ async function getOfficeProcessOrError(
   }
 
   return { profile: access.profile, officeProcess };
+}
+
+function getBaseProcessTemplateFiles(baseProcess: BaseProcess): ProcessTemplateFile[] {
+  if (Array.isArray(baseProcess.template_files) && baseProcess.template_files.length > 0) {
+    return baseProcess.template_files
+      .filter((file) => typeof file?.url === "string" && file.url.trim().length > 0)
+      .map((file) => ({
+        url: file.url,
+        ...(file.label ? { label: file.label } : {}),
+      }));
+  }
+
+  if (baseProcess.template_url?.trim()) {
+    return [{
+      url: baseProcess.template_url.trim(),
+      ...(baseProcess.template_label?.trim() ? { label: baseProcess.template_label.trim() } : {}),
+    }];
+  }
+
+  return [];
+}
+
+function getBaseProcessFlowchartFiles(baseProcess: BaseProcess): ProcessFlowchartFile[] {
+  if (Array.isArray(baseProcess.flowchart_files) && baseProcess.flowchart_files.length > 0) {
+    return baseProcess.flowchart_files
+      .filter((file) => typeof file?.url === "string" && file.url.trim().length > 0)
+      .map((file) => ({ url: file.url }));
+  }
+
+  if (baseProcess.flowchart_image_url?.trim()) {
+    return [{ url: baseProcess.flowchart_image_url.trim() }];
+  }
+
+  return [];
+}
+
+function buildOfficeProcessMaterialPayload(input: {
+  templateFiles: ProcessTemplateFile[];
+  flowchartFiles: ProcessFlowchartFile[];
+}) {
+  return {
+    template_files: input.templateFiles,
+    template_url: input.templateFiles[0]?.url ?? null,
+    template_label: input.templateFiles[0]?.label?.trim() || null,
+    flowchart_files: input.flowchartFiles,
+    flowchart_image_url: input.flowchartFiles[0]?.url ?? null,
+  };
+}
+
+async function duplicateBaseProcessMaterials(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  officeProcessId: string,
+  baseProcess: BaseProcess
+) {
+  const templateFiles: ProcessTemplateFile[] = [];
+  const flowchartFiles: ProcessFlowchartFile[] = [];
+  const copiedUrls: string[] = [];
+
+  for (const template of getBaseProcessTemplateFiles(baseProcess)) {
+    const copied = await duplicateProcessFileFromUrl(supabase, {
+      sourceUrl: template.url,
+      scope: { type: "office_attachment", officeProcessId },
+      kind: "template",
+    });
+    if ("error" in copied) {
+      await deleteProcessFilesByPublicUrls(supabase, copiedUrls);
+      return { error: copied.error };
+    }
+    copiedUrls.push(copied.url);
+    templateFiles.push({
+      url: copied.url,
+      ...(template.label?.trim() ? { label: template.label.trim() } : {}),
+    });
+  }
+
+  for (const flowchart of getBaseProcessFlowchartFiles(baseProcess)) {
+    const copied = await duplicateProcessFileFromUrl(supabase, {
+      sourceUrl: flowchart.url,
+      scope: { type: "office_attachment", officeProcessId },
+      kind: "flowchart",
+    });
+    if ("error" in copied) {
+      await deleteProcessFilesByPublicUrls(supabase, copiedUrls);
+      return { error: copied.error };
+    }
+    copiedUrls.push(copied.url);
+    flowchartFiles.push({ url: copied.url });
+  }
+
+  return { templateFiles, flowchartFiles, copiedUrls };
+}
+
+async function rollbackImportedOfficeProcess(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  officeProcessId: string,
+  copiedUrls: string[]
+) {
+  await deleteProcessFilesByPublicUrls(supabase, copiedUrls);
+  await supabase.from("office_processes").delete().eq("id", officeProcessId);
+}
+
+async function importBaseProcessToOffice(input: {
+  supabase: Awaited<ReturnType<typeof createServiceClient>>;
+  profile: LeaderProfile;
+  baseProcess: BaseProcess;
+  origin: "questionnaire" | "manual";
+  eventType: string;
+  historyDescription: string;
+  historyMetadata?: Record<string, unknown>;
+}) {
+  const snapshot = buildOfficeProcessSnapshot(input.baseProcess);
+  const { data: officeProcess, error: insertError } = await input.supabase
+    .from("office_processes")
+    .insert({
+      office_id: input.profile.office_id,
+      imported_from_base_process_id: input.baseProcess.id,
+      base_process_id: null,
+      ...snapshot,
+      template_files: [],
+      template_url: null,
+      template_label: null,
+      flowchart_files: [],
+      flowchart_image_url: null,
+      origin: input.origin,
+      creation_source: "from_catalog",
+      status: "not_started",
+      added_by_profile_id: input.profile.id,
+    })
+    .select("id, imported_from_base_process_id")
+    .single();
+
+  if (insertError || !officeProcess) {
+    return { error: insertError?.message ?? "Não foi possível adicionar o processo." };
+  }
+
+  const copiedUrls: string[] = [];
+
+  try {
+    const copiedMaterials = await duplicateBaseProcessMaterials(
+      input.supabase,
+      officeProcess.id,
+      input.baseProcess
+    );
+    if ("error" in copiedMaterials) {
+      await rollbackImportedOfficeProcess(input.supabase, officeProcess.id, copiedUrls);
+      return { error: copiedMaterials.error };
+    }
+
+    copiedUrls.push(...copiedMaterials.copiedUrls);
+
+    const materialPayload = buildOfficeProcessMaterialPayload({
+      templateFiles: copiedMaterials.templateFiles,
+      flowchartFiles: copiedMaterials.flowchartFiles,
+    });
+
+    const { error: updateError } = await input.supabase
+      .from("office_processes")
+      .update(materialPayload)
+      .eq("id", officeProcess.id);
+
+    if (updateError) {
+      await rollbackImportedOfficeProcess(input.supabase, officeProcess.id, copiedUrls);
+      return { error: updateError.message };
+    }
+
+    await createChecklistItemsForProcess(
+      officeProcess.id,
+      input.profile.id,
+      input.baseProcess.management_checklist
+    );
+
+    await recordOfficeProcessHistory({
+      officeProcessId: officeProcess.id,
+      officeId: input.profile.office_id,
+      actorProfileId: input.profile.id,
+      eventType: input.eventType,
+      description: input.historyDescription,
+      metadata: {
+        base_process_id: input.baseProcess.id,
+        imported_from_base_process_id: input.baseProcess.id,
+        ...(input.historyMetadata ?? {}),
+      },
+    });
+
+    return {
+      success: true as const,
+      officeProcessId: officeProcess.id,
+      importedFromBaseProcessId: officeProcess.imported_from_base_process_id,
+    };
+  } catch (error) {
+    await rollbackImportedOfficeProcess(input.supabase, officeProcess.id, copiedUrls);
+    return {
+      error: error instanceof Error
+        ? error.message
+        : "Não foi possível concluir a importação do processo.",
+    };
+  }
 }
 
 export async function submitProcessOnboarding(
@@ -234,7 +435,7 @@ export async function submitProcessOnboarding(
       await Promise.all([
         supabase
           .from("office_processes")
-          .select("id, base_process_id")
+          .select("id, imported_from_base_process_id")
           .eq("office_id", profile.office_id),
         supabase
           .from("base_processes")
@@ -247,56 +448,45 @@ export async function submitProcessOnboarding(
     }
 
     const existingBaseProcessIds = new Set(
-      (existingOfficeProcesses ?? []).map((item) => item.base_process_id)
+      (existingOfficeProcesses ?? []).map((item) => item.imported_from_base_process_id)
     );
 
     const processesToInsert = ((baseProcesses ?? []) as BaseProcess[]).filter(
       (process) => !existingBaseProcessIds.has(process.id)
     );
 
+    let importedCount = 0;
     if (processesToInsert.length > 0) {
-      const { data: insertedProcesses, error: insertProcessError } = await supabase
-        .from("office_processes")
-        .insert(
-          processesToInsert.map((baseProcess) => ({
-            office_id: profile.office_id,
-            ...buildOfficeProcessSnapshot(baseProcess),
-            origin: "questionnaire",
-            creation_source: "from_catalog",
-            status: "not_started",
-            added_by_profile_id: profile.id,
-          }))
-        )
-        .select("id, base_process_id");
-
-      if (insertProcessError) {
-        return { error: insertProcessError.message };
-      }
-
-      for (const insertedProcess of insertedProcesses ?? []) {
-        const baseProcess = processesToInsert.find(
-          (item) => item.id === insertedProcess.base_process_id
-        );
-
-        await createChecklistItemsForProcess(
-          insertedProcess.id,
-          profile.id,
-          baseProcess?.management_checklist
-        );
-
-        await recordOfficeProcessHistory({
-          officeProcessId: insertedProcess.id,
-          officeId: profile.office_id,
-          actorProfileId: profile.id,
+      for (const baseProcess of processesToInsert) {
+        const result = await importBaseProcessToOffice({
+          supabase,
+          profile,
+          baseProcess,
+          origin: "questionnaire",
           eventType: "created_from_questionnaire",
-          description: "Processo incluído automaticamente pelo questionário inicial.",
-          metadata: {
+          historyDescription: "Processo incluído automaticamente pelo questionário inicial.",
+          historyMetadata: {
             questionnaire_id: questionnaire.id,
-            base_process_id: insertedProcess.base_process_id,
           },
         });
+
+        if ("error" in result) {
+          return { error: result.error };
+        }
+
+        importedCount += 1;
       }
     }
+
+    await supabase
+      .from("offices")
+      .update({ processes_initialized_at: new Date().toISOString() })
+      .eq("id", profile.office_id);
+
+    revalidatePath("/escritorio/onboarding/processos");
+    revalidatePath("/escritorio/processos");
+    revalidatePath("/escritorio/dashboard");
+    return { success: true, generatedCount: importedCount };
   }
 
   await supabase
@@ -307,7 +497,7 @@ export async function submitProcessOnboarding(
   revalidatePath("/escritorio/onboarding/processos");
   revalidatePath("/escritorio/processos");
   revalidatePath("/escritorio/dashboard");
-  return { success: true, generatedCount: processIds.length };
+  return { success: true, generatedCount: 0 };
 }
 
 export async function addManualOfficeProcess(baseProcessId: string) {
@@ -323,7 +513,7 @@ export async function addManualOfficeProcess(baseProcessId: string) {
       .from("office_processes")
       .select("id")
       .eq("office_id", profile.office_id)
-      .eq("base_process_id", baseProcessId)
+      .eq("imported_from_base_process_id", baseProcessId)
       .maybeSingle(),
   ]);
 
@@ -335,37 +525,18 @@ export async function addManualOfficeProcess(baseProcessId: string) {
     return { error: "Este processo já faz parte da lista do escritório." };
   }
 
-  const { data: officeProcess, error } = await supabase
-    .from("office_processes")
-    .insert({
-      office_id: profile.office_id,
-      ...buildOfficeProcessSnapshot(baseProcess as BaseProcess),
-      origin: "manual",
-      creation_source: "from_catalog",
-      status: "not_started",
-      added_by_profile_id: profile.id,
-    })
-    .select("id")
-    .single();
-
-  if (error || !officeProcess) {
-    return { error: error?.message ?? "Não foi possível adicionar o processo." };
-  }
-
-  await createChecklistItemsForProcess(
-    officeProcess.id,
-    profile.id,
-    (baseProcess as BaseProcess).management_checklist
-  );
-
-  await recordOfficeProcessHistory({
-    officeProcessId: officeProcess.id,
-    officeId: profile.office_id,
-    actorProfileId: profile.id,
+  const result = await importBaseProcessToOffice({
+    supabase,
+    profile,
+    baseProcess: baseProcess as BaseProcess,
+    origin: "manual",
     eventType: "created_manual",
-    description: "Processo adicionado manualmente pelo líder.",
-    metadata: { base_process_id: baseProcessId },
+    historyDescription: "Processo adicionado manualmente pelo líder.",
   });
+
+  if ("error" in result) {
+    return { error: result.error };
+  }
 
   revalidatePath("/escritorio/processos");
   revalidatePath("/escritorio/processos/catalogo");
@@ -390,9 +561,9 @@ export async function addManualOfficeProcessesBulk(baseProcessIds: string[]) {
     supabase.from("base_processes").select("*").in("id", uniqueIds),
     supabase
       .from("office_processes")
-      .select("base_process_id")
+      .select("imported_from_base_process_id")
       .eq("office_id", profile.office_id)
-      .in("base_process_id", uniqueIds),
+      .in("imported_from_base_process_id", uniqueIds),
   ]);
 
   if (bpError) {
@@ -400,60 +571,43 @@ export async function addManualOfficeProcessesBulk(baseProcessIds: string[]) {
   }
 
   const existingSet = new Set(
-    (existingRows ?? []).map((r) => r.base_process_id).filter((id): id is string => id != null)
+    (existingRows ?? [])
+      .map((r) => r.imported_from_base_process_id)
+      .filter((id): id is string => id != null)
   );
   const baseById = new Map((baseRows ?? []).map((bp) => [bp.id, bp as BaseProcess]));
 
   const toInsert = uniqueIds
     .filter((id) => baseById.has(id) && !existingSet.has(id))
-    .map((id) => {
-      const baseProcess = baseById.get(id)!;
-      return {
-        office_id: profile.office_id,
-        ...buildOfficeProcessSnapshot(baseProcess),
-        origin: "manual" as const,
-        creation_source: "from_catalog",
-        status: "not_started" as const,
-        added_by_profile_id: profile.id,
-      };
-    });
+    .map((id) => baseById.get(id)!);
 
   if (toInsert.length === 0) {
     return { success: true as const, added: 0 };
   }
 
-  const { data: inserted, error: insertError } = await supabase
-    .from("office_processes")
-    .insert(toInsert)
-    .select("id, base_process_id");
-
-  if (insertError || !inserted?.length) {
-    return { error: insertError?.message ?? "Não foi possível adicionar os processos." };
-  }
-
-  for (const row of inserted) {
-    const baseProcess = baseById.get(row.base_process_id as string);
-    if (!baseProcess) continue;
-    await createChecklistItemsForProcess(
-      row.id,
-      profile.id,
-      baseProcess.management_checklist
-    );
-    await recordOfficeProcessHistory({
-      officeProcessId: row.id,
-      officeId: profile.office_id,
-      actorProfileId: profile.id,
+  let added = 0;
+  for (const baseProcess of toInsert) {
+    const result = await importBaseProcessToOffice({
+      supabase,
+      profile,
+      baseProcess,
+      origin: "manual",
       eventType: "created_manual",
-      description: "Processo adicionado manualmente pelo líder.",
-      metadata: { base_process_id: row.base_process_id },
+      historyDescription: "Processo adicionado manualmente pelo líder.",
     });
+
+    if ("error" in result) {
+      return { error: result.error };
+    }
+
+    added += 1;
   }
 
   revalidatePath("/escritorio/processos");
   revalidatePath("/escritorio/processos/catalogo");
   revalidatePath("/escritorio/estrategia/cadeia-valor");
   revalidatePath("/escritorio/estrategia/processos-escritorio");
-  return { success: true as const, added: inserted.length };
+  return { success: true as const, added };
 }
 
 export async function updateOfficeProcessDetails(input: {

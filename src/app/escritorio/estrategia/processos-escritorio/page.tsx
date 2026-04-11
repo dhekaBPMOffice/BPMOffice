@@ -44,9 +44,6 @@ export default async function ProcessosEscritorioPage() {
           `*, owner_profile:owner_profile_id (id, full_name), office_process_bpm_phases (phase, stage_status)`
         )
         .eq("office_id", profile.office_id)
-        // Formulário de ativação e adições pelo catálogo gravam creation_source = from_catalog;
-        // origin manual + from_catalog não era incluído quando só filtrávamos origin = questionnaire.
-        .eq("creation_source", "from_catalog")
         .order("selected_at", { ascending: false }),
       supabase
         .from("base_processes")
@@ -56,7 +53,7 @@ export default async function ProcessosEscritorioPage() {
         .order("name", { ascending: true }),
       supabase
         .from("office_processes")
-        .select("base_process_id")
+        .select("imported_from_base_process_id")
         .eq("office_id", profile.office_id),
     ]);
 
@@ -65,7 +62,9 @@ export default async function ProcessosEscritorioPage() {
     office_process_bpm_phases: Array<{ phase: string; stage_status: string }> | null;
   };
 
-  const rows = (processData ?? []) as RowWithRelations[];
+  const rows = ((processData ?? []) as RowWithRelations[]).filter(
+    (row) => row.imported_from_base_process_id != null
+  );
 
   const gestaoItems: GestaoProcessItem[] = rows.map((p) => {
     const statusMeta =
@@ -131,7 +130,7 @@ export default async function ProcessosEscritorioPage() {
 
   const selectedBaseIds = new Set(
     (allOfficeProcesses ?? [])
-      .map((item) => item.base_process_id)
+      .map((item) => item.imported_from_base_process_id)
       .filter((id): id is string => id != null)
   );
 

@@ -31,9 +31,9 @@ function resolveBaseProcessName(input: SaveBaseProcessInput): string {
   return input.name?.trim() ?? "";
 }
 
-/** Mensagem amigável quando ainda existem office_processes apontando para o catálogo (ON DELETE RESTRICT). */
+/** Mensagem amigável caso reste alguma dependência inesperada ao excluir um processo base. */
 const MSG_EXCLUSAO_BLOQUEADA_VINCULOS_ESCRITORIOS =
-  "Não é possível excluir este processo do catálogo enquanto ele estiver atribuído a um ou mais escritórios. Remova o vínculo no escritório (processos do escritório) antes de excluir aqui.";
+  "Não foi possível excluir este processo do catálogo porque ainda existem dependências relacionadas a ele.";
 
 function mapDeleteBaseProcessError(raw: string | undefined): string {
   if (!raw) return "Não foi possível excluir o processo.";

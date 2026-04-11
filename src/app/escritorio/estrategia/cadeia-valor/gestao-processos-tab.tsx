@@ -95,12 +95,33 @@ const TIPO_OPTIONS = [
   { value: "primario", label: "Primário" },
   { value: "gerencial", label: "Gerencial" },
   { value: "apoio", label: "Apoio" },
+  /** Processos sem classificação canónica (ex.: tipo limpo ao gravar). */
+  { value: "__none__", label: "Sem tipo" },
 ];
 
 const SORT_OPTIONS = [
   { value: "name_asc", label: "Nome (A–Z)" },
   { value: "name_desc", label: "Nome (Z–A)" },
 ];
+
+function itemMatchesSearchQuery(item: GestaoProcessItem, q: string): boolean {
+  if (!q) return true;
+  const haystack = [
+    item.name,
+    item.description,
+    item.category,
+    item.nivelLabel,
+    item.tipoLabel,
+    item.origemLabel,
+    item.originDetailLabel,
+    item.ownerName,
+    ...item.vcLevels,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
+}
 
 export function GestaoProcessosTab({ items, stats }: GestaoProcessosTabProps) {
   const router = useRouter();
@@ -123,18 +144,43 @@ export function GestaoProcessosTab({ items, stats }: GestaoProcessosTabProps) {
 
   const maxVcFilterDepth = useMemo(() => maxVcFilterDepthFromItems(items), [items]);
 
+  /** Quando os dados vêm do servidor após gravar, os níveis podem mudar e os filtros em cascata deixam de bater — repõe só filtros de nível. */
+  const portfolioDataSignature = useMemo(
+    () =>
+      items
+        .map((i) => `${i.id}\u001f${i.vcLevels.join("\u001e")}`)
+        .sort()
+        .join("|"),
+    [items]
+  );
+  const prevPortfolioSigRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    if (prevPortfolioSigRef.current === null) {
+      prevPortfolioSigRef.current = portfolioDataSignature;
+      return;
+    }
+    if (prevPortfolioSigRef.current === portfolioDataSignature) return;
+    prevPortfolioSigRef.current = portfolioDataSignature;
+    if (!hasAnyVcLevelFilter(levelFilters)) return;
+    if (applyVcLevelFilters(items, levelFilters).length === 0) {
+      setLevelFilters(clearVcLevelFilters());
+    }
+  }, [portfolioDataSignature, items, levelFilters]);
+
   const filteredItems = useMemo(() => {
     let out = applyVcLevelFilters(items, levelFilters);
     const q = search.trim().toLowerCase();
     if (q) {
-      out = out.filter(
-        (i) =>
-          (i.name ?? "").toLowerCase().includes(q) ||
-          (i.description ?? "").toLowerCase().includes(q)
-      );
+      out = out.filter((i) => itemMatchesSearchQuery(i, q));
     }
     if (status) out = out.filter((i) => i.statusRaw === status);
-    if (tipo) out = out.filter((i) => i.vcProcessType === tipo);
+    if (tipo === "__none__") {
+      out = out.filter((i) => i.vcProcessType == null);
+    } else if (tipo) {
+      out = out.filter((i) => i.vcProcessType === tipo);
+    }
     if (fase) out = out.filter((i) => i.faseBpmSlug === fase);
 
     const copy = [...out];
@@ -326,7 +372,12 @@ export function GestaoProcessosTab({ items, stats }: GestaoProcessosTabProps) {
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Processos (filtro)</CardTitle>
+            <CardTitle className="text-base">Processos visíveis</CardTitle>
+            <CardDescription>
+              {items.length === filteredItems.length
+                ? `${items.length} no portfólio`
+                : `${filteredItems.length} visíveis de ${items.length} no portfólio`}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold">{filteredItems.length}</p>
@@ -363,7 +414,11 @@ export function GestaoProcessosTab({ items, stats }: GestaoProcessosTabProps) {
             <EmptyState
               icon={ClipboardList}
               title="Nenhum processo neste filtro"
-              description="Ajuste os filtros acima ou adicione processos."
+              description={
+                items.length > 0
+                  ? `Existem ${items.length} processo(s) no portfólio; os filtros ou a pesquisa estão a excluir todos. Experimente “Limpar filtros” ou alargue a pesquisa (inclui níveis e tipo).`
+                  : "Ajuste os filtros acima ou adicione processos."
+              }
               action={
                 <div className="flex flex-wrap justify-center gap-2">
                   <Button onClick={() => setCriarDialogOpen(true)}>

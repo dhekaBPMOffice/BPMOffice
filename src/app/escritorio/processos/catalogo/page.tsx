@@ -29,13 +29,13 @@ export default async function CatalogoComplementarProcessosPage() {
       .order("name", { ascending: true }),
     supabase
       .from("office_processes")
-      .select("base_process_id")
+      .select("imported_from_base_process_id")
       .eq("office_id", profile.office_id),
   ]);
 
   const selectedProcessIds = new Set(
     (officeProcesses ?? [])
-      .map((item) => item.base_process_id)
+      .map((item) => item.imported_from_base_process_id)
       .filter((id): id is string => id != null)
   );
   const availableProcesses = (baseProcesses ?? []).filter(

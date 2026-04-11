@@ -99,7 +99,6 @@ export function collectProcessIdsFromAnswers(
 
 export function buildOfficeProcessSnapshot(baseProcess: BaseProcess) {
   return {
-    base_process_id: baseProcess.id,
     name: baseProcess.name,
     description: baseProcess.description,
     category: baseProcess.category,
