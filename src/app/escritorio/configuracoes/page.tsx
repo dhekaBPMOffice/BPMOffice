@@ -16,8 +16,9 @@ import {
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Settings } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { OfficeConfig } from "@/types/database";
+import { DEFAULT_PROCESS_TYPE_OPTIONS, normalizeProcessTypeOptions } from "@/lib/process-type-options";
 
 export default function ConfiguracoesPage() {
   const [config, setConfig] = useState<OfficeConfig | null>(null);
@@ -28,6 +29,9 @@ export default function ConfiguracoesPage() {
   const [aiApiKey, setAiApiKey] = useState("");
   const [aiLearnFromHistory, setAiLearnFromHistory] = useState(true);
   const [notificationReviewReminders, setNotificationReviewReminders] = useState(true);
+  const [processTypeOptionsList, setProcessTypeOptionsList] = useState<string[]>(() => [
+    ...DEFAULT_PROCESS_TYPE_OPTIONS,
+  ]);
 
   const supabase = createClient();
 
@@ -55,6 +59,9 @@ export default function ConfiguracoesPage() {
         setAiApiKey(data.ai_api_key_encrypted ?? "");
         setAiLearnFromHistory(data.ai_learn_from_history ?? true);
         setNotificationReviewReminders(data.notification_review_reminders ?? true);
+        const raw = (data as OfficeConfig & { process_type_options?: string[] })
+          .process_type_options;
+        setProcessTypeOptionsList(normalizeProcessTypeOptions(raw));
       }
       setLoading(false);
     }
@@ -70,6 +77,7 @@ export default function ConfiguracoesPage() {
       ai_api_key: aiApiKey || null,
       ai_learn_from_history: aiLearnFromHistory,
       notification_review_reminders: notificationReviewReminders,
+      process_type_options: processTypeOptionsList,
     });
 
     setSaving(false);
@@ -81,6 +89,7 @@ export default function ConfiguracoesPage() {
               ...prev,
               ai_learn_from_history: aiLearnFromHistory,
               notification_review_reminders: notificationReviewReminders,
+              process_type_options: normalizeProcessTypeOptions(processTypeOptionsList),
             }
           : null
       );
@@ -108,6 +117,7 @@ export default function ConfiguracoesPage() {
           <TabsList>
             <TabsTrigger value="ai">Configuração de IA</TabsTrigger>
             <TabsTrigger value="notifications">Notificações</TabsTrigger>
+            <TabsTrigger value="processos">Tipos de processo</TabsTrigger>
           </TabsList>
 
           <TabsContent value="ai" className="mt-6">
@@ -176,6 +186,114 @@ export default function ConfiguracoesPage() {
                     checked={notificationReviewReminders}
                     onCheckedChange={setNotificationReviewReminders}
                   />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="processos" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tipos de processo</CardTitle>
+                <CardDescription>
+                  Defina a ordem e os rótulos do campo <strong>Tipo</strong> na gestão de processos. Pode
+                  acrescentar novos itens ou substituir os padrões (Gestão, Negócio, Suporte).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ul className="space-y-2">
+                  {processTypeOptionsList.map((label, index) => (
+                    <li
+                      key={`${index}-${label}`}
+                      className="flex flex-col gap-2 rounded-lg border border-border/60 p-3 sm:flex-row sm:items-center"
+                    >
+                      <Input
+                        value={label}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setProcessTypeOptionsList((prev) =>
+                            prev.map((x, i) => (i === index ? v : x))
+                          );
+                        }}
+                        className="min-w-0 flex-1"
+                        aria-label={`Tipo ${index + 1}`}
+                      />
+                      <div className="flex shrink-0 flex-wrap gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9"
+                          disabled={index === 0}
+                          onClick={() =>
+                            setProcessTypeOptionsList((prev) => {
+                              const next = [...prev];
+                              [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                              return next;
+                            })
+                          }
+                          aria-label="Mover para cima"
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9"
+                          disabled={index === processTypeOptionsList.length - 1}
+                          onClick={() =>
+                            setProcessTypeOptionsList((prev) => {
+                              const next = [...prev];
+                              [next[index], next[index + 1]] = [next[index + 1], next[index]];
+                              return next;
+                            })
+                          }
+                          aria-label="Mover para baixo"
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 text-destructive hover:text-destructive"
+                          onClick={() =>
+                            setProcessTypeOptionsList((prev) =>
+                              prev.length > 1 ? prev.filter((_, i) => i !== index) : prev
+                            )
+                          }
+                          aria-label="Remover"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setProcessTypeOptionsList((prev) => [...prev, ""])}
+                  >
+                    <Plus className="h-4 w-4" aria-hidden />
+                    Adicionar tipo
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() =>
+                      setProcessTypeOptionsList([...DEFAULT_PROCESS_TYPE_OPTIONS])
+                    }
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden />
+                    Restaurar padrões
+                  </Button>
                 </div>
               </CardContent>
             </Card>

@@ -43,6 +43,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import { compactLevelsForPersist, draftLevelsForForm } from "@/lib/office-process-levels";
+import {
+  initialTipoLabelFromOfficeProcess,
+  mergeProcessTypeOptionsForSelect,
+} from "@/lib/process-type-options";
+import { ProcessTypeSelect } from "@/components/processes/process-type-select";
 
 const ATTACHMENT_TYPES: { value: OfficeProcessAttachmentType; label: string }[] = [
   { value: "template", label: "Template" },
@@ -105,6 +110,7 @@ export type CatalogBaseProcessSnapshot = {
 
 export function ProcessManagementClient({
   officeProcess,
+  processTypeOptions,
   catalogBaseProcess,
   ownerOptions,
   checklistItems,
@@ -118,6 +124,7 @@ export function ProcessManagementClient({
     description: string | null;
     category: string | null;
     vc_macroprocesso?: string | null;
+    vc_tipo_label?: string | null;
     base_process_id?: string | null;
     template_url?: string | null;
     template_label?: string | null;
@@ -135,6 +142,8 @@ export function ProcessManagementClient({
     vc_level2?: string | null;
     vc_level3?: string | null;
   };
+  /** Lista configurável (Configurações do escritório). */
+  processTypeOptions: string[];
   catalogBaseProcess: CatalogBaseProcessSnapshot;
   ownerOptions: { id: string; full_name: string }[];
   checklistItems: {
@@ -164,11 +173,9 @@ export function ProcessManagementClient({
   const [vcMacro, setVcMacro] = useState(officeProcess.vc_macroprocesso ?? "");
   const [ownerProfileId, setOwnerProfileId] = useState(officeProcess.owner_profile_id ?? "");
   const [notes, setNotes] = useState(officeProcess.notes ?? "");
-  const [vcTipo, setVcTipo] = useState<"" | "primario" | "apoio" | "gerencial">(() => {
-    const t = officeProcess.vc_process_type;
-    if (t === "primario" || t === "apoio" || t === "gerencial") return t;
-    return "";
-  });
+  const [vcTipoLabel, setVcTipoLabel] = useState(() =>
+    initialTipoLabelFromOfficeProcess(officeProcess)
+  );
   const [vcLevelsDraft, setVcLevelsDraft] = useState<string[]>(() =>
     draftLevelsForForm(officeProcess, officeProcess.name)
   );
@@ -238,8 +245,7 @@ export function ProcessManagementClient({
   useEffect(() => {
     setDescription(officeProcess.description ?? "");
     setVcMacro(officeProcess.vc_macroprocesso ?? "");
-    const t = officeProcess.vc_process_type;
-    setVcTipo(t === "primario" || t === "apoio" || t === "gerencial" ? t : "");
+    setVcTipoLabel(initialTipoLabelFromOfficeProcess(officeProcess));
     setVcLevelsDraft(draftLevelsForForm(officeProcess, officeProcess.name));
     setEditedTemplateFiles(
       effectiveTemplateFiles.map((t) => ({
@@ -259,6 +265,11 @@ export function ProcessManagementClient({
   const completedCount = useMemo(
     () => checklistItems.filter((item) => item.is_completed).length,
     [checklistItems]
+  );
+
+  const tipoSelectOptions = useMemo(
+    () => mergeProcessTypeOptionsForSelect(processTypeOptions, vcTipoLabel),
+    [processTypeOptions, vcTipoLabel]
   );
 
   async function handleSaveProcess(e: React.FormEvent) {
@@ -281,7 +292,7 @@ export function ProcessManagementClient({
       status,
       ownerProfileId: ownerProfileId || null,
       notes,
-      vcProcessType: vcTipo === "" ? null : vcTipo,
+      vcTipoLabel: vcTipoLabel.trim() || null,
       vcLevels: vcLevelsDraft,
     });
 
@@ -537,24 +548,14 @@ export function ProcessManagementClient({
                         Classificação usada na estratégia; pode ser alterada em qualquer momento.
                       </p>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="vc-tipo">Tipo</Label>
-                      <Select
-                        id="vc-tipo"
-                        value={vcTipo}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setVcTipo(
-                            v === "primario" || v === "apoio" || v === "gerencial" ? v : ""
-                          );
-                        }}
-                      >
-                        <option value="">Não definido</option>
-                        <option value="primario">Primário</option>
-                        <option value="apoio">Apoio</option>
-                        <option value="gerencial">Gerencial</option>
-                      </Select>
-                    </div>
+                    <ProcessTypeSelect
+                      id="vc-tipo"
+                      label="Tipo"
+                      options={tipoSelectOptions}
+                      value={vcTipoLabel}
+                      onChange={setVcTipoLabel}
+                      placeholderOption="Não definido"
+                    />
                     <div className="space-y-2">
                       <Label htmlFor="vc-macro">Macroprocesso</Label>
                       <Input

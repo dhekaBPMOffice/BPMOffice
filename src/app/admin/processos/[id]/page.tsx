@@ -31,6 +31,11 @@ import {
 } from "lucide-react";
 
 import { fileNameFromUrl } from "@/lib/process-file-display";
+import {
+  DEFAULT_PROCESS_TYPE_OPTIONS,
+  mergeProcessTypeOptionsForSelect,
+} from "@/lib/process-type-options";
+import { ProcessTypeSelect } from "@/components/processes/process-type-select";
 
 function fileExt(name: string): string {
   const dot = name.lastIndexOf(".");
@@ -160,6 +165,11 @@ export default function AdminProcessoDetailPage() {
   const [checklist, setChecklist] = useState("");
   const [sortOrder, setSortOrder] = useState("0");
   const [isActive, setIsActive] = useState(true);
+
+  const adminTipoSelectOptions = useMemo(
+    () => mergeProcessTypeOptionsForSelect([...DEFAULT_PROCESS_TYPE_OPTIONS], tipo),
+    [tipo]
+  );
 
   useEffect(() => {
     if (!saveSuccess) return;
@@ -494,15 +504,14 @@ export default function AdminProcessoDetailPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="tipo-base">Tipo</Label>
-                    <Input
-                      id="tipo-base"
-                      value={tipo}
-                      onChange={(e) => setTipo(e.target.value)}
-                      placeholder="Ex.: Primário, Apoio, Governança…"
-                    />
-                  </div>
+                  <ProcessTypeSelect
+                    id="tipo-base"
+                    label="Tipo"
+                    options={adminTipoSelectOptions}
+                    value={tipo}
+                    onChange={setTipo}
+                    placeholderOption="Selecione ou mantenha vazio"
+                  />
                   <div className="space-y-2">
                     <Label htmlFor="vc-macro-base">Macroprocesso</Label>
                     <Input

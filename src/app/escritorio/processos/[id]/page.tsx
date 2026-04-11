@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageLayout } from "@/components/layout/page-layout";
 import { ClipboardList } from "lucide-react";
 import { ProcessManagementClient } from "./process-management-client";
+import { normalizeProcessTypeOptions } from "@/lib/process-type-options";
 
 export default async function OfficeProcessDetailPage({
   params,
@@ -88,6 +89,16 @@ export default async function OfficeProcessDetailPage({
     catalogBaseProcess = baseRow;
   }
 
+  const { data: officeCfg } = await supabase
+    .from("office_config")
+    .select("process_type_options")
+    .eq("office_id", profile.office_id)
+    .maybeSingle();
+
+  const processTypeOptions = normalizeProcessTypeOptions(
+    (officeCfg?.process_type_options as string[] | undefined) ?? undefined
+  );
+
   return (
     <PageLayout
       title={officeProcess.name}
@@ -102,6 +113,7 @@ export default async function OfficeProcessDetailPage({
     >
       <ProcessManagementClient
         officeProcess={officeProcess}
+        processTypeOptions={processTypeOptions}
         catalogBaseProcess={catalogBaseProcess}
         ownerOptions={ownerOptions ?? []}
         checklistItems={checklistItems ?? []}

@@ -31,6 +31,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClipboardList, LayoutGrid, LayoutList, Plus, Search, Trash2 } from "lucide-react";
+import {
+  DEFAULT_PROCESS_TYPE_OPTIONS,
+  mergeProcessTypeOptionsForSelect,
+} from "@/lib/process-type-options";
+import { ProcessTypeSelect } from "@/components/processes/process-type-select";
 
 const VIEW_STORAGE_KEY = "admin-processos-view-mode";
 
@@ -92,6 +97,11 @@ export default function AdminProcessosPage() {
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [processes]);
+
+  const adminTipoSelectOptions = useMemo(
+    () => mergeProcessTypeOptionsForSelect([...DEFAULT_PROCESS_TYPE_OPTIONS], tipo),
+    [tipo]
+  );
 
   const displayedProcesses = useMemo(() => {
     let list = [...processes];
@@ -378,15 +388,14 @@ export default function AdminProcessosPage() {
           </CardHeader>
           <CardContent>
             <form id="new-base-process-form" onSubmit={handleCreate} className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="tipo-new">Tipo</Label>
-                <Input
-                  id="tipo-new"
-                  value={tipo}
-                  onChange={(e) => setTipo(e.target.value)}
-                  placeholder="Ex.: Primário, Apoio, Governança…"
-                />
-              </div>
+              <ProcessTypeSelect
+                id="tipo-new"
+                label="Tipo"
+                options={adminTipoSelectOptions}
+                value={tipo}
+                onChange={setTipo}
+                placeholderOption="Selecione ou mantenha vazio"
+              />
               <div className="space-y-2">
                 <Label htmlFor="vc-macro-new">Macroprocesso</Label>
                 <Input

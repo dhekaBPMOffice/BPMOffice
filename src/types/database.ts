@@ -83,6 +83,8 @@ export interface OfficeConfig {
   ai_api_key_encrypted: string | null;
   ai_learn_from_history: boolean;
   notification_review_reminders: boolean;
+  /** Rótulos do Tipo (dropdown), por ordem. */
+  process_type_options: string[];
   created_at: string;
   updated_at: string;
 }

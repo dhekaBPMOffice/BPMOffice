@@ -3,11 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { getProfile } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { normalizeProcessTypeOptions } from "@/lib/process-type-options";
 
 export type OfficeConfigInput = {
   ai_api_key?: string | null;
   ai_learn_from_history?: boolean;
   notification_review_reminders?: boolean;
+  /** Lista ordenada de rótulos do Tipo nos processos. */
+  process_type_options?: string[];
 };
 
 export async function saveOfficeConfig(input: OfficeConfigInput) {
@@ -33,6 +36,10 @@ export async function saveOfficeConfig(input: OfficeConfigInput) {
     payload.ai_api_key_encrypted = input.ai_api_key ? input.ai_api_key : null;
   }
 
+  if (input.process_type_options !== undefined) {
+    payload.process_type_options = normalizeProcessTypeOptions(input.process_type_options);
+  }
+
   if (existing) {
     const { error } = await supabase
       .from("office_config")
@@ -50,5 +57,8 @@ export async function saveOfficeConfig(input: OfficeConfigInput) {
   }
 
   revalidatePath("/escritorio/configuracoes");
+  if (input.process_type_options !== undefined) {
+    revalidatePath("/escritorio/processos");
+  }
   return { success: true };
 }

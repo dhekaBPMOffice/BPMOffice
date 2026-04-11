@@ -25,6 +25,7 @@ import {
   levelsFromRow,
   mirrorFirstThreeLegacyColumns,
 } from "@/lib/office-process-levels";
+import { mapTipoLabelToCanonical } from "@/lib/process-type-options";
 
 type LeaderProfile = Profile & {
   role: "leader";
@@ -468,8 +469,10 @@ export async function updateOfficeProcessDetails(input: {
   notes?: string;
   /** Macroprocesso na cadeia de valor (coluna `vc_macroprocesso`). */
   vcMacroprocesso?: string | null;
-  /** Tipo na cadeia (canónico); `null` limpa tipo e rótulo livre. */
+  /** Tipo na cadeia (canónico); `null` limpa tipo e rótulo livre. Preferir `vcTipoLabel`. */
   vcProcessType?: "primario" | "apoio" | "gerencial" | null;
+  /** Rótulo do tipo (lista configurável); define `vc_tipo_label` e mapeia `vc_process_type` para Negócio/Suporte/Gestão. */
+  vcTipoLabel?: string | null;
   /** Lista de níveis (ordem hierárquica). */
   vcLevels?: string[];
 }) {
@@ -543,7 +546,11 @@ export async function updateOfficeProcessDetails(input: {
     payload.completed_at = null;
   }
 
-  if (typeof input.vcProcessType !== "undefined") {
+  if (typeof input.vcTipoLabel !== "undefined") {
+    const t = input.vcTipoLabel?.trim() || null;
+    payload.vc_tipo_label = t;
+    payload.vc_process_type = t ? mapTipoLabelToCanonical(t) : null;
+  } else if (typeof input.vcProcessType !== "undefined") {
     payload.vc_process_type = input.vcProcessType;
     payload.vc_tipo_label = null;
   }
@@ -603,7 +610,13 @@ export async function updateOfficeProcessDetails(input: {
   if (typeof input.flowchartFiles !== "undefined") {
     changes.push("fluxogramas atualizados");
   }
-  if (typeof input.vcProcessType !== "undefined") {
+  if (typeof input.vcTipoLabel !== "undefined") {
+    const prev = String(officeProcess.vc_tipo_label ?? "").trim();
+    const next = input.vcTipoLabel?.trim() ?? "";
+    if (prev !== next) {
+      changes.push("tipo atualizado");
+    }
+  } else if (typeof input.vcProcessType !== "undefined") {
     const prev = (officeProcess.vc_process_type as string | null) ?? null;
     const next = input.vcProcessType;
     if (prev !== next) {
