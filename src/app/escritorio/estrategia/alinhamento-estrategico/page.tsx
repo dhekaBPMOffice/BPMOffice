@@ -21,40 +21,14 @@ import {
 } from "@/components/ui/table";
 import { Target, Network, Loader2 } from "lucide-react";
 import type { OfficeStrategicObjective } from "../objetivos-estrategicos/actions";
+import type { ProcessItem } from "@/types/cadeia-valor";
 import {
   createStrategicObjectiveProcessLink,
   deleteStrategicObjectiveProcessLink,
   type StrategicObjectiveProcessLink,
 } from "./actions";
 
-type ProcessType = "Primário" | "Apoio" | "Gerencial";
-type Priority = "Alta" | "Média" | "Baixa";
-type GeneralStatus = "Não iniciado" | "Em andamento" | "Concluído" | "Em acompanhamento";
-type StageStatus = "Não iniciado" | "Em andamento" | "Concluído";
-
 const STORAGE_KEY_PROCESSES = "cadeia-valor-processos";
-
-type BPMStage =
-  | "Levantamento"
-  | "Modelagem"
-  | "Validação"
-  | "Descritivo"
-  | "Proposição de melhorias"
-  | "Implantação"
-  | "Acompanhamento";
-
-interface ProcessItem {
-  id: string;
-  tipo: ProcessType;
-  macroprocesso: string;
-  niveis: string[];
-  gestorProcesso: string;
-  ultimaAtualizacao: string;
-  responsavelAtualizacao: string;
-  prioridade: Priority;
-  statusGeral: GeneralStatus;
-  etapas: Record<BPMStage, StageStatus>;
-}
 
 function normalizeProcessFromStorage(raw: unknown): ProcessItem {
   const r = raw as ProcessItem & {
@@ -69,6 +43,22 @@ function normalizeProcessFromStorage(raw: unknown): ProcessItem {
   return { ...r, niveis: legacy };
 }
 
+function mergeAlignmentProcesses(
+  fromApi: ProcessItem[],
+  fromStorage: ProcessItem[]
+): ProcessItem[] {
+  const byId = new Map<string, ProcessItem>();
+  for (const p of fromApi) {
+    byId.set(p.id, p);
+  }
+  for (const p of fromStorage) {
+    if (!byId.has(p.id)) {
+      byId.set(p.id, p);
+    }
+  }
+  return Array.from(byId.values());
+}
+
 function niveisToLegacyFields(niveis: string[]) {
   return {
     nivel1: niveis[0] ?? "",
@@ -80,6 +70,7 @@ function niveisToLegacyFields(niveis: string[]) {
 interface AlignmentData {
   objectives: OfficeStrategicObjective[];
   links: StrategicObjectiveProcessLink[];
+  processes: ProcessItem[];
   error: string | null;
 }
 
@@ -98,18 +89,17 @@ export default function AlinhamentoEstrategicoPage() {
       setLoading(true);
       setError(null);
 
-      // processos da cadeia de valor (localStorage)
+      let storageProcesses: ProcessItem[] = [];
       try {
         const storedProcesses = localStorage.getItem(STORAGE_KEY_PROCESSES);
         if (storedProcesses) {
           const parsed = JSON.parse(storedProcesses) as unknown[];
-          setProcesses(parsed.map(normalizeProcessFromStorage));
+          storageProcesses = parsed.map(normalizeProcessFromStorage);
         }
       } catch {
-        setProcesses([]);
+        storageProcesses = [];
       }
 
-      // objetivos e vínculos (backend) - será conectado via actions
       try {
         const res = await fetch("/api/estrategia/alinhamento");
         if (!res.ok) {
@@ -121,14 +111,16 @@ export default function AlinhamentoEstrategicoPage() {
         }
         setObjectives(json.objectives ?? []);
         setLinks(json.links ?? []);
+        setProcesses(
+          mergeAlignmentProcesses(json.processes ?? [], storageProcesses)
+        );
       } catch (err) {
-        if (!error) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Não foi possível carregar objetivos e vínculos."
-          );
-        }
+        setProcesses(storageProcesses);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível carregar objetivos e vínculos."
+        );
       } finally {
         setLoading(false);
       }
