@@ -24,6 +24,7 @@ import {
   DatabaseBackup,
   HelpCircle,
   ShieldCheck,
+  Workflow,
 } from "lucide-react";
 import { type UserRole } from "@/types/database";
 import { IconChip } from "@/components/ui/icon-chip";
@@ -83,6 +84,11 @@ const leaderNavGroups: NavGroup[] = [
     items: [
       { label: "Dashboard", href: "/escritorio/dashboard", icon: LayoutDashboard },
       { label: "Estratégia", href: "/escritorio/estrategia", icon: Target },
+      {
+        label: "Processos",
+        href: "/escritorio/estrategia/cadeia-valor?aba=gestao",
+        icon: Workflow,
+      },
       { label: "Demandas", href: "/escritorio/demandas", icon: ClipboardList },
     ],
   },
@@ -120,6 +126,17 @@ const userNavGroups: NavGroup[] = [
   },
 ];
 
+function navLinkMatches(pathname: string, hrefPath: string): boolean {
+  if (
+    hrefPath === "/admin" ||
+    hrefPath === "/escritorio/dashboard" ||
+    hrefPath === "/escritorio/trabalho"
+  ) {
+    return pathname === hrefPath;
+  }
+  return pathname.startsWith(hrefPath);
+}
+
 export function Sidebar({
   role,
   officeName,
@@ -143,6 +160,14 @@ export function Sidebar({
       : role === "leader"
         ? leaderNavGroups
         : userNavGroups;
+
+  const allHrefPaths = navGroups.flatMap((g) =>
+    g.items.map((item) => item.href.split("?")[0])
+  );
+  const matchingLens = allHrefPaths
+    .filter((hrefPath) => navLinkMatches(pathname, hrefPath))
+    .map((p) => p.length);
+  const maxMatchLen = matchingLens.length > 0 ? Math.max(...matchingLens) : -1;
 
   return (
     <aside
@@ -260,10 +285,11 @@ export function Sidebar({
               )}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
+                  const hrefPath = item.href.split("?")[0];
                   const isActive =
-                    item.href === "/admin" || item.href === "/escritorio/dashboard" || item.href === "/escritorio/trabalho"
-                      ? pathname === item.href
-                      : pathname.startsWith(item.href);
+                    navLinkMatches(pathname, hrefPath) &&
+                    hrefPath.length === maxMatchLen &&
+                    maxMatchLen >= 0;
 
                   const Icon = item.icon;
 
