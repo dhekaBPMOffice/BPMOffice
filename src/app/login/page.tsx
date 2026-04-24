@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { signInWithPasswordAction } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,26 +58,26 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const supabase = createClient();
     try {
-      const { error: authError } = await withTimeout(
-        supabase.auth.signInWithPassword({
-          email,
-          password,
-        }),
-        15000
-      );
+      // Login no servidor evita fetch direto do browser → Supabase (bloqueios, extensões, CORS atípicos).
+      const result = await withTimeout(signInWithPasswordAction(email, password), 20000);
 
-      if (authError) {
-        setError("E-mail ou senha inválidos.");
+      if ("error" in result) {
+        setError(result.error);
         return;
       }
 
-      // Força navegação após login; o middleware ajusta a rota final por perfil.
       router.replace("/escritorio/dashboard");
       router.refresh();
-    } catch {
-      setError("Não foi possível entrar agora. Tente novamente em instantes.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg === "timeout") {
+        setError("A conexão demorou demais. Verifique a internet e tente de novo.");
+        return;
+      }
+      setError(
+        "Não foi possível entrar agora. Confira NEXT_PUBLIC_SUPABASE_URL no .env.local, rede/VPN e se o projeto Supabase está ativo."
+      );
     } finally {
       setLoading(false);
     }
