@@ -57,7 +57,7 @@ export function ProcessOnboardingForm({
       return;
     }
 
-    router.push("/escritorio/estrategia/cadeia-valor?aba=gestao");
+    router.push("/escritorio/estrategia/processos-escritorio");
     router.refresh();
   }
 

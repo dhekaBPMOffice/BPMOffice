@@ -59,6 +59,10 @@ export type QuestionnaireQuestionWithOptions = ProcessQuestionnaireQuestion & {
   })[];
 };
 
+function isSelectableQuestion(questionType: QuestionnaireQuestionWithOptions["question_type"]) {
+  return questionType === "single_select" || questionType === "multi_select";
+}
+
 export function collectProcessIdsFromAnswers(
   questions: QuestionnaireQuestionWithOptions[],
   answers: Record<string, string | string[]>
@@ -78,7 +82,7 @@ export function collectProcessIdsFromAnswers(
 
     if (!hasAnswer) continue;
 
-    if (question.enable_process_linking) {
+    if (question.enable_process_linking && !isSelectableQuestion(question.question_type)) {
       for (const link of question.process_questionnaire_question_processes ?? []) {
         linkedProcessIds.add(link.base_process_id);
       }

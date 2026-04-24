@@ -56,7 +56,7 @@ export default async function ProcessOnboardingPage() {
   ]);
 
   if (office?.processes_initialized_at) {
-    redirect("/escritorio/estrategia/cadeia-valor?aba=gestao");
+    redirect("/escritorio/estrategia/processos-escritorio");
   }
 
   if (!questionnaire) {
