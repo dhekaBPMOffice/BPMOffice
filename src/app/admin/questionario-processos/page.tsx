@@ -31,6 +31,7 @@ export default function QuestionarioProcessosPage() {
     const { data, error: queryError } = await supabase
       .from("process_questionnaires")
       .select("*")
+      .eq("is_process_activation_form", true)
       .order("version", { ascending: false });
 
     if (queryError) {
@@ -85,13 +86,13 @@ export default function QuestionarioProcessosPage() {
 
   return (
     <PageLayout
-      title="Questionário de Ativação"
-      description="Monte o questionário que definirá automaticamente os processos de cada escritório."
+      title="Formulário de Ativação"
+      description="Vista dedicada do formulário de ativação, agora estruturado em etapas para o onboarding inicial do líder."
       iconName="ClipboardList"
       actions={
         <Button onClick={() => setShowNew((current) => !current)}>
           <Plus className="h-4 w-4" />
-          Novo Questionário
+          Novo formulário
         </Button>
       }
     >
@@ -106,7 +107,7 @@ export default function QuestionarioProcessosPage() {
           <CardHeader>
             <CardTitle>Novo questionário</CardTitle>
             <CardDescription>
-              Crie uma nova versão do questionário para evoluir a lógica de ativação.
+              Crie o formulário de ativação inicial que será exibido no primeiro acesso do líder.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -128,11 +129,11 @@ export default function QuestionarioProcessosPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
-                  placeholder="Explique o objetivo desta versão do questionário."
+                  placeholder="Explique o objetivo desta jornada de ativação."
                 />
               </div>
               <div className="flex gap-2">
-                <Button type="submit">Criar questionário</Button>
+                <Button type="submit">Criar formulário</Button>
                 <Button type="button" variant="outline" onClick={() => setShowNew(false)}>
                   Cancelar
                 </Button>
@@ -144,9 +145,9 @@ export default function QuestionarioProcessosPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Versões cadastradas</CardTitle>
+          <CardTitle>Formulário cadastrado</CardTitle>
           <CardDescription>
-            Mantenha apenas uma versão ativa por vez para controlar a jornada do primeiro acesso.
+            Mantenha um único formulário de ativação ativo para controlar a jornada do primeiro acesso.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -155,8 +156,8 @@ export default function QuestionarioProcessosPage() {
           ) : items.length === 0 ? (
             <EmptyState
               icon={ClipboardList}
-              title="Nenhum questionário cadastrado"
-              description="Crie a primeira versão e vincule processos às respostas."
+              title="Nenhum formulário de ativação cadastrado"
+              description="Crie o formulário inicial para começar a estruturar a jornada guiada."
             />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

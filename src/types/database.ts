@@ -183,9 +183,21 @@ export interface ProcessQuestionnaire {
   updated_at: string;
 }
 
+export interface ProcessQuestionnaireSection {
+  id: string;
+  questionnaire_id: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProcessQuestionnaireQuestion {
   id: string;
   questionnaire_id: string;
+  section_id: string;
   prompt: string;
   helper_text: string | null;
   question_type: ProcessQuestionType | FormQuestionType;

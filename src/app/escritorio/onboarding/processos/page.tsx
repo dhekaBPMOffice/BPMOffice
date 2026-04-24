@@ -22,7 +22,8 @@ export default async function ProcessOnboardingPage() {
     );
   }
 
-  const [{ data: office }, { data: questionnaire }] = await Promise.all([
+  const [{ data: office }, { data: questionnaire }, { data: sections }, { data: questions }] =
+    await Promise.all([
     supabase
       .from("offices")
       .select("processes_initialized_at")
@@ -30,30 +31,35 @@ export default async function ProcessOnboardingPage() {
       .single(),
     supabase
       .from("process_questionnaires")
-      .select(`
-        id,
-        title,
-        description,
-        process_questionnaire_questions (
-          id,
-          prompt,
-          helper_text,
-          question_type,
-          is_required,
-          sort_order,
-          process_questionnaire_options (
-            id,
-            label,
-            value,
-            helper_text,
-            sort_order,
-            is_active
-          )
-        )
-      `)
+      .select("id, title, description")
       .eq("is_process_activation_form", true)
       .single(),
-  ]);
+    supabase
+      .from("process_questionnaire_sections")
+      .select("id, title, subtitle, description, sort_order, questionnaire_id")
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("process_questionnaire_questions")
+      .select(`
+        id,
+        section_id,
+        questionnaire_id,
+        prompt,
+        helper_text,
+        question_type,
+        is_required,
+        sort_order,
+        process_questionnaire_options (
+          id,
+          label,
+          value,
+          helper_text,
+          sort_order,
+          is_active
+        )
+      `)
+      .order("sort_order", { ascending: true }),
+    ]);
 
   if (office?.processes_initialized_at) {
     redirect("/escritorio/estrategia/processos-escritorio");
@@ -83,13 +89,32 @@ export default async function ProcessOnboardingPage() {
     );
   }
 
+  const questionnaireSections = (sections ?? [])
+    .filter((section) => section.questionnaire_id === questionnaire.id)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((section) => ({
+      ...section,
+      process_questionnaire_questions: (questions ?? [])
+        .filter(
+          (question) =>
+            question.questionnaire_id === questionnaire.id &&
+            question.section_id === section.id
+        )
+        .sort((a, b) => a.sort_order - b.sort_order),
+    }));
+
   return (
     <PageLayout
       title="Onboarding de Processos"
-      description="Responda ao questionário para que o sistema monte a estrutura inicial de processos do seu escritório."
+      description="Percorra as etapas da ativação para que o sistema monte a estrutura inicial de processos do seu escritório."
       iconName="ClipboardList"
     >
-      <ProcessOnboardingForm questionnaire={questionnaire} />
+      <ProcessOnboardingForm
+        questionnaire={{
+          ...questionnaire,
+          process_questionnaire_sections: questionnaireSections,
+        }}
+      />
     </PageLayout>
   );
 }

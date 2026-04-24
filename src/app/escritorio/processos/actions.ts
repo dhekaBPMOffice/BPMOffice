@@ -332,40 +332,59 @@ export async function submitProcessOnboarding(
     return { error: "Nenhum questionário ativo foi encontrado." };
   }
 
-  const { data: questionData, error: questionError } = await supabase
-    .from("process_questionnaire_questions")
-    .select(`
-      id,
-      prompt,
-      helper_text,
-      question_type,
-      is_required,
-      enable_process_linking,
-      sort_order,
-      process_questionnaire_question_processes (
-        base_process_id
-      ),
-      process_questionnaire_options (
-        id,
-        label,
-        value,
-        helper_text,
-        sort_order,
-        is_active,
-        enable_process_linking,
-        process_questionnaire_option_processes (
-          base_process_id
-        )
-      )
-    `)
-    .eq("questionnaire_id", questionnaire.id)
-    .order("sort_order", { ascending: true });
+  const [{ data: sectionData, error: sectionError }, { data: questionData, error: questionError }] =
+    await Promise.all([
+      supabase
+        .from("process_questionnaire_sections")
+        .select("id, sort_order")
+        .eq("questionnaire_id", questionnaire.id)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("process_questionnaire_questions")
+        .select(`
+          id,
+          section_id,
+          prompt,
+          helper_text,
+          question_type,
+          is_required,
+          enable_process_linking,
+          sort_order,
+          process_questionnaire_question_processes (
+            base_process_id
+          ),
+          process_questionnaire_options (
+            id,
+            label,
+            value,
+            helper_text,
+            sort_order,
+            is_active,
+            enable_process_linking,
+            process_questionnaire_option_processes (
+              base_process_id
+            )
+          )
+        `)
+        .eq("questionnaire_id", questionnaire.id)
+        .order("sort_order", { ascending: true }),
+    ]);
 
-  if (questionError) {
-    return { error: questionError.message };
+  if (sectionError || questionError) {
+    return { error: sectionError?.message ?? questionError?.message ?? "Não foi possível carregar o formulário." };
   }
 
-  const questions = (questionData ?? []) as QuestionnaireQuestionWithOptions[];
+  const sectionOrder = new Map(
+    (sectionData ?? []).map((section) => [section.id, section.sort_order])
+  );
+  const questions = ((questionData ?? []) as (QuestionnaireQuestionWithOptions & {
+    section_id?: string | null;
+  })[]).sort((a, b) => {
+    const sectionA = sectionOrder.get(a.section_id ?? "") ?? 0;
+    const sectionB = sectionOrder.get(b.section_id ?? "") ?? 0;
+    if (sectionA !== sectionB) return sectionA - sectionB;
+    return a.sort_order - b.sort_order;
+  });
 
   for (const question of questions) {
     const rawAnswer = answers[question.id];
