@@ -3,8 +3,10 @@ import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLayout } from "@/components/layout/page-layout";
-import { ClipboardList } from "lucide-react";
 import { ProcessOnboardingForm } from "./process-onboarding-form";
+
+/** Máx. duração do pedido (seg.) para `submitProcessOnboarding` (importar vários processos + ficheiros). Ajuste no hosting (ex. Vercel) conforme o plano. */
+export const maxDuration = 300;
 
 export default async function ProcessOnboardingPage() {
   const profile = await requireRole(["leader"]);
@@ -104,17 +106,11 @@ export default async function ProcessOnboardingPage() {
     }));
 
   return (
-    <PageLayout
-      title="Onboarding de Processos"
-      description="Percorra as etapas da ativação para que o sistema monte a estrutura inicial de processos do seu escritório."
-      iconName="ClipboardList"
-    >
-      <ProcessOnboardingForm
-        questionnaire={{
-          ...questionnaire,
-          process_questionnaire_sections: questionnaireSections,
-        }}
-      />
-    </PageLayout>
+    <ProcessOnboardingForm
+      questionnaire={{
+        ...questionnaire,
+        process_questionnaire_sections: questionnaireSections,
+      }}
+    />
   );
 }

@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const PROCESS_FILES_BUCKET = "process-files";
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+/** Evita `fetch` pendurada ao obter ficheiro remoto (ex.: importação de processos do catálogo). */
+const DUPLICATE_FILE_FETCH_TIMEOUT_MS = 60_000;
 
 const TEMPLATE_BLOCKED_EXTENSIONS = new Set([
   "exe", "bat", "cmd", "sh", "ps1", "vbs", "js", "jar", "dll", "msi",
@@ -255,7 +257,31 @@ export async function duplicateProcessFileFromUrl(
     }
   }
 
-  const response = await fetch(sourceUrl);
+  let response: Response;
+  try {
+    response = await fetch(sourceUrl, {
+      signal: AbortSignal.timeout(DUPLICATE_FILE_FETCH_TIMEOUT_MS),
+    });
+  } catch (error) {
+    const isAbort =
+      (error instanceof Error && error.name === "AbortError") ||
+      (typeof DOMException !== "undefined" &&
+        error instanceof DOMException &&
+        error.name === "AbortError");
+    if (isAbort) {
+      return {
+        error:
+          "Tempo esgotado ao obter o arquivo. Verifique a ligação ou tente de novo em instantes.",
+      };
+    }
+    return {
+      error:
+        error instanceof Error
+          ? `Falha de rede ao obter o arquivo: ${error.message}`
+          : "Falha de rede ao obter o arquivo de origem.",
+    };
+  }
+
   if (!response.ok) {
     return {
       error: `Não foi possível copiar o arquivo de origem (${response.status} ${response.statusText}).`,

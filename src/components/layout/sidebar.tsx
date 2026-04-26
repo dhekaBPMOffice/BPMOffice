@@ -154,6 +154,8 @@ export function Sidebar({
     setMounted(true);
   }, []);
 
+  if (pathname.startsWith("/escritorio/onboarding")) return null;
+
   const navGroups =
     role === "admin_master"
       ? adminNavGroups
