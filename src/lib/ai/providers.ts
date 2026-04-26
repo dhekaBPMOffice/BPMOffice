@@ -7,6 +7,17 @@ export interface AIProvider {
   generate(prompt: string, context?: string): Promise<{ text: string; tokensUsed?: number }>;
 }
 
+type GooglePart =
+  | { text: string }
+  | { inline_data: { mime_type: string; data: string } };
+
+type GoogleGenerateContentResponse = {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> };
+  }>;
+  usageMetadata?: { totalTokenCount?: number };
+};
+
 export class OpenAIProvider implements AIProvider {
   constructor(
     private apiKey: string,
@@ -141,32 +152,67 @@ export class GoogleProvider implements AIProvider {
   async generate(prompt: string, context?: string): Promise<{ text: string; tokensUsed?: number }> {
     const fullPrompt = context ? `${context}\n\n---\n\n${prompt}` : prompt;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+    return this.generateContent([{ text: fullPrompt }]);
+  }
+
+  async generateWithImage(
+    prompt: string,
+    imageDataUrl: string
+  ): Promise<{ text: string; tokensUsed?: number }> {
+    const image = this.parseImageDataUrl(imageDataUrl);
+
+    return this.generateContent([
+      { text: prompt },
+      {
+        inline_data: {
+          mime_type: image.mimeType,
+          data: image.base64,
+        },
+      },
+    ]);
+  }
+
+  private async generateContent(parts: GooglePart[]): Promise<{ text: string; tokensUsed?: number }> {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`;
 
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": this.apiKey,
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: fullPrompt }] }],
+        contents: [{ role: "user", parts }],
       }),
     });
 
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`Google API error: ${res.status} - ${err}`);
+      throw new Error(`Google Gemini API error: ${res.status} - ${err}`);
     }
 
-    const data = (await res.json()) as {
-      candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
-      }>;
-      usageMetadata?: { totalTokenCount?: number };
-    };
+    const data = (await res.json()) as GoogleGenerateContentResponse;
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const text =
+      data.candidates?.[0]?.content?.parts
+        ?.map((part) => part.text)
+        .filter((text): text is string => Boolean(text))
+        .join("") ?? "";
     const tokensUsed = data.usageMetadata?.totalTokenCount;
 
     return { text, tokensUsed };
+  }
+
+  private parseImageDataUrl(imageDataUrl: string): { mimeType: string; base64: string } {
+    const match = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) {
+      throw new Error("Formato de imagem inválido para o Google Gemini.");
+    }
+
+    return {
+      mimeType: match[1],
+      base64: match[2],
+    };
   }
 }
 

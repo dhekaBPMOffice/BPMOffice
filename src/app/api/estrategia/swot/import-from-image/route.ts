@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { getProfile } from "@/lib/auth";
 import { AIService } from "@/lib/ai/ai-service";
-import { createProvider } from "@/lib/ai/providers";
-import { OpenAIProvider } from "@/lib/ai/providers";
+import { createProvider, GoogleProvider, OpenAIProvider } from "@/lib/ai/providers";
 import { createStrategicPlan } from "@/app/escritorio/estrategia/swot/actions";
 import { createSwotItem } from "@/app/escritorio/estrategia/swot/actions";
 
@@ -69,16 +68,6 @@ export async function POST(request: Request) {
     }
 
     const config = await AIService.getConfig(profile.office_id);
-    if (config.provider !== "openai") {
-      return NextResponse.json(
-        {
-          error:
-            "Importação por imagem está disponível apenas com o provedor OpenAI. Configure em Configurações do escritório.",
-        },
-        { status: 501 }
-      );
-    }
-
     if (!config.apiKey?.trim()) {
       return NextResponse.json(
         { error: "Chave de API de IA não configurada." },
@@ -91,12 +80,12 @@ export async function POST(request: Request) {
     const dataUrl = `data:${file.type};base64,${base64}`;
 
     const provider = createProvider(
-      config.provider as "openai",
+      config.provider as "openai" | "anthropic" | "google",
       config.apiKey,
       config.model
     );
 
-    if (!(provider instanceof OpenAIProvider)) {
+    if (!(provider instanceof OpenAIProvider || provider instanceof GoogleProvider)) {
       return NextResponse.json(
         { error: "Provedor de IA não suporta análise de imagem." },
         { status: 501 }

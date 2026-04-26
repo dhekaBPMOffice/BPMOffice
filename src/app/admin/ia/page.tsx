@@ -28,6 +28,13 @@ const BPM_PHASES = [
   { key: "encerramento", label: "Encerramento" },
 ] as const;
 
+const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_MODEL_BY_PROVIDER: Record<string, string> = {
+  openai: "gpt-4",
+  anthropic: "claude-3",
+  google: GEMINI_DEFAULT_MODEL,
+};
+
 export default function IaPage() {
   const [defaultProvider, setDefaultProvider] = useState("openai");
   const [defaultModel, setDefaultModel] = useState("gpt-4");
@@ -68,6 +75,15 @@ export default function IaPage() {
     }
     load();
   }, []);
+
+  function handleProviderChange(provider: string) {
+    setDefaultProvider(provider);
+
+    const knownDefaultModels = new Set(Object.values(DEFAULT_MODEL_BY_PROVIDER));
+    if (!defaultModel.trim() || knownDefaultModels.has(defaultModel)) {
+      setDefaultModel(DEFAULT_MODEL_BY_PROVIDER[provider] ?? defaultModel);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -120,11 +136,11 @@ export default function IaPage() {
               <Select
                 id="default_provider"
                 value={defaultProvider}
-                onChange={(e) => setDefaultProvider(e.target.value)}
+                onChange={(e) => handleProviderChange(e.target.value)}
               >
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Anthropic</option>
-                <option value="google">Google</option>
+                <option value="google">Google Gemini</option>
               </Select>
             </div>
 
@@ -134,8 +150,14 @@ export default function IaPage() {
                 id="default_model"
                 value={defaultModel}
                 onChange={(e) => setDefaultModel(e.target.value)}
-                placeholder="Ex: gpt-4, claude-3, gemini-pro"
+                placeholder={`Ex: gpt-4, claude-3, ${GEMINI_DEFAULT_MODEL}`}
               />
+              {defaultProvider === "google" && (
+                <p className="text-xs text-muted-foreground">
+                  Para Gemini, use um modelo compatível com a API Google AI, como{" "}
+                  {GEMINI_DEFAULT_MODEL} ou gemini-2.5-pro.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
