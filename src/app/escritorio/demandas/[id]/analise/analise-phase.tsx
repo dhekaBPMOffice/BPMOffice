@@ -122,7 +122,7 @@ export function AnalisePhase({ demandId }: AnalisePhaseProps) {
                 id="technique"
                 value={technique}
                 onChange={(e) => setTechnique(e.target.value)}
-                placeholder="Ex: Análise SWOT, Value Stream Mapping"
+                placeholder="Ex: Análise SWOT (F.O.F.A), Value Stream Mapping"
               />
             </div>
             <div className="space-y-2">

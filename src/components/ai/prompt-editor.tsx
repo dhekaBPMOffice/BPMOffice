@@ -19,7 +19,7 @@ const PHASES: { key: string; label: string }[] = [
   { key: "melhorias", label: "Melhorias" },
   { key: "implantacao", label: "Implantação" },
   { key: "encerramento", label: "Encerramento" },
-  { key: "swot", label: "SWOT" },
+  { key: "swot", label: "SWOT (F.O.F.A)" },
   { key: "strategic_identity", label: "Identidade Estratégica" },
   { key: "strategic_objectives", label: "Objetivos Estratégicos" },
   { key: "tactical_plan", label: "Plano Tático" },

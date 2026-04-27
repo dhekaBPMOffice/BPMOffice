@@ -21,7 +21,7 @@ import {
 
 const STEPS = [
   { id: "identity", label: "IDENTIDADE" },
-  { id: "swot", label: "SWOT" },
+  { id: "swot", label: "SWOT (F.O.F.A)" },
   { id: "objectives", label: "OBJETIVOS" },
   { id: "action-plan", label: "PLANO DE AÇÃO" },
   { id: "review", label: "REVISÃO" },

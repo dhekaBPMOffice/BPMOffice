@@ -50,11 +50,11 @@ const sections: Section[] = [
   },
   {
     title: "Escritório de Processos",
-    description: "Análise SWOT, objetivos, processos do escritório e portfólio de serviços.",
+    description: "Análise SWOT (F.O.F.A), objetivos, processos do escritório e portfólio de serviços.",
     icon: FolderKanban,
     variant: "purple",
     links: [
-      { label: "Análise Swot", href: "/escritorio/estrategia/swot", icon: BarChart3 },
+      { label: "Análise SWOT (F.O.F.A)", href: "/escritorio/estrategia/swot", icon: BarChart3 },
       { label: "Objetivos do Escritório", href: "/escritorio/estrategia/objetivos-escritorio", icon: Target },
       { label: "Processos do Escritório", href: "/escritorio/estrategia/processos-escritorio", icon: ClipboardList },
       { label: "Portfólio de Serviços", href: "/escritorio/estrategia/portfolio", icon: Briefcase },
@@ -81,7 +81,7 @@ export default function EstrategiaPage() {
   return (
     <PageLayout
       title="Estratégia"
-      description="Planejamento estratégico, cadeia de valor, SWOT e portfólio de serviços."
+      description="Planejamento estratégico, cadeia de valor, SWOT (F.O.F.A) e portfólio de serviços."
       iconName="Target"
     >
       <div

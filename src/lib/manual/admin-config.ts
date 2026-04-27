@@ -195,7 +195,7 @@ A área de **Configuração IA** permite:
 - Configurar chaves de API
 - Personalizar prompts padrão
 
-As funcionalidades de IA (SWOT, planos táticos, objetivos etc.) usam essas configurações.
+As funcionalidades de IA (SWOT / F.O.F.A, planos táticos, objetivos etc.) usam essas configurações.
     `.trim(),
     steps: [
       "Acesse Configuração IA no menu",

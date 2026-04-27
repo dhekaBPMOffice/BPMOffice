@@ -26,13 +26,13 @@ export const DEFAULT_PROMPTS: Record<string, string> = {
     "Com base no nome e contexto do escritório de processos, sugira uma missão, visão e valores organizacionais. Retorne no formato:\nMissão: [texto]\nVisão: [texto]\nValores: [valor1], [valor2], [valor3], [valor4], [valor5]\nAs sugestões devem ser inspiradoras, concisas e alinhadas ao contexto de gestão de processos de negócio (BPM).",
 
   swot:
-    "Considerando o contexto do escritório de processos e sua identidade (missão, visão e valores), gere uma análise SWOT detalhada. Retorne no formato:\nForças:\n- [item]\n- [item]\n- [item]\nFraquezas:\n- [item]\n- [item]\n- [item]\nOportunidades:\n- [item]\n- [item]\n- [item]\nAmeaças:\n- [item]\n- [item]\n- [item]\nCada item deve ser específico e acionável para o contexto de BPM.",
+    "Considerando o contexto do escritório de processos e sua identidade (missão, visão e valores), gere uma análise SWOT (F.O.F.A) detalhada (mesma matriz: Forças, Fraquezas, Oportunidades, Ameaças). Retorne no formato:\nForças:\n- [item]\n- [item]\n- [item]\nFraquezas:\n- [item]\n- [item]\n- [item]\nOportunidades:\n- [item]\n- [item]\n- [item]\nAmeaças:\n- [item]\n- [item]\n- [item]\nCada item deve ser específico e acionável para o contexto de BPM.",
 
   swot_quadrant:
-    "Com base nas respostas do usuário às perguntas guiadas abaixo (contexto do quadrante indicado), sugira apenas itens para esse quadrante (Forças, Fraquezas, Oportunidades ou Ameaças). O input pode conter várias respostas em texto. Retorne somente uma lista de itens, um por linha, no formato:\n- [item]\n- [item]\n- [item]\nGere entre 3 e 6 itens específicos e acionáveis. Não repita o nome do quadrante na resposta.",
+    "No contexto da matriz SWOT (F.O.F.A), com base nas respostas do usuário às perguntas guiadas abaixo (quadrante indicado), sugira apenas itens para esse quadrante (Forças, Fraquezas, Oportunidades ou Ameaças). O input pode conter várias respostas em texto. Retorne somente uma lista de itens, um por linha, no formato:\n- [item]\n- [item]\n- [item]\nGere entre 3 e 6 itens específicos e acionáveis. Não repita o nome do quadrante na resposta.",
 
   strategic_objectives:
-    "Com base na análise SWOT apresentada, sugira objetivos estratégicos SMART. Retorne no formato:\n1. [Título do objetivo] - [Descrição breve]\n2. [Título do objetivo] - [Descrição breve]\nOs objetivos devem ser específicos, mensuráveis, alcançáveis, relevantes e com prazo definido. Sugira entre 3 e 6 objetivos.",
+    "Com base na análise SWOT (F.O.F.A) apresentada, sugira objetivos estratégicos SMART. Retorne no formato:\n1. [Título do objetivo] - [Descrição breve]\n2. [Título do objetivo] - [Descrição breve]\nOs objetivos devem ser específicos, mensuráveis, alcançáveis, relevantes e com prazo definido. Sugira entre 3 e 6 objetivos.",
 
   tactical_plan:
     "Com base nos objetivos estratégicos apresentados, crie um plano tático com ações concretas. Retorne no formato:\nObjetivo: [título do objetivo]\n- Ação: [descrição da ação] | Responsável: [sugestão] | Prazo: [YYYY-MM-DD]\n- Ação: [descrição da ação] | Responsável: [sugestão] | Prazo: [YYYY-MM-DD]\nRepita para cada objetivo. As ações devem ser práticas e executáveis dentro de um trimestre.",
@@ -42,7 +42,7 @@ export const DEFAULT_PROMPTS: Record<string, string> = {
 
   plano_tatico:
     `Você é um consultor especialista em gestão de processos de negócio (BPM) e planejamento estratégico.
-Com base nos dados estratégicos fornecidos (SWOT, objetivos estratégicos, objetivos do escritório, portfólio de serviços) e nas respostas do usuário à entrevista guiada, crie um plano tático detalhado com ações concretas.
+Com base nos dados estratégicos fornecidos (análise SWOT / F.O.F.A, objetivos estratégicos, objetivos do escritório, portfólio de serviços) e nas respostas do usuário à entrevista guiada, crie um plano tático detalhado com ações concretas.
 
 REGRAS:
 - Gere entre 5 e 15 ações táticas práticas e executáveis

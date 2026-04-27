@@ -46,7 +46,7 @@ const INTERVIEW_QUESTIONS = [
   },
   {
     id: "additional_context",
-    label: "Há algum desafio ou contexto específico não coberto pela SWOT?",
+    label: "Há algum desafio ou contexto específico não coberto pela análise SWOT (F.O.F.A)?",
     placeholder:
       "Ex: Mudança de liderança, nova regulamentação, fusão de equipes, demanda urgente...",
   },
@@ -99,7 +99,7 @@ export function StepInterview({
 
           {!hasData ? (
             <p className="text-sm text-muted-foreground">
-              Nenhum dado estratégico encontrado. Cadastre informações na SWOT, Objetivos ou
+              Nenhum dado estratégico encontrado. Cadastre informações na análise SWOT (F.O.F.A), Objetivos ou
               Portfólio antes de gerar o plano.
             </p>
           ) : (
@@ -107,7 +107,7 @@ export function StepInterview({
               <div className="flex flex-wrap gap-2 mb-3">
                 {swotCount > 0 && (
                   <Badge variant="outline" className="gap-1">
-                    <TrendingUp className="h-3 w-3" /> {swotCount} itens SWOT
+                    <TrendingUp className="h-3 w-3" /> {swotCount} itens SWOT (F.O.F.A)
                   </Badge>
                 )}
                 {stratObjCount > 0 && (

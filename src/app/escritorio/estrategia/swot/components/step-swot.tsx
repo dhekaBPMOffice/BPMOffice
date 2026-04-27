@@ -57,14 +57,14 @@ export function StepSwot({ planId, planName, mission, vision, swotItems, onReloa
     await onReload();
   }
 
-  const aiContext = `Escritório: ${planName}\nMissão: ${mission || "Não definida"}\nVisão: ${vision || "Não definida"}\nItens SWOT existentes: ${swotItems.length}`;
+  const aiContext = `Escritório: ${planName}\nMissão: ${mission || "Não definida"}\nVisão: ${vision || "Não definida"}\nItens SWOT (F.O.F.A) existentes: ${swotItems.length}`;
 
   return (
     <div className="space-y-8">
       <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold text-foreground">Análise SWOT (F.O.F.A.)</h2>
+        <h2 className="text-2xl font-bold text-foreground">Análise SWOT (F.O.F.A)</h2>
         <p className="text-muted-foreground">
-          Mapeie forças, fraquezas, oportunidades e ameaças. Também conhecida como F.O.F.A. (Forças, Oportunidades, Fraquezas, Ameaças).
+          Mapeie forças, fraquezas, oportunidades e ameaças. Também conhecida como F.O.F.A (Forças, Oportunidades, Fraquezas, Ameaças).
         </p>
       </div>
 
@@ -73,7 +73,7 @@ export function StepSwot({ planId, planName, mission, vision, swotItems, onReloa
           phase="swot"
           context={aiContext}
           onResult={handleAIResult}
-          label="Gerar Análise SWOT com IA"
+          label="Gerar análise SWOT (F.O.F.A) com IA"
         />
       </div>
 

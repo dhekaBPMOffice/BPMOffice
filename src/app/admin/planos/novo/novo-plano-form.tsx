@@ -21,7 +21,7 @@ import { CreditCard } from "lucide-react";
 
 const FEATURES = [
   { key: "value_chain", label: "Cadeia de Valor" },
-  { key: "swot", label: "Análise SWOT" },
+  { key: "swot", label: "Análise SWOT (F.O.F.A)" },
   { key: "portfolio", label: "Portfólio" },
   { key: "bpm_cycle", label: "Ciclo BPM" },
   { key: "ai", label: "IA" },

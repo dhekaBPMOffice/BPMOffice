@@ -232,7 +232,7 @@ A área de **Demandas** permite acompanhar o ciclo completo de projetos BPM:
     id: "estrategia",
     resource: "estrategia",
     title: "Estratégia",
-    shortDescription: "Cadeia de valor, SWOT, objetivos estratégicos e planos táticos com IA.",
+    shortDescription: "Cadeia de valor, SWOT (F.O.F.A), objetivos estratégicos e planos táticos com IA.",
     iconName: "Target",
     href: "/escritorio/manual/estrategia",
     content: `
@@ -241,14 +241,14 @@ A área de **Demandas** permite acompanhar o ciclo completo de projetos BPM:
 A **Estratégia** contempla:
 
 - **Cadeia de Valor**: mapeamento de processos em Gestão, Negócio e Apoio
-- **Planejamento Estratégico**: identidade, análise SWOT, objetivos estratégicos e planos táticos com IA
+- **Planejamento Estratégico**: identidade, análise SWOT (F.O.F.A), objetivos estratégicos e planos táticos com IA
 - **Framework de Processos**: configuração de frameworks ativos
 - **Portfólio de Serviços**: catálogo de serviços e demanda x capacidade
     `.trim(),
     steps: [
       "Configure a cadeia de valor do escritório",
       "Crie ou importe objetivos estratégicos",
-      "Use a análise SWOT para planejamento",
+      "Use a análise SWOT (F.O.F.A) para planejamento",
       "Gere planos táticos com suporte da IA",
     ],
   },

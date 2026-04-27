@@ -87,7 +87,7 @@ export function StepReview({ plan, swotItems, objectives, tacticalPlans, planId,
 
   const completionItems = [
     { label: "Identidade definida", done: !!(plan.mission && plan.vision) },
-    { label: "Análise SWOT", done: swotItems.length > 0 },
+    { label: "Análise SWOT (F.O.F.A)", done: swotItems.length > 0 },
     { label: "Objetivos estratégicos", done: objectives.length > 0 },
     { label: "Plano de ação", done: tacticalPlans.length > 0 },
   ];
@@ -167,7 +167,7 @@ export function StepReview({ plan, swotItems, objectives, tacticalPlans, planId,
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
               <div className="h-6 w-6 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 text-xs font-bold">2</div>
-              Análise SWOT
+              Análise SWOT (F.O.F.A)
             </CardTitle>
             <Badge variant="outline">{swotItems.length} itens</Badge>
           </div>
@@ -195,7 +195,7 @@ export function StepReview({ plan, swotItems, objectives, tacticalPlans, planId,
               })}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-3">Nenhum item SWOT</p>
+            <p className="text-sm text-muted-foreground text-center py-3">Nenhum item na análise SWOT (F.O.F.A)</p>
           )}
         </CardContent>
       </Card>

@@ -10,7 +10,7 @@ export const maxDuration = 60;
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_SIZE_MB = 10;
 
-const SWOT_IMAGE_PROMPT = `Esta imagem contém uma matriz SWOT (F.O.F.A. - Forças, Oportunidades, Fraquezas, Ameaças). 
+const SWOT_IMAGE_PROMPT = `Esta imagem contém uma matriz SWOT (F.O.F.A — Forças, Oportunidades, Fraquezas, Ameaças). 
 Extraia todos os itens de cada quadrante que aparecer na imagem.
 Retorne APENAS um JSON válido, sem texto antes ou depois, sem markdown, com as chaves em inglês minúsculas:
 { "strengths": ["item1", "item2"], "weaknesses": [], "opportunities": [], "threats": [] }
@@ -101,13 +101,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Não foi possível extrair a matriz SWOT da imagem. Tente uma foto mais nítida ou com os quadrantes bem legíveis.",
+            "Não foi possível extrair a matriz SWOT (F.O.F.A) da imagem. Tente uma foto mais nítida ou com os quadrantes bem legíveis.",
         },
         { status: 400 }
       );
     }
 
-    const planName = `SWOT importada – ${new Date().toLocaleDateString("pt-BR")}`;
+    const planName = `SWOT (F.O.F.A) importada – ${new Date().toLocaleDateString("pt-BR")}`;
     const year = new Date().getFullYear();
     const planResult = await createStrategicPlan(planName, year);
     if (planResult.error || !planResult.data) {
@@ -134,11 +134,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       planId,
-      message: "Matriz SWOT importada. Revise os itens e arraste entre quadrantes se necessário.",
+      message: "Matriz SWOT (F.O.F.A) importada. Revise os itens e arraste entre quadrantes se necessário.",
     });
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : "Erro ao importar matriz SWOT.";
+      err instanceof Error ? err.message : "Erro ao importar matriz SWOT (F.O.F.A).";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

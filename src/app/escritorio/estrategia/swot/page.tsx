@@ -178,7 +178,7 @@ export default function SwotPage() {
     const day = String(d.getDate()).padStart(2, "0");
     const month = String(d.getMonth() + 1).padStart(2, "0");
     const year = d.getFullYear();
-    const name = `Análise SWOT – ${day}/${month}/${year}`;
+    const name = `Análise SWOT (F.O.F.A) – ${day}/${month}/${year}`;
     setCreating(true);
     try {
       const result = await createStrategicPlan(name, year);
@@ -219,8 +219,8 @@ export default function SwotPage() {
 
   return (
     <PageLayout
-      title="Análise SWOT (F.O.F.A.)"
-      description="Forças, Oportunidades, Fraquezas e Ameaças. Importe uma imagem da matriz, crie uma análise manualmente ou acompanhe o histórico das suas análises."
+      title="Análise SWOT (F.O.F.A)"
+      description="Forças, Oportunidades, Fraquezas e Ameaças (SWOT / F.O.F.A). Importe uma imagem da matriz, crie uma análise manualmente ou acompanhe o histórico das suas análises."
       iconName="Grid2x2"
       backHref="/escritorio/estrategia"
     >
@@ -230,10 +230,10 @@ export default function SwotPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <FileUp className="h-5 w-5 text-[var(--identity-primary)]" />
-              <CardTitle>Importar matriz SWOT</CardTitle>
+              <CardTitle>Importar matriz SWOT (F.O.F.A)</CardTitle>
             </div>
             <CardDescription>
-              Envie uma foto ou imagem (PNG, JPEG ou WebP) da sua matriz SWOT.
+              Envie uma foto ou imagem (PNG, JPEG ou WebP) da sua matriz SWOT (F.O.F.A).
               A IA extrai os itens e preenche os quadrantes. Máx. 10 MB.
             </CardDescription>
           </CardHeader>
@@ -274,7 +274,7 @@ export default function SwotPage() {
               <label htmlFor="swot-file-import" className="cursor-pointer">
                 <FileUp className="mx-auto h-10 w-10 text-muted-foreground" />
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Solte aqui uma imagem da matriz SWOT
+                  Solte aqui uma imagem da matriz SWOT (F.O.F.A)
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   ou clique para selecionar
@@ -306,7 +306,7 @@ export default function SwotPage() {
                   Importando…
                 </>
               ) : (
-                "Importar matriz SWOT"
+                "Importar matriz SWOT (F.O.F.A)"
               )}
             </button>
           </CardContent>
@@ -316,7 +316,7 @@ export default function SwotPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-[var(--identity-primary)]" />
-              <CardTitle>Criar análise SWOT</CardTitle>
+              <CardTitle>Criar análise SWOT (F.O.F.A)</CardTitle>
             </div>
             <CardDescription>
               Crie uma nova análise com uma data de referência. O nome será gerado automaticamente.
@@ -334,7 +334,7 @@ export default function SwotPage() {
                   className="mt-1"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Nome gerado: Análise SWOT – {referenceDate ? (() => {
+                  Nome gerado: Análise SWOT (F.O.F.A) – {referenceDate ? (() => {
                     const d = new Date(referenceDate);
                     return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
                   })() : "DD/MM/AAAA"}
@@ -379,7 +379,7 @@ export default function SwotPage() {
           <div className="flex items-center gap-2">
             <ListChecks className="h-5 w-5 text-[var(--identity-primary)]" />
             <div>
-              <CardTitle>Suas análises SWOT</CardTitle>
+              <CardTitle>Suas análises SWOT (F.O.F.A)</CardTitle>
               <CardDescription>
                 {loading ? "Carregando…" : currentPlan ? `Diagrama: ${currentPlan.name}` : "Selecione ou crie uma análise acima."}
               </CardDescription>
@@ -410,7 +410,7 @@ export default function SwotPage() {
                 Nenhuma análise ainda.
               </p>
               <p className="text-sm text-muted-foreground">
-                Crie uma análise ou importe uma matriz acima.
+                Crie uma análise ou importe uma matriz SWOT (F.O.F.A) acima.
               </p>
             </div>
           ) : itemsLoading ? (
@@ -420,7 +420,7 @@ export default function SwotPage() {
           ) : selectedPlanId && (currentPlan || swotItems.length >= 0) ? (
             <SwotMatrix
               planId={selectedPlanId}
-              planName={currentPlan?.name ?? "Análise SWOT"}
+              planName={currentPlan?.name ?? "Análise SWOT (F.O.F.A)"}
               mission={currentPlan?.mission}
               vision={currentPlan?.vision}
               swotItems={swotItems}
@@ -523,7 +523,7 @@ export default function SwotPage() {
       <Dialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <DialogContent onClose={() => setDeleteId(null)}>
           <DialogHeader>
-            <DialogTitle>Excluir análise SWOT</DialogTitle>
+            <DialogTitle>Excluir análise SWOT (F.O.F.A)</DialogTitle>
             <DialogDescription>
               Esta ação não pode ser desfeita. Deseja realmente excluir esta análise e todos os dados vinculados?
             </DialogDescription>

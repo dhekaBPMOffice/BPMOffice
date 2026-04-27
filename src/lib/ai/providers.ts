@@ -57,7 +57,7 @@ export class OpenAIProvider implements AIProvider {
 
   /**
    * Gera texto a partir de um prompt e uma imagem (visão).
-   * Útil para extrair dados de matriz SWOT em imagem.
+   * Útil para extrair dados de matriz SWOT (F.O.F.A) em imagem.
    */
   async generateWithImage(
     prompt: string,

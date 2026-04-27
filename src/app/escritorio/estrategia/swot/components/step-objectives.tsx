@@ -109,7 +109,7 @@ export function StepObjectives({ planId, swotItems, objectives, onReload }: Step
     .map((item) => `${SWOT_LABELS[item.type]}: ${item.content}`)
     .join("\n");
 
-  const aiContext = `Análise SWOT atual:\n${swotSummary || "Nenhum item SWOT definido"}\n\nObjetivos existentes: ${objectives.length}`;
+  const aiContext = `Análise SWOT (F.O.F.A) atual:\n${swotSummary || "Nenhum item SWOT (F.O.F.A) definido"}\n\nObjetivos existentes: ${objectives.length}`;
 
   return (
     <div className="space-y-8">
@@ -155,7 +155,7 @@ export function StepObjectives({ planId, swotItems, objectives, onReload }: Step
                       <div className="flex items-center gap-1.5 mt-2">
                         <Target className="h-3 w-3 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">
-                          Vinculado ao SWOT: {swotItems.find((s) => s.id === obj.swot_item_id)?.content?.slice(0, 40) ?? "—"}
+                          Vinculado à análise SWOT (F.O.F.A): {swotItems.find((s) => s.id === obj.swot_item_id)?.content?.slice(0, 40) ?? "—"}
                         </span>
                       </div>
                     )}
@@ -186,7 +186,7 @@ export function StepObjectives({ planId, swotItems, objectives, onReload }: Step
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingId ? "Editar Objetivo" : "Novo Objetivo Estratégico"}</DialogTitle>
-            <DialogDescription>Defina o título, descrição e vínculo com o SWOT.</DialogDescription>
+            <DialogDescription>Defina o título, descrição e vínculo com a análise SWOT (F.O.F.A).</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -207,7 +207,7 @@ export function StepObjectives({ planId, swotItems, objectives, onReload }: Step
               />
             </div>
             <div className="space-y-2">
-              <Label>Vinculado ao SWOT (opcional)</Label>
+              <Label>Vinculado à análise SWOT (F.O.F.A) (opcional)</Label>
               <Select value={swotId} onChange={(e) => setSwotId(e.target.value)}>
                 <option value="">Nenhum</option>
                 {swotItems.map((item) => (

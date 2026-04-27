@@ -51,7 +51,7 @@ CONFIGURAÇÃO DO PLANO:
 - Período: ${config.period_start} a ${config.period_end}
 - Horizonte: ${config.horizon}
 
-ANÁLISE SWOT DO ESCRITÓRIO:
+ANÁLISE SWOT (F.O.F.A) DO ESCRITÓRIO:
 ${swotSummary}
 
 OBJETIVOS (use estes títulos exatos ao vincular ações):

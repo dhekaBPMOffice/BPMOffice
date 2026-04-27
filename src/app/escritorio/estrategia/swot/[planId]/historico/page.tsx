@@ -188,7 +188,7 @@ export default function HistoricoPage() {
               <div>
                 <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
                   <div className="h-5 w-5 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 text-xs font-bold">2</div>
-                  Análise SWOT ({snapshotData.swotItems.length} itens)
+                  Análise SWOT (F.O.F.A) ({snapshotData.swotItems.length} itens)
                 </h3>
                 <div className="grid grid-cols-2 gap-3 pl-7">
                   {(["strength", "weakness", "opportunity", "threat"] as SwotType[]).map((type) => {
