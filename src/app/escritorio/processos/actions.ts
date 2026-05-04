@@ -502,7 +502,9 @@ export async function submitProcessOnboarding(
       .update({ processes_initialized_at: new Date().toISOString() })
       .eq("id", profile.office_id);
 
-    revalidatePath("/escritorio/onboarding/processos");
+    // Não revalidar a rota de onboarding aqui: enquanto o utilizador vê a conclusão no cliente,
+    // o refetch do RSC voltaria a correr `page.tsx` com `processes_initialized_at` já definido e
+    // faria `redirect` ao dashboard, apagando a mensagem antes do clique no botão.
     revalidatePath("/escritorio/processos");
     revalidatePath("/escritorio/dashboard");
     return { success: true, generatedCount: importedCount };
@@ -513,7 +515,6 @@ export async function submitProcessOnboarding(
     .update({ processes_initialized_at: new Date().toISOString() })
     .eq("id", profile.office_id);
 
-  revalidatePath("/escritorio/onboarding/processos");
   revalidatePath("/escritorio/processos");
   revalidatePath("/escritorio/dashboard");
   return { success: true, generatedCount: 0 };

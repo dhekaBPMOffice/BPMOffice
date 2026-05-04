@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { submitProcessOnboarding } from "@/app/escritorio/processos/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { OnboardingCompletionScreen } from "./onboarding-completion-screen";
 import {
   ArrowLeft,
   ArrowRight,
@@ -95,6 +95,30 @@ function isSectionComplete(
   return required.every((q) => isQuestionAnswered(q, answers));
 }
 
+/** Índice da primeira secção (a partir de `fromIndex`) que tenha pelo menos uma pergunta. */
+function firstSectionIndexWithQuestions(
+  sections: QuestionnaireSection[],
+  fromIndex: number
+): number {
+  const start = Math.max(0, fromIndex);
+  for (let i = start; i < sections.length; i++) {
+    if ((sections[i].process_questionnaire_questions?.length ?? 0) > 0) return i;
+  }
+  return -1;
+}
+
+/** Índice da última secção até `upToIndex` (inclusive) que tenha pelo menos uma pergunta. */
+function lastSectionIndexWithQuestions(
+  sections: QuestionnaireSection[],
+  upToIndex: number
+): number {
+  const end = Math.min(upToIndex, sections.length - 1);
+  for (let i = end; i >= 0; i--) {
+    if ((sections[i].process_questionnaire_questions?.length ?? 0) > 0) return i;
+  }
+  return -1;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -104,8 +128,6 @@ export function ProcessOnboardingForm({
 }: {
   questionnaire: Questionnaire;
 }) {
-  const router = useRouter();
-
   // ── State ────────────────────────────────────────────────────────────────
   const [phase, setPhase] = useState<Phase>("welcome");
   const [currentStep, setCurrentStep] = useState(0);
@@ -174,10 +196,6 @@ export function ProcessOnboardingForm({
         return;
       }
       setPhase("submitting-done");
-      setTimeout(() => {
-        router.push("/escritorio/estrategia/processos-escritorio");
-        router.refresh();
-      }, 3500);
     } catch {
       setError(SUBMIT_PROCESS_ONBOARDING_NETWORK_ERROR);
     } finally {
@@ -187,11 +205,14 @@ export function ProcessOnboardingForm({
 
   async function goToNextQuestion() {
     if (!currentQuestion) {
-      if (currentStep < sections.length - 1) {
-        setPhase("section-done");
-      } else {
-        await handleSubmit();
+      const nextIdx = firstSectionIndexWithQuestions(sections, currentStep + 1);
+      if (nextIdx !== -1) {
+        setCurrentStep(nextIdx);
+        setQIndex(0);
+        setPhase("questions");
+        return;
       }
+      await handleSubmit();
       return;
     }
 
@@ -218,11 +239,15 @@ export function ProcessOnboardingForm({
     if (qIndex > 0) {
       setQIndex(qIndex - 1);
     } else if (currentStep > 0) {
-      const prevSection = sections[currentStep - 1];
-      const prevQs = (prevSection?.process_questionnaire_questions ?? [])
+      const prevIdx = lastSectionIndexWithQuestions(sections, currentStep - 1);
+      if (prevIdx === -1) {
+        setPhase("welcome");
+        return;
+      }
+      const prevQs = (sections[prevIdx]?.process_questionnaire_questions ?? [])
         .slice()
         .sort((a, b) => a.sort_order - b.sort_order);
-      setCurrentStep(currentStep - 1);
+      setCurrentStep(prevIdx);
       setQIndex(Math.max(0, prevQs.length - 1));
     } else {
       setPhase("welcome");
@@ -230,14 +255,21 @@ export function ProcessOnboardingForm({
   }
 
   function jumpToSection(index: number) {
-    setCurrentStep(index);
+    const idx = firstSectionIndexWithQuestions(sections, index);
+    if (idx === -1) return;
+    setCurrentStep(idx);
     setQIndex(0);
     setPhase("questions");
     setError(null);
   }
 
   function continueToNextSection() {
-    setCurrentStep(currentStep + 1);
+    const nextIdx = firstSectionIndexWithQuestions(sections, currentStep + 1);
+    if (nextIdx === -1) {
+      void handleSubmit();
+      return;
+    }
+    setCurrentStep(nextIdx);
     setQIndex(0);
     setPhase("questions");
     setError(null);
@@ -357,15 +389,25 @@ export function ProcessOnboardingForm({
           <Button
             size="lg"
             className="w-full gap-2 rounded-2xl text-base"
+            disabled={totalQuestions === 0}
             onClick={() => {
+              const first = firstSectionIndexWithQuestions(sections, 0);
+              if (first === -1) return;
               setPhase("questions");
-              setCurrentStep(0);
+              setCurrentStep(first);
               setQIndex(0);
+              setError(null);
             }}
           >
             Iniciar diagnóstico
             <ArrowRight className="h-5 w-5" />
           </Button>
+
+          {totalQuestions === 0 && (
+            <p className="mt-4 text-center text-sm text-destructive">
+              Este formulário não tem perguntas configuradas. Contacte o administrador.
+            </p>
+          )}
 
           <p className="mt-4 text-center text-xs text-muted-foreground">
             Suas respostas ficam salvas. Você pode pausar e continuar depois.
@@ -451,46 +493,10 @@ export function ProcessOnboardingForm({
   if (phase === "submitting-done") {
     return (
       <FocusWrapper>
-        <div className="w-full max-w-md text-center">
-          <div className="mb-6 flex justify-center">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 ring-8 ring-primary/5">
-              <Sparkles className="h-10 w-10 text-primary" />
-            </div>
-          </div>
-
-          <h2 className="text-3xl font-bold">Diagnóstico concluído!</h2>
-          <p className="mt-3 text-muted-foreground">
-            Suas respostas foram salvas. O sistema está montando a estrutura inicial de processos do
-            escritório.
-          </p>
-
-          {/* Stats */}
-          <div className="mt-8 flex items-center justify-center gap-8">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-primary">{sections.length}</p>
-              <p className="mt-1 text-sm text-muted-foreground">etapas</p>
-            </div>
-            <div className="h-10 w-px bg-border" />
-            <div className="text-center">
-              <p className="text-3xl font-bold text-primary">{answeredQuestions}</p>
-              <p className="mt-1 text-sm text-muted-foreground">respostas</p>
-            </div>
-            <div className="h-10 w-px bg-border" />
-            <div className="text-center">
-              <p className="text-3xl font-bold text-primary">100%</p>
-              <p className="mt-1 text-sm text-muted-foreground">completo</p>
-            </div>
-          </div>
-
-          {/* Loading */}
-          <div className="mt-10 flex items-center justify-center gap-3 text-sm text-muted-foreground">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            Gerando lista de processos...
-          </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            Você será redirecionado automaticamente
-          </p>
-        </div>
+        <OnboardingCompletionScreen
+          sectionsCount={sections.length}
+          answeredQuestions={answeredQuestions}
+        />
       </FocusWrapper>
     );
   }
@@ -498,8 +504,42 @@ export function ProcessOnboardingForm({
   // =========================================================================
   // QUESTIONS SCREEN  (phase === "questions")
   // =========================================================================
-  if (!currentSection || !currentQuestion) {
-    return null;
+  if (!currentSection) {
+    return (
+      <FocusWrapper>
+        <p className="text-center text-sm text-muted-foreground">
+          Não foi possível carregar esta etapa. Recarregue a página ou volte atrás.
+        </p>
+      </FocusWrapper>
+    );
+  }
+
+  if (!currentQuestion) {
+    const nextIdx = firstSectionIndexWithQuestions(sections, currentStep + 1);
+    return (
+      <FocusWrapper>
+        <div className="w-full max-w-md space-y-4 text-center">
+          <p className="text-sm text-muted-foreground">
+            A etapa «{currentSection.title}» não tem perguntas. Avance para a seguinte ou conclua o
+            diagnóstico se não houver mais etapas com perguntas.
+          </p>
+          <Button
+            type="button"
+            onClick={() => {
+              if (nextIdx !== -1) {
+                setCurrentStep(nextIdx);
+                setQIndex(0);
+                setPhase("questions");
+              } else {
+                void handleSubmit();
+              }
+            }}
+          >
+            {nextIdx !== -1 ? "Ir para a próxima etapa com perguntas" : "Concluir diagnóstico"}
+          </Button>
+        </div>
+      </FocusWrapper>
+    );
   }
 
   const CurrentSectionIcon = getSectionIcon(currentStep);
