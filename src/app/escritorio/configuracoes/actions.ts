@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getProfile } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { normalizeProcessTypeOptions } from "@/lib/process-type-options";
+import { isValidIanaTimeZone } from "@/lib/timezone";
 
 export type OfficeConfigInput = {
   ai_api_key?: string | null;
@@ -11,6 +12,8 @@ export type OfficeConfigInput = {
   notification_review_reminders?: boolean;
   /** Lista ordenada de rótulos do Tipo nos processos. */
   process_type_options?: string[];
+  /** IANA ou null para herdar o fuso definido pelo admin master. */
+  timezone?: string | null;
 };
 
 export async function saveOfficeConfig(input: OfficeConfigInput) {
@@ -40,6 +43,17 @@ export async function saveOfficeConfig(input: OfficeConfigInput) {
     payload.process_type_options = normalizeProcessTypeOptions(input.process_type_options);
   }
 
+  if (input.timezone !== undefined) {
+    const raw = input.timezone?.trim();
+    if (!raw) {
+      payload.timezone = null;
+    } else if (!isValidIanaTimeZone(raw)) {
+      return { error: "Fuso horário inválido. Use um identificador IANA (ex.: America/Sao_Paulo)." };
+    } else {
+      payload.timezone = raw;
+    }
+  }
+
   if (existing) {
     const { error } = await supabase
       .from("office_config")
@@ -57,6 +71,7 @@ export async function saveOfficeConfig(input: OfficeConfigInput) {
   }
 
   revalidatePath("/escritorio/configuracoes");
+  revalidatePath("/escritorio");
   if (input.process_type_options !== undefined) {
     revalidatePath("/escritorio/processos");
   }

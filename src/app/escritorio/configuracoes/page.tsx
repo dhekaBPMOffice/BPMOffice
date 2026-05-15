@@ -19,6 +19,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { OfficeConfig } from "@/types/database";
 import { DEFAULT_PROCESS_TYPE_OPTIONS, normalizeProcessTypeOptions } from "@/lib/process-type-options";
+import { TimezoneSelect } from "@/components/config/timezone-select";
 
 export default function ConfiguracoesPage() {
   const [config, setConfig] = useState<OfficeConfig | null>(null);
@@ -32,6 +33,7 @@ export default function ConfiguracoesPage() {
   const [processTypeOptionsList, setProcessTypeOptionsList] = useState<string[]>(() => [
     ...DEFAULT_PROCESS_TYPE_OPTIONS,
   ]);
+  const [officeTimeZone, setOfficeTimeZone] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -62,6 +64,7 @@ export default function ConfiguracoesPage() {
         const raw = (data as OfficeConfig & { process_type_options?: string[] })
           .process_type_options;
         setProcessTypeOptionsList(normalizeProcessTypeOptions(raw));
+        setOfficeTimeZone(data.timezone ?? null);
       }
       setLoading(false);
     }
@@ -78,6 +81,7 @@ export default function ConfiguracoesPage() {
       ai_learn_from_history: aiLearnFromHistory,
       notification_review_reminders: notificationReviewReminders,
       process_type_options: processTypeOptionsList,
+      timezone: officeTimeZone,
     });
 
     setSaving(false);
@@ -90,6 +94,7 @@ export default function ConfiguracoesPage() {
               ai_learn_from_history: aiLearnFromHistory,
               notification_review_reminders: notificationReviewReminders,
               process_type_options: normalizeProcessTypeOptions(processTypeOptionsList),
+              timezone: officeTimeZone,
             }
           : null
       );
@@ -117,6 +122,7 @@ export default function ConfiguracoesPage() {
           <TabsList>
             <TabsTrigger value="ai">Configuração de IA</TabsTrigger>
             <TabsTrigger value="notifications">Notificações</TabsTrigger>
+            <TabsTrigger value="regional">Data e hora</TabsTrigger>
             <TabsTrigger value="processos">Tipos de processo</TabsTrigger>
           </TabsList>
 
@@ -185,6 +191,30 @@ export default function ConfiguracoesPage() {
                     id="review_reminders"
                     checked={notificationReviewReminders}
                     onCheckedChange={setNotificationReviewReminders}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="regional" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Fuso horário</CardTitle>
+                <CardDescription>
+                  Datas e horários na área do escritório usam este fuso. Escolha{" "}
+                  <strong>Padrão da plataforma</strong> para seguir o fuso definido em{" "}
+                  <span className="whitespace-nowrap">Admin Master → Configurações globais</span>. Se o admin
+                  não tiver configurado, o sistema usa América/São Paulo.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Fuso do escritório</Label>
+                  <TimezoneSelect
+                    value={officeTimeZone}
+                    onChange={setOfficeTimeZone}
+                    allowInherit
                   />
                 </div>
               </CardContent>

@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { PageLayout } from "@/components/layout/page-layout";
 import { cn } from "@/lib/utils";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDatePtBr } from "@/lib/timezone";
 import {
   getStrategicPlans,
   getSwotItems,
@@ -57,6 +59,7 @@ const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 export default function SwotPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const timeZone = useTimeZone();
   const [plans, setPlans] = useState<StrategicPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -467,7 +470,7 @@ export default function SwotPage() {
                           {plan.year}
                         </span>
                         <span>
-                          Criado em {new Date(plan.created_at).toLocaleDateString("pt-BR")}
+                          Criado em {formatDatePtBr(plan.created_at, timeZone)}
                         </span>
                       </div>
                       <div className="mt-2">

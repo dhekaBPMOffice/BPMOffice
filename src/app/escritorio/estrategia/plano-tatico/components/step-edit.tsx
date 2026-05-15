@@ -31,6 +31,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { AIGeneratedAction } from "./step-preview";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDatePtBr } from "@/lib/timezone";
 
 const PRIORITY_STYLES: Record<string, { label: string; className: string }> = {
   alta: { label: "Alta", className: "bg-red-100 text-red-700" },
@@ -74,6 +76,7 @@ export function StepEdit({
   isSaving,
   saveError,
 }: StepEditProps) {
+  const timeZone = useTimeZone();
   const [showDialog, setShowDialog] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [form, setForm] = useState<AIGeneratedAction>({
@@ -190,7 +193,7 @@ export function StepEdit({
                             {a.deadline && (
                               <span className="flex items-center gap-1">
                                 <CalendarDays className="h-3 w-3" />{" "}
-                                {new Date(a.deadline + "T00:00:00").toLocaleDateString("pt-BR")}
+                                {formatDatePtBr(a.deadline + "T00:00:00", timeZone)}
                               </span>
                             )}
                             {a.priority && (

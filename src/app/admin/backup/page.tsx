@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { PageLayout } from "@/components/layout/page-layout";
 import { HardDrive, Download, Database, Settings } from "lucide-react";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDateTimePtBr } from "@/lib/timezone";
 import {
   getBackups,
   createManualBackup,
@@ -32,6 +34,7 @@ import {
 } from "./actions";
 
 export default function AdminBackupPage() {
+  const timeZone = useTimeZone();
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,13 +85,7 @@ export default function AdminBackupPage() {
   }
 
   function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTimePtBr(dateStr, timeZone);
   }
 
   return (

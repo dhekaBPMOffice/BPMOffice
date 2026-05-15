@@ -12,6 +12,8 @@ import { AnalisePhase } from "./analise/analise-phase";
 import { MelhoriasPhase } from "./melhorias/melhorias-phase";
 import { ImplantacaoPhase } from "./implantacao/implantacao-phase";
 import { EncerramentoPhase } from "./encerramento/encerramento-phase";
+import { getEffectiveOfficeTimeZone } from "@/lib/timezone-server";
+import { formatDatePtBr } from "@/lib/timezone";
 
 export default async function DemandaDetailPage({
   params,
@@ -29,6 +31,8 @@ export default async function DemandaDetailPage({
       </PageLayout>
     );
   }
+
+  const timeZone = await getEffectiveOfficeTimeZone(profile.office_id);
 
   const { data: demand, error } = await supabase
     .from("demands")
@@ -98,11 +102,7 @@ export default async function DemandaDetailPage({
           <span>Responsável: {assignedName}</span>
           <span>
             Criado em:{" "}
-            {new Date(demand.created_at).toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            })}
+            {formatDatePtBr(demand.created_at, timeZone)}
           </span>
         </div>
 

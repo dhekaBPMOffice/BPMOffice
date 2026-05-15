@@ -41,6 +41,8 @@ import {
   type TrainingPlan,
   type TrainingRecord,
 } from "./actions";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDatePtBr } from "@/lib/timezone";
 
 type RecordWithPlan = TrainingRecord & {
   plan?: TrainingPlan;
@@ -53,6 +55,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function CapacitacaoPage() {
+  const timeZone = useTimeZone();
   const [plans, setPlans] = useState<TrainingPlan[]>([]);
   const [records, setRecords] = useState<RecordWithPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -338,11 +341,7 @@ export default function CapacitacaoPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {record.completed_at
-                        ? new Date(record.completed_at).toLocaleDateString("pt-BR", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                          })
+                        ? formatDatePtBr(record.completed_at, timeZone)
                         : "—"}
                     </TableCell>
                     <TableCell>

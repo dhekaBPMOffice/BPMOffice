@@ -35,6 +35,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, FileText } from "lucide-react";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDatePtBr } from "@/lib/timezone";
 
 interface LevantamentoPhaseProps {
   demandId: string;
@@ -48,6 +50,7 @@ interface SurveyScript {
 }
 
 export function LevantamentoPhase({ demandId }: LevantamentoPhaseProps) {
+  const timeZone = useTimeZone();
   const [scripts, setScripts] = useState<SurveyScript[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -285,7 +288,7 @@ export function LevantamentoPhase({ demandId }: LevantamentoPhaseProps) {
                         <TableRow key={r.id}>
                           <TableCell>{r.respondent || "—"}</TableCell>
                           <TableCell>
-                            {new Date(r.created_at).toLocaleDateString("pt-BR")}
+                            {formatDatePtBr(r.created_at, timeZone)}
                           </TableCell>
                         </TableRow>
                       ))}

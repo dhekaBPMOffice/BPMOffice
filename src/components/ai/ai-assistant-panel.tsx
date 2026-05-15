@@ -13,6 +13,8 @@ import {
 import { Select } from "@/components/ui/select";
 import { Bot, Loader2, Save, History, Download, Sparkles } from "lucide-react";
 import { useAI } from "@/hooks/use-ai";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDateTimePtBr } from "@/lib/timezone";
 
 interface AIAssistantPanelProps {
   phase: string;
@@ -27,6 +29,7 @@ export function AIAssistantPanel({
   defaultInput = "",
   placeholder = "Cole ou digite os dados de entrada para a IA processar...",
 }: AIAssistantPanelProps) {
+  const timeZone = useTimeZone();
   const [input, setInput] = useState(defaultInput);
   const [editableResult, setEditableResult] = useState("");
   const [versionsList, setVersionsList] = useState<Array<{ id: string; versionNumber: number; content: string; createdAt: string }>>([]);
@@ -155,7 +158,7 @@ export function AIAssistantPanel({
                       <option value="">Histórico de versões</option>
                       {allVersions.map((v) => (
                         <option key={v.id} value={v.id}>
-                          v{v.versionNumber} - {new Date(v.createdAt).toLocaleString("pt-BR")}
+                          v{v.versionNumber} - {formatDateTimePtBr(v.createdAt, timeZone)}
                         </option>
                       ))}
                     </Select>

@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/table";
 import { UsuarioRowActions } from "./usuario-row-actions";
 import { LayoutGrid, List, Plus, Users } from "lucide-react";
+import { getEffectiveOfficeTimeZone } from "@/lib/timezone-server";
+import { formatDateTimePtBr } from "@/lib/timezone";
 
 interface UsuariosPageProps {
   searchParams?: Promise<{ visualizacao?: string }>;
@@ -36,6 +38,8 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
       </PageLayout>
     );
   }
+
+  const timeZone = await getEffectiveOfficeTimeZone(profile.office_id);
 
   const [
     { data: users, error },
@@ -76,15 +80,7 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
   }
 
   const formatDate = (dateStr: string | null) =>
-    dateStr
-      ? new Date(dateStr).toLocaleDateString("pt-BR", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : "—";
+    dateStr ? formatDateTimePtBr(dateStr, timeZone) : "—";
 
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {

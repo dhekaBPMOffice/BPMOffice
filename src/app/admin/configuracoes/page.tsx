@@ -14,8 +14,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PageLayout } from "@/components/layout/page-layout";
-import { Settings } from "lucide-react";
 import { savePlatformSettings } from "./actions";
+import { TimezoneSelect } from "@/components/config/timezone-select";
+import { DEFAULT_TIME_ZONE, isValidIanaTimeZone, parsePlatformTimeZoneValue } from "@/lib/timezone";
 
 const SETTING_KEYS = {
   review_period: "review_period",
@@ -24,6 +25,7 @@ const SETTING_KEYS = {
   default_techniques_improvement: "default_techniques_improvement",
   closure_checklist: "closure_checklist",
   implementation_plan_fields: "implementation_plan_fields",
+  timezone: "timezone",
 } as const;
 
 export default function ConfiguracoesPage() {
@@ -38,6 +40,8 @@ export default function ConfiguracoesPage() {
   const [techniquesImprovementText, setTechniquesImprovementText] = useState("");
   const [closureChecklistText, setClosureChecklistText] = useState("");
   const [implementationFieldsText, setImplementationFieldsText] = useState("");
+
+  const [platformTimeZone, setPlatformTimeZone] = useState<string>(DEFAULT_TIME_ZONE);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,6 +85,11 @@ export default function ConfiguracoesPage() {
       setClosureChecklistText((cc ?? []).join("\n"));
       setImplementationFieldsText((ip ?? []).join("\n"));
 
+      const tzRaw = parsePlatformTimeZoneValue(settings[SETTING_KEYS.timezone]);
+      setPlatformTimeZone(
+        tzRaw && isValidIanaTimeZone(tzRaw) ? tzRaw : DEFAULT_TIME_ZONE
+      );
+
       setLoading(false);
     }
     load();
@@ -115,6 +124,7 @@ export default function ConfiguracoesPage() {
       default_techniques_improvement: ti,
       closure_checklist: cc,
       implementation_plan_fields: ip,
+      timezone: platformTimeZone.trim() || DEFAULT_TIME_ZONE,
     });
 
     if (result?.error) {
@@ -142,6 +152,23 @@ export default function ConfiguracoesPage() {
             {error}
           </div>
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Fuso horário</CardTitle>
+            <CardDescription>
+              Datas e horários na área do admin master são exibidos neste fuso. Se nada estiver salvo, usa-se{" "}
+              {DEFAULT_TIME_ZONE} (São Paulo).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label>Identificador IANA</Label>
+            <TimezoneSelect
+              value={platformTimeZone}
+              onChange={(tz) => setPlatformTimeZone(tz ?? DEFAULT_TIME_ZONE)}
+            />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

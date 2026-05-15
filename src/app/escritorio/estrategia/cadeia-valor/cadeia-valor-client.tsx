@@ -63,6 +63,8 @@ import {
   type ValueChainStructuredRow,
 } from "@/lib/cadeia-valor/extract-attachment";
 import { cn } from "@/lib/utils";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDateTimePtBr } from "@/lib/timezone";
 import jsPDF from "jspdf";
 import {
   BPM_STAGES,
@@ -268,12 +270,6 @@ function processHighlightTitle(process: ProcessItem): string {
   const fallback = segmentsWhenNiveisEmpty(process);
   if (fallback.length > 0) return fallback[0];
   return normalizeLevel(process.macroprocesso, "Sem Macroprocesso");
-}
-
-function formatDateTime(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString("pt-BR");
 }
 
 function toCSVCell(value: string): string {
@@ -596,6 +592,12 @@ function deleteServerIgnoredError(res: { success?: boolean; error?: string }): b
 }
 
 export function CadeiaValorClient({ initialProcesses }: { initialProcesses: ProcessItem[] }) {
+  const timeZone = useTimeZone();
+  const formatDateTime = (value: string) => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return formatDateTimePtBr(parsed, timeZone);
+  };
   const router = useRouter();
   const [processes, setProcesses] = useState<ProcessItem[]>(initialProcesses);
   const [uploads, setUploads] = useState<UploadedFileItem[]>([]);

@@ -31,6 +31,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { IconChip } from "@/components/ui/icon-chip";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDatePtBr } from "@/lib/timezone";
 
 const ICON_MAP = {
   Activity,
@@ -133,28 +135,6 @@ interface DashboardContentProps {
   data: DashboardHomeData;
 }
 
-function formatRelativeDate(dateStr: string) {
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "Agora mesmo";
-  if (diffMins < 60) return `${diffMins} min atrás`;
-  if (diffHours < 24) return `${diffHours}h atrás`;
-  if (diffDays < 7) return `${diffDays} dias atrás`;
-  return date.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
 function getPriorityVariant(priority: string) {
   if (priority === "Urgente") return "destructive";
   if (priority === "Alta") return "warning";
@@ -168,6 +148,26 @@ function getAlertToneClass(tone: DashboardAlertItem["tone"]) {
 }
 
 export function DashboardContent({ data }: DashboardContentProps) {
+  const timeZone = useTimeZone();
+
+  function formatRelativeDate(dateStr: string) {
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) {
+      return "—";
+    }
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Agora mesmo";
+    if (diffMins < 60) return `${diffMins} min atrás`;
+    if (diffHours < 24) return `${diffHours}h atrás`;
+    if (diffDays < 7) return `${diffDays} dias atrás`;
+    return formatDatePtBr(date, timeZone);
+  }
+
   const headerAction = (
     <Link
       href="/escritorio/notificacoes"

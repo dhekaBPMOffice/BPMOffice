@@ -25,6 +25,8 @@ import { Select } from "@/components/ui/select";
 import { PageLayout } from "@/components/layout/page-layout";
 import { Bell } from "lucide-react";
 import { sendNotification } from "./actions";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDateTimePtBr } from "@/lib/timezone";
 
 interface Notification {
   id: string;
@@ -37,6 +39,7 @@ interface Notification {
 }
 
 export default function NotificacoesPage() {
+  const timeZone = useTimeZone();
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [targetType, setTargetType] = useState<"all" | "office">("all");
@@ -136,14 +139,7 @@ export default function NotificacoesPage() {
     }
   }
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const formatDate = (dateStr: string) => formatDateTimePtBr(dateStr, timeZone);
 
   const channelLabels: Record<string, string> = {
     platform: "Plataforma",

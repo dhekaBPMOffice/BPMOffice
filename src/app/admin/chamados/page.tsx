@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageLayout } from "@/components/layout/page-layout";
 import { Headphones, LayoutGrid, List } from "lucide-react";
+import { getPlatformTimeZone } from "@/lib/timezone-server";
+import { formatDateTimePtBr } from "@/lib/timezone";
 
 interface ChamadosPageProps {
   searchParams?: Promise<{ aba?: string; visualizacao?: string }>;
@@ -27,6 +29,7 @@ interface ChamadosPageProps {
 export default async function ChamadosPage({ searchParams: searchParamsPromise }: ChamadosPageProps) {
   const searchParams: { aba?: string; visualizacao?: string } = await (searchParamsPromise ?? Promise.resolve({}));
   const supabase = await createServiceClient();
+  const timeZone = await getPlatformTimeZone();
 
   const { data: tickets, error } = await supabase
     .from("support_tickets")
@@ -49,14 +52,7 @@ export default async function ChamadosPage({ searchParams: searchParamsPromise }
     );
   }
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const formatDate = (dateStr: string) => formatDateTimePtBr(dateStr, timeZone);
 
   const statusLabels: Record<string, string> = {
     open: "Aberto",

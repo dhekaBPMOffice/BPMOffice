@@ -83,6 +83,8 @@ export interface OfficeConfig {
   ai_api_key_encrypted: string | null;
   ai_learn_from_history: boolean;
   notification_review_reminders: boolean;
+  /** IANA tz, ex. America/Sao_Paulo. null = usar fuso da plataforma. */
+  timezone: string | null;
   /** Rótulos do Tipo (dropdown), por ordem. */
   process_type_options: string[];
   created_at: string;

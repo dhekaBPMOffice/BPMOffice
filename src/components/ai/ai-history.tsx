@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/dialog";
 import { History } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDateTimePtBr } from "@/lib/timezone";
 
 interface AIHistoryProps {
   projectId: string;
@@ -42,6 +44,7 @@ interface Interaction {
 }
 
 export function AIHistory({ projectId }: AIHistoryProps) {
+  const timeZone = useTimeZone();
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Interaction | null>(null);
@@ -131,7 +134,7 @@ export function AIHistory({ projectId }: AIHistoryProps) {
                     </TableCell>
                     <TableCell>{i.provider}</TableCell>
                     <TableCell>
-                      {new Date(i.created_at).toLocaleString("pt-BR")}
+                      {formatDateTimePtBr(i.created_at, timeZone)}
                     </TableCell>
                     <TableCell>{i.tokens_used ?? "—"}</TableCell>
                   </TableRow>

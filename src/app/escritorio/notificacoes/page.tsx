@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bell, Check } from "lucide-react";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDateTimePtBr } from "@/lib/timezone";
 
 interface Notification {
   id: string;
@@ -22,6 +24,7 @@ interface Notification {
 }
 
 export default function EscritorioNotificacoesPage() {
+  const timeZone = useTimeZone();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -92,14 +95,7 @@ export default function EscritorioNotificacoesPage() {
     }
   }
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const formatDate = (dateStr: string) => formatDateTimePtBr(dateStr, timeZone);
 
   return (
     <PageLayout

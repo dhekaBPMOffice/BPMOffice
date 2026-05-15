@@ -28,6 +28,8 @@ import {
   type StrategicObjective,
   type TacticalPlan,
 } from "../actions";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDatePtBr } from "@/lib/timezone";
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
   pending: { label: "Pendente", className: "bg-gray-100 text-gray-700" },
@@ -51,6 +53,7 @@ interface StepActionPlanProps {
 }
 
 export function StepActionPlan({ planId, objectives, tacticalPlans, onReload }: StepActionPlanProps) {
+  const timeZone = useTimeZone();
   const [showDialog, setShowDialog] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [objectiveId, setObjectiveId] = useState("");
@@ -218,7 +221,7 @@ export function StepActionPlan({ planId, objectives, tacticalPlans, onReload }: 
                             )}
                             {plan.deadline && (
                               <span className="flex items-center gap-1">
-                                <CalendarDays className="h-3 w-3" /> {new Date(plan.deadline).toLocaleDateString("pt-BR")}
+                                <CalendarDays className="h-3 w-3" /> {formatDatePtBr(plan.deadline, timeZone)}
                               </span>
                             )}
                             <Select

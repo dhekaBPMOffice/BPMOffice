@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/layout/app-shell";
+import { getPlatformTimeZone } from "@/lib/timezone-server";
 import type { Branding } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default async function AdminLayout({
     .maybeSingle();
 
   const branding = (defaultBranding as Branding | null) ?? null;
+  const timeZone = await getPlatformTimeZone();
 
   return (
     <AppShell
@@ -27,6 +29,7 @@ export default async function AdminLayout({
       officeName="Administração Master"
       branding={branding}
       platformLogoUrl={branding?.logo_url ?? null}
+      timeZone={timeZone}
     >
       {children}
     </AppShell>

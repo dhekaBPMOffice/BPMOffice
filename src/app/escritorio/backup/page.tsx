@@ -29,8 +29,11 @@ import {
   saveOfficeBackupConfig,
   type Backup,
 } from "./actions";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDateTimePtBr } from "@/lib/timezone";
 
 export default function EscritorioBackupPage() {
+  const timeZone = useTimeZone();
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,13 +84,7 @@ export default function EscritorioBackupPage() {
   }
 
   function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTimePtBr(dateStr, timeZone);
   }
 
   return (

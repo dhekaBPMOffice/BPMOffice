@@ -1,6 +1,8 @@
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/layout/app-shell";
+import { getEffectiveOfficeTimeZone, getPlatformTimeZone } from "@/lib/timezone-server";
+import { DEFAULT_TIME_ZONE } from "@/lib/timezone";
 import type { Branding } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -24,19 +26,24 @@ export default async function OfficeLayout({
     .is("office_id", null)
     .maybeSingle();
 
+  let timeZone = DEFAULT_TIME_ZONE;
+
   if (profile.office_id) {
-    const [{ data: office }, { data: brandingData }, { data: defaultBranding }] = await Promise.all([
+    const [{ data: office }, { data: brandingData }, { data: defaultBranding }, tz] = await Promise.all([
       supabase.from("offices").select("name").eq("id", profile.office_id).single(),
       supabase.from("branding").select("*").eq("office_id", profile.office_id).maybeSingle(),
       defaultBrandingPromise,
+      getEffectiveOfficeTimeZone(profile.office_id),
     ]);
 
     if (office) officeName = office.name;
     if (brandingData) branding = brandingData as Branding;
     platformLogoUrl = defaultBranding?.logo_url ?? null;
+    timeZone = tz;
   } else {
     const { data: defaultBranding } = await defaultBrandingPromise;
     platformLogoUrl = defaultBranding?.logo_url ?? null;
+    timeZone = await getPlatformTimeZone();
   }
 
   return (
@@ -45,6 +52,7 @@ export default async function OfficeLayout({
       officeName={officeName}
       branding={branding}
       platformLogoUrl={platformLogoUrl}
+      timeZone={timeZone}
     >
       {children}
     </AppShell>

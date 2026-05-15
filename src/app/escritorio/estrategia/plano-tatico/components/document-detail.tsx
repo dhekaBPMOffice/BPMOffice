@@ -45,6 +45,8 @@ import {
   type TacticalPriority,
   type TacticalCategory,
 } from "../actions";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDatePtBr } from "@/lib/timezone";
 
 const STATUS_OPTIONS = [
   { value: "draft", label: "Rascunho" },
@@ -98,6 +100,7 @@ interface DocumentDetailProps {
 }
 
 export function DocumentDetail({ document: initialDoc, actions: initialActions }: DocumentDetailProps) {
+  const timeZone = useTimeZone();
   const router = useRouter();
   const [doc, setDoc] = useState(initialDoc);
   const [actions, setActions] = useState(initialActions);
@@ -299,8 +302,8 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
               {doc.period_start && doc.period_end && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <CalendarDays className="h-3.5 w-3.5" />
-                  {new Date(doc.period_start + "T00:00:00").toLocaleDateString("pt-BR")} —{" "}
-                  {new Date(doc.period_end + "T00:00:00").toLocaleDateString("pt-BR")}
+                  {formatDatePtBr(doc.period_start + "T00:00:00", timeZone)} —{" "}
+                  {formatDatePtBr(doc.period_end + "T00:00:00", timeZone)}
                 </p>
               )}
             </div>
@@ -376,7 +379,7 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
                         {a.deadline && (
                           <span className="flex items-center gap-1">
                             <CalendarDays className="h-3 w-3" />{" "}
-                            {new Date(a.deadline + "T00:00:00").toLocaleDateString("pt-BR")}
+                            {formatDatePtBr(a.deadline + "T00:00:00", timeZone)}
                           </span>
                         )}
                         {a.category && (

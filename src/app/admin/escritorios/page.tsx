@@ -24,6 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getPlatformTimeZone } from "@/lib/timezone-server";
+import { formatDatePtBr } from "@/lib/timezone";
 
 const ORDEM_VALUES = [
   "criado_desc",
@@ -76,6 +78,7 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
     }
   }
   const supabase = await createClient();
+  const timeZone = await getPlatformTimeZone();
 
   const { data: offices, error } = await supabase
     .from("offices")
@@ -104,11 +107,7 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
     if (!dateStr) return "—";
     const t = new Date(dateStr).getTime();
     if (!Number.isFinite(t)) return "—";
-    return new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return formatDatePtBr(dateStr, timeZone);
   };
 
   const rawAba = searchParamFirst(searchParams.aba);

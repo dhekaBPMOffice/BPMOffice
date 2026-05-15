@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile, requireRole } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
+import { getEffectiveOfficeTimeZone } from "@/lib/timezone-server";
+import { formatDateTimePtBr } from "@/lib/timezone";
 import {
   Card,
   CardContent,
@@ -39,6 +41,7 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
     );
   }
 
+  const timeZone = await getEffectiveOfficeTimeZone(profile.office_id);
   const { data: demands, error } = await supabase
     .from("demands")
     .select(`
@@ -61,14 +64,7 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
     );
   }
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const formatDate = (dateStr: string) => formatDateTimePtBr(dateStr, timeZone);
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning"; label: string }> = {

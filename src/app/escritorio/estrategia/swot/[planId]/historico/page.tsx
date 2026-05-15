@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -29,6 +29,8 @@ import {
   type TacticalPlan,
   type SwotType,
 } from "../../actions";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDatePtBr, formatInTimeZone } from "@/lib/timezone";
 
 const SWOT_LABELS: Record<SwotType, string> = {
   strength: "Forças",
@@ -60,7 +62,7 @@ interface SnapshotData {
 
 export default function HistoricoPage() {
   const params = useParams();
-  const router = useRouter();
+  const timeZone = useTimeZone();
   const planId = params.planId as string;
   const [plan, setPlan] = useState<StrategicPlan | null>(null);
   const [snapshots, setSnapshots] = useState<PlanSnapshot[]>([]);
@@ -127,7 +129,7 @@ export default function HistoricoPage() {
                       <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {new Date(snapshot.created_at).toLocaleDateString("pt-BR", {
+                          {formatInTimeZone(snapshot.created_at, timeZone, {
                             day: "2-digit",
                             month: "long",
                             year: "numeric",
@@ -164,7 +166,8 @@ export default function HistoricoPage() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Versão {viewingSnapshot?.version_number} &mdash; {viewingSnapshot && new Date(viewingSnapshot.created_at).toLocaleDateString("pt-BR")}
+              Versão {viewingSnapshot?.version_number} &mdash;{" "}
+              {viewingSnapshot && formatDatePtBr(viewingSnapshot.created_at, timeZone)}
             </DialogTitle>
           </DialogHeader>
 
@@ -243,7 +246,7 @@ export default function HistoricoPage() {
                         <span>{tp.action}</span>
                         <span className="text-xs text-muted-foreground ml-2">
                           {tp.responsible && `(${tp.responsible})`}
-                          {tp.deadline && ` - ${new Date(tp.deadline).toLocaleDateString("pt-BR")}`}
+                          {tp.deadline && ` - ${formatDatePtBr(tp.deadline, timeZone)}`}
                         </span>
                       </div>
                     </li>

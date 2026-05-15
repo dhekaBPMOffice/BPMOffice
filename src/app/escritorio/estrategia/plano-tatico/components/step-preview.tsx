@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import type { StrategicDataBundle } from "../actions";
 import type { PlanConfig } from "./step-config";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDatePtBr } from "@/lib/timezone";
 
 export interface AIGeneratedAction {
   action: string;
@@ -69,6 +71,7 @@ export function StepPreview({
   onBack,
   onNext,
 }: StepPreviewProps) {
+  const timeZone = useTimeZone();
   const [removedIndices, setRemovedIndices] = useState<Set<number>>(new Set());
 
   function handleRemove(index: number) {
@@ -209,7 +212,7 @@ export function StepPreview({
                           {a.deadline && (
                             <span className="flex items-center gap-1">
                               <CalendarDays className="h-3 w-3" />{" "}
-                              {new Date(a.deadline + "T00:00:00").toLocaleDateString("pt-BR")}
+                              {formatDatePtBr(a.deadline + "T00:00:00", timeZone)}
                             </span>
                           )}
                           {a.priority && (

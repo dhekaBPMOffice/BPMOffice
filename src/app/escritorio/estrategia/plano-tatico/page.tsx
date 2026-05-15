@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { PageLayout } from "@/components/layout/page-layout";
 import { getTacticalPlanDocuments } from "./actions";
+import { getSessionOfficeTimeZone } from "@/lib/timezone-server";
+import { formatDatePtBr } from "@/lib/timezone";
 
 const STATUS_CONFIG: Record<string, { label: string; className: string; icon: typeof Clock }> = {
   draft: { label: "Rascunho", className: "bg-gray-100 text-gray-700", icon: FileText },
@@ -35,6 +37,7 @@ const HORIZON_LABELS: Record<string, string> = {
 };
 
 export default async function PlanoTaticoPage() {
+  const timeZone = await getSessionOfficeTimeZone();
   const { data: documents, error } = await getTacticalPlanDocuments();
 
   return (
@@ -112,8 +115,8 @@ export default async function PlanoTaticoPage() {
                       {doc.period_start && doc.period_end && (
                         <CardDescription className="flex items-center gap-1 text-xs">
                           <CalendarDays className="h-3 w-3" />
-                          {new Date(doc.period_start + "T00:00:00").toLocaleDateString("pt-BR")} —{" "}
-                          {new Date(doc.period_end + "T00:00:00").toLocaleDateString("pt-BR")}
+                          {formatDatePtBr(doc.period_start + "T00:00:00", timeZone)} —{" "}
+                          {formatDatePtBr(doc.period_end + "T00:00:00", timeZone)}
                         </CardDescription>
                       )}
                     </CardHeader>

@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/layout/page-layout";
 import { ClipboardList } from "lucide-react";
+import { getPlatformTimeZone } from "@/lib/timezone-server";
+import { formatDateTimePtBr } from "@/lib/timezone";
 
 export default async function AdminEscritorioProcessosPage({
   params,
@@ -15,6 +17,7 @@ export default async function AdminEscritorioProcessosPage({
   const { id } = await params;
   const supabase = await createClient();
   const supabaseAdmin = await createServiceClient();
+  const timeZone = await getPlatformTimeZone();
 
   const [{ data: office, error: officeError }, { data: officeProcesses }, { data: submissions }] =
     await Promise.all([
@@ -83,7 +86,7 @@ export default async function AdminEscritorioProcessosPage({
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Respondido em {new Date(latestSubmission.submitted_at).toLocaleString("pt-BR")}
+                  Respondido em {formatDateTimePtBr(latestSubmission.submitted_at, timeZone)}
                 </p>
                 {(submissionAnswers.data ?? []).map((answer) => {
                   const question = answer.process_questionnaire_questions as {

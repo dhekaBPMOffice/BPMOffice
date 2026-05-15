@@ -26,6 +26,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import type { SupportTicket } from "@/types/database";
 import { LayoutGrid, LifeBuoy, List } from "lucide-react";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDateTimePtBr } from "@/lib/timezone";
 
 const PRIORITIES = [
   { value: "low", label: "Baixa" },
@@ -49,6 +51,7 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "success" | "war
 };
 
 export default function SuportePage() {
+  const timeZone = useTimeZone();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -89,14 +92,7 @@ export default function SuportePage() {
     }
   }
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const formatDate = (dateStr: string) => formatDateTimePtBr(dateStr, timeZone);
 
   const chamadosAtivos = tickets.filter((ticket) => ticket.status !== "resolved" && ticket.status !== "closed");
   const chamadosArquivados = tickets.filter((ticket) => ticket.status === "resolved" || ticket.status === "closed");

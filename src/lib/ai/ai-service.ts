@@ -6,6 +6,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { createProvider } from "./providers";
 import { getDefaultPrompt } from "./prompts";
+import { getEffectiveOfficeTimeZone } from "@/lib/timezone-server";
+import { DEFAULT_TIME_ZONE, formatDateTimePtBr } from "@/lib/timezone";
 
 export interface AIConfig {
   provider: string;
@@ -68,7 +70,7 @@ export class AIService {
   /**
    * Busca histórico de interações do projeto para incluir no contexto (se learnFromHistory).
    */
-  static async getHistoryContext(projectId: string, limit = 5): Promise<string> {
+  static async getHistoryContext(projectId: string, limit = 5, timeZone?: string): Promise<string> {
     const supabase = await createClient();
 
     const { data: interactions } = await supabase
@@ -82,7 +84,7 @@ export class AIService {
 
     const parts = interactions.map(
       (i) =>
-        `[${i.phase}] ${new Date(i.created_at).toLocaleString("pt-BR")}\nEntrada: ${(i.input_data ?? "").slice(0, 500)}...\nSaída: ${(i.output_data ?? "").slice(0, 800)}...`
+        `[${i.phase}] ${formatDateTimePtBr(i.created_at, timeZone ?? DEFAULT_TIME_ZONE)}\nEntrada: ${(i.input_data ?? "").slice(0, 500)}...\nSaída: ${(i.output_data ?? "").slice(0, 800)}...`
     );
     return "Histórico de interações anteriores deste projeto:\n\n" + parts.join("\n\n---\n\n");
   }
@@ -106,7 +108,8 @@ export class AIService {
 
     let context = "";
     if (config.learnFromHistory && projectId) {
-      context = await this.getHistoryContext(projectId);
+      const officeTz = await getEffectiveOfficeTimeZone(officeId);
+      context = await this.getHistoryContext(projectId, 5, officeTz);
     }
 
     const provider = createProvider(

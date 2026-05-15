@@ -28,6 +28,8 @@ import {
   type TacticalPlan,
   type SwotType,
 } from "../actions";
+import { useTimeZone } from "@/components/providers/timezone-provider";
+import { formatDatePtBr } from "@/lib/timezone";
 
 const SWOT_ICONS: Record<SwotType, typeof TrendingUp> = {
   strength: TrendingUp,
@@ -60,6 +62,7 @@ interface StepReviewProps {
 }
 
 export function StepReview({ plan, swotItems, objectives, tacticalPlans, planId, onReload }: StepReviewProps) {
+  const timeZone = useTimeZone();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [snapshotNotes, setSnapshotNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -251,7 +254,7 @@ export function StepReview({ plan, swotItems, objectives, tacticalPlans, planId,
                     <span className="font-medium">{tp.action}</span>
                     <div className="flex gap-3 text-xs text-muted-foreground mt-0.5">
                       {tp.responsible && <span>{tp.responsible}</span>}
-                      {tp.deadline && <span>{new Date(tp.deadline).toLocaleDateString("pt-BR")}</span>}
+                      {tp.deadline && <span>{formatDatePtBr(tp.deadline, timeZone)}</span>}
                     </div>
                   </div>
                 </li>

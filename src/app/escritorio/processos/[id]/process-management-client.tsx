@@ -32,6 +32,8 @@ import {
   getOfficeProcessEventTypeLabel,
   localizeOfficeProcessHistoryDescription,
 } from "@/lib/office-process-history";
+import { formatDatePtBr, formatDateTimePtBr } from "@/lib/timezone";
+import { useTimeZone } from "@/components/providers/timezone-provider";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -259,7 +261,7 @@ function normalizeFlowchartFilesFromRow(row: {
   return [];
 }
 
-function formatRelativeDate(dateStr: string) {
+function formatRelativeDate(dateStr: string, timeZone: string) {
   const date = new Date(dateStr);
   if (Number.isNaN(date.getTime())) return "—";
   const now = new Date();
@@ -272,11 +274,7 @@ function formatRelativeDate(dateStr: string) {
   if (diffMins < 60) return `${diffMins} min atrás`;
   if (diffHours < 24) return `${diffHours}h atrás`;
   if (diffDays < 7) return `${diffDays} dias atrás`;
-  return date.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatDatePtBr(date, timeZone);
 }
 
 function ProcessManagementClientInner({
@@ -291,6 +289,7 @@ function ProcessManagementClientInner({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const timeZone = useTimeZone();
   const [status, setStatus] = useState<OfficeProcessStatus>(officeProcess.status);
   const [description, setDescription] = useState(officeProcess.description ?? "");
   const [vcMacro, setVcMacro] = useState(officeProcess.vc_macroprocesso ?? "");
@@ -444,7 +443,7 @@ function ProcessManagementClientInner({
     () =>
       history.slice(0, 5).map((ev) => ({
         id: ev.id,
-        relative: formatRelativeDate(ev.created_at),
+        relative: formatRelativeDate(ev.created_at, timeZone),
         summary: localizeOfficeProcessHistoryDescription(ev.description),
       })),
     [history]
@@ -670,7 +669,7 @@ function ProcessManagementClientInner({
         lastActivity={
           latestHistoryEvent
             ? {
-                relative: formatRelativeDate(latestHistoryEvent.created_at),
+                relative: formatRelativeDate(latestHistoryEvent.created_at, timeZone),
                 summary: localizeOfficeProcessHistoryDescription(latestHistoryEvent.description),
               }
             : null
@@ -1475,7 +1474,7 @@ function ProcessManagementClientInner({
                           </Badge>
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {new Date(event.created_at).toLocaleString("pt-BR")}
+                          {formatDateTimePtBr(event.created_at, timeZone)}
                         </p>
                       </div>
                     ))

@@ -2,15 +2,7 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-
-const SETTING_KEYS = [
-  "review_period",
-  "review_unit",
-  "default_techniques_analysis",
-  "default_techniques_improvement",
-  "closure_checklist",
-  "implementation_plan_fields",
-] as const;
+import { isValidIanaTimeZone } from "@/lib/timezone";
 
 export async function savePlatformSettings(data: {
   review_period: number;
@@ -19,7 +11,13 @@ export async function savePlatformSettings(data: {
   default_techniques_improvement: string[];
   closure_checklist: string[];
   implementation_plan_fields: string[];
+  timezone: string;
 }) {
+  const tz = data.timezone?.trim();
+  if (!tz || !isValidIanaTimeZone(tz)) {
+    return { error: "Fuso horário inválido. Use um identificador IANA (ex.: America/Sao_Paulo)." };
+  }
+
   const supabase = await createServiceClient();
 
   const settings: { key: string; value: unknown }[] = [
@@ -29,6 +27,7 @@ export async function savePlatformSettings(data: {
     { key: "default_techniques_improvement", value: data.default_techniques_improvement },
     { key: "closure_checklist", value: data.closure_checklist },
     { key: "implementation_plan_fields", value: data.implementation_plan_fields },
+    { key: "timezone", value: tz },
   ];
 
   for (const { key, value } of settings) {
@@ -40,5 +39,6 @@ export async function savePlatformSettings(data: {
   }
 
   revalidatePath("/admin/configuracoes");
+  revalidatePath("/admin");
   return { success: true };
 }

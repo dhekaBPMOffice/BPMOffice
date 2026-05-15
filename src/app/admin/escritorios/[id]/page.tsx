@@ -14,6 +14,8 @@ import { Building2 } from "lucide-react";
 import { EscritorioEditForm } from "./escritorio-edit-form";
 import { EscritorioAcoesCard } from "./escritorio-acoes-card";
 import { LiderEscritorioCardClient } from "./lider-escritorio-card-client";
+import { getPlatformTimeZone } from "@/lib/timezone-server";
+import { formatDateTimePtBr } from "@/lib/timezone";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -23,6 +25,7 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
   const { id } = await params;
   const supabase = await createClient();
   const supabaseAdmin = await createServiceClient();
+  const timeZone = await getPlatformTimeZone();
 
   const { data: office, error: officeError } = await supabase
     .from("offices")
@@ -67,14 +70,7 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
         .eq("is_active", true),
     ]);
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const formatDate = (dateStr: string) => formatDateTimePtBr(dateStr, timeZone);
 
   const { data: plans } = await supabase
     .from("plans")
