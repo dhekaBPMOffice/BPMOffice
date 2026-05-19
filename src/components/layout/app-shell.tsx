@@ -5,6 +5,7 @@ import { TimezoneProvider } from "@/components/providers/timezone-provider";
 import { DEFAULT_TIME_ZONE } from "@/lib/timezone";
 import { type Profile, type UserRole } from "@/types/database";
 import type { Branding } from "@/types/database";
+import type { AreaAccessMap } from "@/lib/system-areas";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -14,6 +15,7 @@ interface AppShellProps {
   platformLogoUrl?: string | null;
   /** Fuso IANA para formatação de datas nesta área (admin ou escritório). */
   timeZone?: string;
+  allowedAreas?: AreaAccessMap;
 }
 
 export function AppShell({
@@ -23,6 +25,7 @@ export function AppShell({
   branding = null,
   platformLogoUrl = null,
   timeZone = DEFAULT_TIME_ZONE,
+  allowedAreas,
 }: AppShellProps) {
   return (
     <IdentityProvider branding={branding}>
@@ -32,6 +35,7 @@ export function AppShell({
             role={profile.role as UserRole}
             officeName={officeName}
             logoUrl={branding?.logo_url ?? null}
+            allowedAreas={allowedAreas}
           />
           <div className="flex flex-1 flex-col overflow-hidden min-w-0">
             <Header profile={profile} platformLogoUrl={platformLogoUrl} />

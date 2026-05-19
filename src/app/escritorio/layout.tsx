@@ -1,8 +1,10 @@
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/layout/app-shell";
+import { getOfficeAreaAccess } from "@/lib/area-access";
 import { getEffectiveOfficeTimeZone, getPlatformTimeZone } from "@/lib/timezone-server";
 import { DEFAULT_TIME_ZONE } from "@/lib/timezone";
+import { DEFAULT_AREA_ACCESS } from "@/lib/system-areas";
 import type { Branding } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +20,7 @@ export default async function OfficeLayout({
   let officeName = "Escritório";
   let branding: Branding | null = null;
   let platformLogoUrl: string | null = null;
+  let allowedAreas = DEFAULT_AREA_ACCESS;
 
   const defaultBrandingPromise = supabase
     .from("branding")
@@ -29,17 +32,19 @@ export default async function OfficeLayout({
   let timeZone = DEFAULT_TIME_ZONE;
 
   if (profile.office_id) {
-    const [{ data: office }, { data: brandingData }, { data: defaultBranding }, tz] = await Promise.all([
+    const [{ data: office }, { data: brandingData }, { data: defaultBranding }, tz, areaAccess] = await Promise.all([
       supabase.from("offices").select("name").eq("id", profile.office_id).single(),
       supabase.from("branding").select("*").eq("office_id", profile.office_id).maybeSingle(),
       defaultBrandingPromise,
       getEffectiveOfficeTimeZone(profile.office_id),
+      getOfficeAreaAccess(profile.office_id),
     ]);
 
     if (office) officeName = office.name;
     if (brandingData) branding = brandingData as Branding;
     platformLogoUrl = defaultBranding?.logo_url ?? null;
     timeZone = tz;
+    allowedAreas = areaAccess;
   } else {
     const { data: defaultBranding } = await defaultBrandingPromise;
     platformLogoUrl = defaultBranding?.logo_url ?? null;
@@ -53,6 +58,7 @@ export default async function OfficeLayout({
       branding={branding}
       platformLogoUrl={platformLogoUrl}
       timeZone={timeZone}
+      allowedAreas={allowedAreas}
     >
       {children}
     </AppShell>

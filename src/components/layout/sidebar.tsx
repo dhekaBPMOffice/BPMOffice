@@ -27,12 +27,14 @@ import {
   Workflow,
 } from "lucide-react";
 import { type UserRole } from "@/types/database";
+import type { AreaAccessMap, SystemAreaKey } from "@/lib/system-areas";
 import { IconChip } from "@/components/ui/icon-chip";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  area?: SystemAreaKey;
 }
 
 interface NavGroup {
@@ -82,20 +84,21 @@ const adminNavGroups: NavGroup[] = [
 const leaderNavGroups: NavGroup[] = [
   {
     items: [
-      { label: "Dashboard", href: "/escritorio/dashboard", icon: LayoutDashboard },
-      { label: "Estratégia", href: "/escritorio/estrategia", icon: Target },
+      { label: "Dashboard", href: "/escritorio/dashboard", icon: LayoutDashboard, area: "dashboard" },
+      { label: "Estratégia", href: "/escritorio/estrategia", icon: Target, area: "estrategia" },
       {
         label: "Processos",
         href: "/escritorio/estrategia/cadeia-valor?aba=gestao",
         icon: Workflow,
+        area: "processos",
       },
-      { label: "Demandas", href: "/escritorio/demandas", icon: ClipboardList },
+      { label: "Demandas", href: "/escritorio/demandas", icon: ClipboardList, area: "demandas" },
     ],
   },
   {
     items: [
-      { label: "Conhecimento", href: "/escritorio/conhecimento", icon: BookOpen },
-      { label: "Capacitação", href: "/escritorio/capacitacao", icon: GraduationCap },
+      { label: "Conhecimento", href: "/escritorio/conhecimento", icon: BookOpen, area: "conhecimento" },
+      { label: "Capacitação", href: "/escritorio/capacitacao", icon: GraduationCap, area: "capacitacao" },
       { label: "Usuários", href: "/escritorio/usuarios", icon: Users },
     ],
   },
@@ -113,10 +116,10 @@ const leaderNavGroups: NavGroup[] = [
 const userNavGroups: NavGroup[] = [
   {
     items: [
-      { label: "Área de Trabalho", href: "/escritorio/trabalho", icon: LayoutDashboard },
-      { label: "Demandas", href: "/escritorio/demandas", icon: ClipboardList },
-      { label: "Conhecimento", href: "/escritorio/conhecimento", icon: BookOpen },
-      { label: "Capacitação", href: "/escritorio/capacitacao", icon: GraduationCap },
+      { label: "Área de Trabalho", href: "/escritorio/trabalho", icon: LayoutDashboard, area: "dashboard" },
+      { label: "Demandas", href: "/escritorio/demandas", icon: ClipboardList, area: "demandas" },
+      { label: "Conhecimento", href: "/escritorio/conhecimento", icon: BookOpen, area: "conhecimento" },
+      { label: "Capacitação", href: "/escritorio/capacitacao", icon: GraduationCap, area: "capacitacao" },
     ],
   },
   {
@@ -141,10 +144,12 @@ export function Sidebar({
   role,
   officeName,
   logoUrl,
+  allowedAreas,
 }: {
   role: UserRole;
   officeName?: string;
   logoUrl?: string | null;
+  allowedAreas?: AreaAccessMap;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -156,12 +161,21 @@ export function Sidebar({
 
   if (pathname.startsWith("/escritorio/onboarding")) return null;
 
-  const navGroups =
+  const baseNavGroups =
     role === "admin_master"
       ? adminNavGroups
       : role === "leader"
         ? leaderNavGroups
         : userNavGroups;
+  const navGroups =
+    role === "admin_master" || !allowedAreas
+      ? baseNavGroups
+      : baseNavGroups
+          .map((group) => ({
+            ...group,
+            items: group.items.filter((item) => !item.area || allowedAreas[item.area]),
+          }))
+          .filter((group) => group.items.length > 0);
 
   const allHrefPaths = navGroups.flatMap((g) =>
     g.items.map((item) => item.href.split("?")[0])

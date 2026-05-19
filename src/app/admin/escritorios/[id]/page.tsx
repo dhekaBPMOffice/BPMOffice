@@ -34,12 +34,14 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
       name,
       slug,
       plan_id,
+      area_overrides,
       is_active,
       created_at,
       updated_at,
       plans (
         id,
-        name
+        name,
+        features
       )
     `)
     .eq("id", id)
@@ -74,7 +76,7 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
 
   const { data: plans } = await supabase
     .from("plans")
-    .select("id, name")
+    .select("id, name, features")
     .eq("is_active", true)
     .order("name");
 
@@ -117,6 +119,7 @@ export default async function EscritorioDetailPage({ params }: PageProps) {
                 name: office.name,
                 slug: office.slug,
                 plan_id: office.plan_id,
+                area_overrides: office.area_overrides ?? {},
               }}
               plans={plans ?? []}
             />

@@ -1,6 +1,7 @@
 "use server";
 
 import { createServiceClient } from "@/lib/supabase/server";
+import { SYSTEM_AREAS } from "@/lib/system-areas";
 import { revalidatePath } from "next/cache";
 
 const FEATURE_KEYS = [
@@ -13,11 +14,16 @@ const FEATURE_KEYS = [
   "training",
   "custom_ai_api",
   "backup_auto",
-] as const;
+] as string[];
+
+const PLAN_FEATURE_KEYS = [
+  ...FEATURE_KEYS,
+  ...SYSTEM_AREAS.map((area) => area.featureKey),
+];
 
 function buildFeatures(formData: FormData): Record<string, boolean> {
   const features: Record<string, boolean> = {};
-  for (const key of FEATURE_KEYS) {
+  for (const key of PLAN_FEATURE_KEYS) {
     features[key] = formData.get(`features_${key}`) === "true";
   }
   return features;

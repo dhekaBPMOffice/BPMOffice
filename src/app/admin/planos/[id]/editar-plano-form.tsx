@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { PageLayout } from "@/components/layout/page-layout";
+import { SYSTEM_AREAS } from "@/lib/system-areas";
 import { CreditCard } from "lucide-react";
 
 const FEATURES = [
@@ -53,6 +54,13 @@ export function EditarPlanoForm({ plan }: { plan: Plan }) {
     }
     return f;
   });
+  const [areas, setAreas] = useState<Record<string, boolean>>(() => {
+    const f: Record<string, boolean> = {};
+    for (const area of SYSTEM_AREAS) {
+      f[area.featureKey] = plan.features?.[area.featureKey] ?? false;
+    }
+    return f;
+  });
   const [isActive, setIsActive] = useState(plan.is_active);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -63,6 +71,9 @@ export function EditarPlanoForm({ plan }: { plan: Plan }) {
     const formData = new FormData(e.currentTarget);
     for (const { key } of FEATURES) {
       formData.set(`features_${key}`, (features[key] ?? false) ? "true" : "false");
+    }
+    for (const area of SYSTEM_AREAS) {
+      formData.set(`features_${area.featureKey}`, (areas[area.featureKey] ?? false) ? "true" : "false");
     }
     formData.set("is_active", isActive ? "true" : "false");
 
@@ -171,6 +182,23 @@ export function EditarPlanoForm({ plan }: { plan: Plan }) {
                       checked={features[key] ?? false}
                       onCheckedChange={(checked) =>
                         setFeatures((prev) => ({ ...prev, [key]: checked }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Áreas do sistema</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {SYSTEM_AREAS.map((area) => (
+                  <div key={area.key} className="flex items-center justify-between rounded-lg border p-3">
+                    <span className="text-sm">{area.label}</span>
+                    <Switch
+                      checked={areas[area.featureKey] ?? false}
+                      onCheckedChange={(checked) =>
+                        setAreas((prev) => ({ ...prev, [area.featureKey]: checked }))
                       }
                     />
                   </div>

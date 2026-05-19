@@ -3,6 +3,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
 import { validatePassword } from "@/lib/password";
+import { SYSTEM_AREAS, type AreaOverrides } from "@/lib/system-areas";
 import { revalidatePath } from "next/cache";
 
 function generateSlug(name: string): string {
@@ -75,6 +76,16 @@ export async function updateOffice(id: string, formData: FormData) {
   const name = formData.get("name") as string;
   const slug = formData.get("slug") as string;
   const planId = formData.get("plan_id") as string | null;
+  const areaOverrides: AreaOverrides = {};
+
+  for (const area of SYSTEM_AREAS) {
+    const value = formData.get(`area_override_${area.key}`);
+    if (value === "allow") {
+      areaOverrides[area.key] = true;
+    } else if (value === "block") {
+      areaOverrides[area.key] = false;
+    }
+  }
 
   if (!name?.trim()) {
     return { error: "Nome é obrigatório." };
@@ -93,6 +104,7 @@ export async function updateOffice(id: string, formData: FormData) {
       name: name.trim(),
       slug: finalSlug,
       plan_id: planId || null,
+      area_overrides: areaOverrides,
     })
     .eq("id", id);
 

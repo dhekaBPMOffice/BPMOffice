@@ -5,6 +5,7 @@ export interface Office {
   name: string;
   slug: string;
   plan_id: string | null;
+  area_overrides: Record<string, boolean>;
   is_active: boolean;
   processes_initialized_at?: string | null;
   created_at: string;

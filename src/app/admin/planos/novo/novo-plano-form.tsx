@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { PageLayout } from "@/components/layout/page-layout";
+import { SYSTEM_AREAS } from "@/lib/system-areas";
 import { CreditCard } from "lucide-react";
 
 const FEATURES = [
@@ -38,6 +39,9 @@ export function NovoPlanoForm() {
   const [features, setFeatures] = useState<Record<string, boolean>>(
     Object.fromEntries(FEATURES.map((f) => [f.key, false]))
   );
+  const [areas, setAreas] = useState<Record<string, boolean>>(
+    Object.fromEntries(SYSTEM_AREAS.map((area) => [area.featureKey, false]))
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -46,6 +50,9 @@ export function NovoPlanoForm() {
 
     const formData = new FormData(e.currentTarget);
     for (const [key, checked] of Object.entries(features)) {
+      formData.set(`features_${key}`, checked ? "true" : "false");
+    }
+    for (const [key, checked] of Object.entries(areas)) {
       formData.set(`features_${key}`, checked ? "true" : "false");
     }
 
@@ -152,6 +159,23 @@ export function NovoPlanoForm() {
                       checked={features[key] ?? false}
                       onCheckedChange={(checked) =>
                         setFeatures((prev) => ({ ...prev, [key]: checked }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Áreas do sistema</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {SYSTEM_AREAS.map((area) => (
+                  <div key={area.key} className="flex items-center justify-between rounded-lg border p-3">
+                    <span className="text-sm">{area.label}</span>
+                    <Switch
+                      checked={areas[area.featureKey] ?? false}
+                      onCheckedChange={(checked) =>
+                        setAreas((prev) => ({ ...prev, [area.featureKey]: checked }))
                       }
                     />
                   </div>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { SYSTEM_AREAS, resolveAreaAccess } from "@/lib/system-areas";
 
 function generateSlug(name: string): string {
   return name
@@ -25,8 +26,9 @@ interface EscritorioEditFormProps {
     name: string;
     slug: string;
     plan_id: string | null;
+    area_overrides: Record<string, boolean>;
   };
-  plans: { id: string; name: string }[];
+  plans: { id: string; name: string; features: Record<string, boolean> | null }[];
 }
 
 export function EscritorioEditForm({ office, plans }: EscritorioEditFormProps) {
@@ -35,13 +37,33 @@ export function EscritorioEditForm({ office, plans }: EscritorioEditFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState(office.name);
   const [slug, setSlug] = useState(office.slug);
+  const [planId, setPlanId] = useState(office.plan_id ?? "");
+  const [areaOverrides, setAreaOverrides] = useState<Record<string, "inherit" | "allow" | "block">>(() =>
+    Object.fromEntries(
+      SYSTEM_AREAS.map((area) => {
+        const value = office.area_overrides?.[area.key];
+        return [area.key, value === true ? "allow" : value === false ? "block" : "inherit"];
+      })
+    )
+  );
 
   const derivedSlug = generateSlug(name);
+  const selectedPlan = plans.find((plan) => plan.id === planId) ?? null;
+  const inheritedAreas = resolveAreaAccess(selectedPlan?.features ?? null, {});
 
   useEffect(() => {
     setName(office.name);
     setSlug(office.slug);
-  }, [office.name, office.slug, office.plan_id]);
+    setPlanId(office.plan_id ?? "");
+    setAreaOverrides(
+      Object.fromEntries(
+        SYSTEM_AREAS.map((area) => {
+          const value = office.area_overrides?.[area.key];
+          return [area.key, value === true ? "allow" : value === false ? "block" : "inherit"];
+        })
+      )
+    );
+  }, [office.name, office.slug, office.plan_id, office.area_overrides]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -51,6 +73,10 @@ export function EscritorioEditForm({ office, plans }: EscritorioEditFormProps) {
     const form = e.currentTarget;
     const formData = new FormData(form);
     formData.set("slug", slug || derivedSlug);
+    formData.set("plan_id", planId);
+    for (const area of SYSTEM_AREAS) {
+      formData.set(`area_override_${area.key}`, areaOverrides[area.key] ?? "inherit");
+    }
 
     const result = await updateOffice(office.id, formData);
 
@@ -96,7 +122,12 @@ export function EscritorioEditForm({ office, plans }: EscritorioEditFormProps) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="edit-plan_id">Plano</Label>
-          <Select id="edit-plan_id" name="plan_id" defaultValue={office.plan_id ?? ""} key={office.plan_id ?? "none"}>
+          <Select
+            id="edit-plan_id"
+            name="plan_id"
+            value={planId}
+            onChange={(event) => setPlanId(event.target.value)}
+          >
             <option value="">Sem plano</option>
             {plans.map((plan) => (
               <option key={plan.id} value={plan.id}>
@@ -104,6 +135,48 @@ export function EscritorioEditForm({ office, plans }: EscritorioEditFormProps) {
               </option>
             ))}
           </Select>
+        </div>
+        <div className="space-y-3 rounded-lg border p-4">
+          <div>
+            <Label>Áreas do sistema</Label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use “Herdar do plano” para seguir a configuração do plano selecionado, ou defina uma exceção para este escritório.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            {SYSTEM_AREAS.map((area) => {
+              const inherited = inheritedAreas[area.key];
+              const override = areaOverrides[area.key] ?? "inherit";
+              const effective =
+                override === "allow" ? true : override === "block" ? false : inherited;
+
+              return (
+                <div key={area.key} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_180px] sm:items-center">
+                  <div>
+                    <p className="text-sm font-medium">{area.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Plano: {inherited ? "liberado" : "bloqueado"} - Efetivo: {effective ? "liberado" : "bloqueado"}
+                    </p>
+                  </div>
+                  <Select
+                    name={`area_override_${area.key}`}
+                    value={areaOverrides[area.key] ?? "inherit"}
+                    onChange={(event) =>
+                      setAreaOverrides((prev) => ({
+                        ...prev,
+                        [area.key]: event.target.value as "inherit" | "allow" | "block",
+                      }))
+                    }
+                    aria-label={`Acesso à área ${area.label}`}
+                  >
+                    <option value="inherit">Herdar do plano</option>
+                    <option value="allow">Liberar</option>
+                    <option value="block">Bloquear</option>
+                  </Select>
+                </div>
+              );
+            })}
+          </div>
         </div>
         <div className="pt-2">
           <Button type="submit" disabled={submitting}>
