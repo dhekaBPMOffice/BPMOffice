@@ -18,7 +18,7 @@ export interface Plan {
   description: string | null;
   max_users: number;
   max_processes: number;
-  features: Record<string, boolean>;
+  features: Record<string, boolean | string>;
   price_monthly: number;
   is_active: boolean;
   created_at: string;

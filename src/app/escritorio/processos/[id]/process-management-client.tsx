@@ -127,6 +127,7 @@ type ProcessManagementClientProps = {
     vc_level2?: string | null;
     vc_level3?: string | null;
   };
+  managementVersion?: "complete" | "simple";
   processTypeOptions: string[];
   ownerOptions: { id: string; full_name: string }[];
   checklistItems: {
@@ -1645,10 +1646,575 @@ function ProcessManagementClientInner({
   );
 }
 
+function ProcessManagementSimpleClient({
+  officeProcess,
+  processTypeOptions,
+  ownerOptions,
+  attachments,
+}: ProcessManagementClientProps) {
+  const router = useRouter();
+  const [status, setStatus] = useState<OfficeProcessStatus>(officeProcess.status);
+  const [description, setDescription] = useState(officeProcess.description ?? "");
+  const [vcMacro, setVcMacro] = useState(officeProcess.vc_macroprocesso ?? "");
+  const [ownerProfileId, setOwnerProfileId] = useState(officeProcess.owner_profile_id ?? "");
+  const [notes] = useState(officeProcess.notes ?? "");
+  const [vcTipoLabel, setVcTipoLabel] = useState(() =>
+    initialTipoLabelFromOfficeProcess(officeProcess)
+  );
+  const [vcLevelsDraft, setVcLevelsDraft] = useState<string[]>(() =>
+    draftLevelsForForm(officeProcess, officeProcess.name)
+  );
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [newAttachmentFiles, setNewAttachmentFiles] = useState<{ file: File; title: string }[]>(
+    []
+  );
+  const [newAttachmentType, setNewAttachmentType] =
+    useState<OfficeProcessAttachmentType>("other");
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
+  const flowchartFileInputRef = useRef<HTMLInputElement>(null);
+  const officeFlowchartFiles = useMemo(
+    () => normalizeFlowchartFilesFromRow(officeProcess),
+    [officeProcess]
+  );
+  const [editedFlowchartFiles, setEditedFlowchartFiles] = useState<ProcessFlowchartFile[]>(() =>
+    officeFlowchartFiles.map((f) => ({ url: f.url }))
+  );
+  const [materialUploading, setMaterialUploading] = useState<"flowchart" | null>(null);
+  const [materialError, setMaterialError] = useState<string | null>(null);
+  const tipoSelectOptions = useMemo(
+    () => mergeProcessTypeOptionsForSelect(processTypeOptions, vcTipoLabel),
+    [processTypeOptions, vcTipoLabel]
+  );
+
+  useEffect(() => {
+    setDescription(officeProcess.description ?? "");
+    setVcMacro(officeProcess.vc_macroprocesso ?? "");
+    setVcTipoLabel(initialTipoLabelFromOfficeProcess(officeProcess));
+    setVcLevelsDraft(draftLevelsForForm(officeProcess, officeProcess.name));
+    setEditedFlowchartFiles(officeFlowchartFiles.map((f) => ({ url: f.url })));
+  }, [officeFlowchartFiles, officeProcess]);
+
+  async function handleSaveProcess(e: React.FormEvent) {
+    e.preventDefault();
+    setSaveError(null);
+    const levelsCompact = compactLevelsForPersist(vcLevelsDraft);
+    const macroTrim = vcMacro.trim();
+    if (!macroTrim && !levelsCompact[0]) {
+      setSaveError("Preencha o macroprocesso e/ou o nível 1.");
+      return;
+    }
+    setSaving(true);
+
+    const result = await updateOfficeProcessDetails({
+      officeProcessId: officeProcess.id,
+      description,
+      flowchartFiles: editedFlowchartFiles,
+      status,
+      ownerProfileId: ownerProfileId || null,
+      notes,
+      vcTipoLabel: vcTipoLabel.trim() || null,
+      vcMacroprocesso: macroTrim || null,
+      vcLevels: vcLevelsDraft,
+    });
+
+    if ("error" in result && result.error) {
+      setSaveError(result.error);
+      setSaving(false);
+      return;
+    }
+
+    setSaving(false);
+    router.refresh();
+  }
+
+  async function handleFlowchartFileSelected(files: FileList | null) {
+    const file = files?.[0];
+    if (!file?.size) return;
+    setMaterialError(null);
+    setMaterialUploading("flowchart");
+    const formData = new FormData();
+    formData.set("officeProcessId", officeProcess.id);
+    formData.set("kind", "flowchart");
+    formData.set("file", file);
+    const result = await uploadOfficeProcessMaterialFile(formData);
+    setMaterialUploading(null);
+    if ("error" in result && result.error) {
+      setMaterialError(result.error);
+      return;
+    }
+    if ("success" in result && result.success && result.url) {
+      setEditedFlowchartFiles((prev) => [...prev, { url: result.url }]);
+    }
+  }
+
+  async function handleDeleteAttachment(attachmentId: string) {
+    if (!window.confirm("Remover este documento do processo?")) return;
+    setAttachmentError(null);
+    setDeletingAttachmentId(attachmentId);
+    const result = await deleteOfficeProcessAttachment(attachmentId);
+    setDeletingAttachmentId(null);
+    if ("error" in result && result.error) {
+      setAttachmentError(result.error);
+      return;
+    }
+    router.refresh();
+  }
+
+  async function handleAttachmentAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setAttachmentError(null);
+
+    const toAdd = newAttachmentFiles.filter((item) => item.file?.size);
+    if (toAdd.length === 0) {
+      setAttachmentError("Selecione um ou mais arquivos.");
+      return;
+    }
+
+    setAttachmentUploading(true);
+    for (const item of toAdd) {
+      const formData = new FormData();
+      formData.set("file", item.file);
+      formData.set("officeProcessId", officeProcess.id);
+
+      const uploadResult = await uploadOfficeAttachmentFile(formData);
+      if ("error" in uploadResult) {
+        setAttachmentError(uploadResult.error ?? null);
+        setAttachmentUploading(false);
+        return;
+      }
+
+      const result = await addOfficeProcessAttachment({
+        officeProcessId: officeProcess.id,
+        title: item.title.trim() || item.file.name,
+        attachmentUrl: uploadResult.url,
+        attachmentType: newAttachmentType,
+      });
+
+      if ("error" in result && result.error) {
+        setAttachmentError(result.error ?? null);
+        setAttachmentUploading(false);
+        return;
+      }
+    }
+
+    setNewAttachmentFiles([]);
+    setNewAttachmentType("other");
+    setAttachmentUploading(false);
+    router.refresh();
+  }
+
+  function addAttachmentFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setNewAttachmentFiles((prev) => [
+      ...prev,
+      ...Array.from(files).map((file) => ({ file, title: "" })),
+    ]);
+  }
+
+  function removeAttachmentFile(index: number) {
+    setNewAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  return (
+    <ProcessWorkspaceShell>
+      <div className="space-y-6">
+        <Card className="border-border/80 shadow-[var(--shadow-card)]">
+          <CardHeader>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-2">
+                <CardTitle className="text-2xl">Gestão do Processo</CardTitle>
+                <CardDescription className="max-w-3xl leading-relaxed">
+                  Atualize os dados principais, acompanhe responsáveis e mantenha os materiais do
+                  processo em um fluxo direto.
+                </CardDescription>
+              </div>
+              <Badge variant={OFFICE_PROCESS_STATUS_META[status].variant}>
+                {OFFICE_PROCESS_STATUS_META[status].label}
+              </Badge>
+            </div>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-border/80">
+          <CardContent className="p-0">
+            <form onSubmit={handleSaveProcess}>
+              <section className="space-y-4 border-b border-border/70 p-6">
+                <div className="space-y-1">
+                  <h3 className="text-base font-semibold">Descrição</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Objetivo, escopo e principais observações do processo.
+                  </p>
+                </div>
+                <div>
+                  <Textarea
+                    rows={6}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Descreva o objetivo e escopo do processo."
+                  />
+                </div>
+              </section>
+
+              <section className="space-y-4 border-b border-border/70 p-6">
+                <div className="space-y-1">
+                  <h3 className="text-base font-semibold">Tipo, hierarquia e responsável</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Estrutura do processo, situação atual e pessoa responsável.
+                  </p>
+                </div>
+                <div className="space-y-5">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <ProcessTypeSelect
+                      id="simple-vc-tipo"
+                      label="Tipo"
+                      options={tipoSelectOptions}
+                      value={vcTipoLabel}
+                      onChange={setVcTipoLabel}
+                      placeholderOption="Não definido"
+                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="simple-vc-macro">Macroprocesso</Label>
+                      <Input
+                        id="simple-vc-macro"
+                        value={vcMacro}
+                        onChange={(e) => setVcMacro(e.target.value)}
+                        placeholder="Opcional: agrupa o processo num macro."
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {vcLevelsDraft.map((val, idx) => (
+                      <div
+                        key={idx}
+                        className="flex flex-col gap-2 sm:flex-row sm:items-end"
+                      >
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <Label htmlFor={`simple-vc-n-${idx}`}>Nível {idx + 1}</Label>
+                          <Input
+                            id={`simple-vc-n-${idx}`}
+                            value={val}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setVcLevelsDraft((prev) =>
+                                prev.map((item, itemIdx) => (itemIdx === idx ? value : item))
+                              );
+                            }}
+                            placeholder={
+                              idx === 0 ? "Ex.: Macroárea" : "Ex.: subdivisão da hierarquia"
+                            }
+                          />
+                        </div>
+                        {idx > 0 ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() =>
+                              setVcLevelsDraft((prev) =>
+                                prev.filter((_, itemIdx) => itemIdx !== idx)
+                              )
+                            }
+                          >
+                            Remover
+                          </Button>
+                        ) : null}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => setVcLevelsDraft((prev) => [...prev, ""])}
+                    >
+                      <Plus className="h-4 w-4" aria-hidden />
+                      Adicionar nível
+                    </Button>
+                  </div>
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value as OfficeProcessStatus)}
+                      >
+                        {Object.entries(OFFICE_PROCESS_STATUS_META).map(([value, meta]) => (
+                          <option key={value} value={value}>
+                            {meta.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Responsável</Label>
+                      <Select
+                        value={ownerProfileId}
+                        onChange={(e) => setOwnerProfileId(e.target.value)}
+                      >
+                        <option value="">Não definido</option>
+                        {ownerOptions.map((owner) => (
+                          <option key={owner.id} value={owner.id}>
+                            {owner.full_name}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-4 border-b border-border/70 p-6">
+                <div className="space-y-1">
+                  <h3 className="text-base font-semibold">Fluxograma</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Desenho do processo para consulta e atualização.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {materialError ? (
+                    <p className="text-sm text-destructive">{materialError}</p>
+                  ) : null}
+                  {editedFlowchartFiles.length > 0 ? (
+                    <div className="divide-y overflow-hidden rounded-lg border">
+                      {editedFlowchartFiles.map((ff, i) => {
+                        const fileName = fileNameFromUrl(ff.url);
+                        return (
+                          <div
+                            key={`simple-flowchart-${i}-${ff.url}`}
+                            className="flex flex-wrap items-center gap-2 bg-background px-3 py-3"
+                          >
+                            <FileExtBadge name={fileName} />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium" title={fileName}>
+                                {fileName}
+                              </p>
+                            </div>
+                            <a
+                              href={ff.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={cn(
+                                buttonVariants({ variant: "ghost", size: "icon" }),
+                                "shrink-0"
+                              )}
+                              title="Abrir ficheiro"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="shrink-0"
+                              onClick={() =>
+                                setEditedFlowchartFiles((prev) =>
+                                  prev.filter((_, itemIdx) => itemIdx !== i)
+                                )
+                              }
+                              title="Remover"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={Workflow}
+                      title="Nenhum fluxograma cadastrado"
+                      description="Adicione o fluxograma para documentar visualmente este processo."
+                    />
+                  )}
+                  <input
+                    ref={flowchartFileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".png,.jpg,.jpeg,.gif,.webp,.bpm,.bpmn,.bpms,.pdf"
+                    onChange={(e) => {
+                      void handleFlowchartFileSelected(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={materialUploading === "flowchart"}
+                    onClick={() => flowchartFileInputRef.current?.click()}
+                  >
+                    {materialUploading === "flowchart" ? "Enviando..." : "Adicionar fluxograma"}
+                  </Button>
+                </div>
+              </section>
+
+              <div className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-end">
+                {saveError ? (
+                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                    {saveError}
+                  </div>
+                ) : null}
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Salvando..." : "Salvar alterações"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/80">
+          <CardHeader>
+            <CardTitle>Documentos do processo</CardTitle>
+            <CardDescription>
+              Documentos de apoio, evidências e arquivos úteis para a operação.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-3">
+              {attachments.length === 0 ? (
+                  <EmptyState
+                    icon={BookOpen}
+                    title="Nenhum documento cadastrado"
+                    description="Envie documentos para formar a base de conhecimento operacional deste processo."
+                  />
+                ) : (
+                  attachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background p-3 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{attachment.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {
+                            ATTACHMENT_TYPES.find(
+                              (type) => type.value === attachment.attachment_type
+                            )?.label
+                          }
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={attachment.attachment_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          download
+                          className={buttonVariants({ variant: "outline", size: "sm" })}
+                        >
+                          Baixar
+                        </a>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={deletingAttachmentId === attachment.id}
+                          onClick={() => void handleDeleteAttachment(attachment.id)}
+                          aria-label="Remover documento"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form onSubmit={handleAttachmentAdd} className="space-y-4 rounded-xl border border-border/70 bg-muted/20 p-4">
+                <div>
+                  <h3 className="text-sm font-semibold">Novo documento</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Envie um ou mais arquivos para o repositório.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select
+                    value={newAttachmentType}
+                    onChange={(e) =>
+                      setNewAttachmentType(e.target.value as OfficeProcessAttachmentType)
+                    }
+                  >
+                    {ATTACHMENT_TYPES.filter((type) => type.value !== "flowchart").map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Arquivos</Label>
+                  {newAttachmentFiles.map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg border bg-background p-2">
+                      <Input
+                        placeholder="Título (opcional)"
+                        value={item.title}
+                        onChange={(e) =>
+                          setNewAttachmentFiles((prev) =>
+                            prev.map((fileItem, itemIdx) =>
+                              itemIdx === i ? { ...fileItem, title: e.target.value } : fileItem
+                            )
+                          )
+                        }
+                        className="flex-1"
+                      />
+                      <span className="max-w-[140px] truncate text-xs text-muted-foreground">
+                        {item.file.name}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeAttachmentFile(i)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Input
+                    type="file"
+                    multiple
+                    accept="*/*"
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      if (!files?.length) return;
+                      addAttachmentFiles(files);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+                {attachmentError ? (
+                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                    {attachmentError}
+                  </div>
+                ) : null}
+                <Button
+                  type="submit"
+                  disabled={attachmentUploading || newAttachmentFiles.length === 0}
+                >
+                  {attachmentUploading
+                    ? "Enviando..."
+                    : `Adicionar ${newAttachmentFiles.length > 0 ? newAttachmentFiles.length : ""} documento(s)`}
+                </Button>
+              </form>
+          </CardContent>
+        </Card>
+      </div>
+    </ProcessWorkspaceShell>
+  );
+}
+
 export function ProcessManagementClient(props: ProcessManagementClientProps) {
   return (
     <Suspense>
-      <ProcessManagementClientInner {...props} />
+      {props.managementVersion === "simple" ? (
+        <ProcessManagementSimpleClient {...props} />
+      ) : (
+        <ProcessManagementClientInner {...props} />
+      )}
     </Suspense>
   );
 }

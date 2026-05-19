@@ -21,11 +21,22 @@ const PLAN_FEATURE_KEYS = [
   ...SYSTEM_AREAS.map((area) => area.featureKey),
 ];
 
-function buildFeatures(formData: FormData): Record<string, boolean> {
-  const features: Record<string, boolean> = {};
+const PROCESS_MANAGEMENT_VERSIONS = ["complete", "simple"] as const;
+type ProcessManagementVersion = (typeof PROCESS_MANAGEMENT_VERSIONS)[number];
+
+function readProcessManagementVersion(formData: FormData): ProcessManagementVersion {
+  const value = formData.get("process_management_version");
+  return PROCESS_MANAGEMENT_VERSIONS.includes(value as ProcessManagementVersion)
+    ? (value as ProcessManagementVersion)
+    : "complete";
+}
+
+function buildFeatures(formData: FormData): Record<string, boolean | string> {
+  const features: Record<string, boolean | string> = {};
   for (const key of PLAN_FEATURE_KEYS) {
     features[key] = formData.get(`features_${key}`) === "true";
   }
+  features.process_management_version = readProcessManagementVersion(formData);
   return features;
 }
 

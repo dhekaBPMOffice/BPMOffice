@@ -7,6 +7,7 @@ import { updatePlan } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -32,6 +33,8 @@ const FEATURES = [
   { key: "backup_auto", label: "Backup Automático" },
 ] as const;
 
+type ProcessManagementVersion = "complete" | "simple";
+
 interface Plan {
   id: string;
   name: string;
@@ -39,7 +42,7 @@ interface Plan {
   max_users: number;
   max_processes: number;
   price_monthly: number;
-  features: Record<string, boolean>;
+  features: Record<string, boolean | string>;
   is_active: boolean;
 }
 
@@ -47,17 +50,21 @@ export function EditarPlanoForm({ plan }: { plan: Plan }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [processManagementVersion, setProcessManagementVersion] =
+    useState<ProcessManagementVersion>(() =>
+      plan.features?.process_management_version === "simple" ? "simple" : "complete"
+    );
   const [features, setFeatures] = useState<Record<string, boolean>>(() => {
     const f: Record<string, boolean> = {};
     for (const { key } of FEATURES) {
-      f[key] = plan.features?.[key] ?? false;
+      f[key] = plan.features?.[key] === true;
     }
     return f;
   });
   const [areas, setAreas] = useState<Record<string, boolean>>(() => {
     const f: Record<string, boolean> = {};
     for (const area of SYSTEM_AREAS) {
-      f[area.featureKey] = plan.features?.[area.featureKey] ?? false;
+      f[area.featureKey] = plan.features?.[area.featureKey] === true;
     }
     return f;
   });
@@ -75,6 +82,7 @@ export function EditarPlanoForm({ plan }: { plan: Plan }) {
     for (const area of SYSTEM_AREAS) {
       formData.set(`features_${area.featureKey}`, (areas[area.featureKey] ?? false) ? "true" : "false");
     }
+    formData.set("process_management_version", processManagementVersion);
     formData.set("is_active", isActive ? "true" : "false");
 
     const result = await updatePlan(plan.id, formData);
@@ -170,6 +178,25 @@ export function EditarPlanoForm({ plan }: { plan: Plan }) {
                 defaultValue={plan.price_monthly}
                 required
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="process_management_version">
+                Versão da gestão de processos
+              </Label>
+              <Select
+                id="process_management_version"
+                value={processManagementVersion}
+                onChange={(e) =>
+                  setProcessManagementVersion(e.target.value as ProcessManagementVersion)
+                }
+              >
+                <option value="complete">Gestão completa</option>
+                <option value="simple">Gestão simples</option>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Define qual experiência será exibida para os processos dos escritórios deste plano.
+              </p>
             </div>
 
             <div className="space-y-3">

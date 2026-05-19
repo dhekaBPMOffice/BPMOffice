@@ -7,6 +7,7 @@ import { createPlan } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -32,10 +33,14 @@ const FEATURES = [
   { key: "backup_auto", label: "Backup Automático" },
 ] as const;
 
+type ProcessManagementVersion = "complete" | "simple";
+
 export function NovoPlanoForm() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [processManagementVersion, setProcessManagementVersion] =
+    useState<ProcessManagementVersion>("complete");
   const [features, setFeatures] = useState<Record<string, boolean>>(
     Object.fromEntries(FEATURES.map((f) => [f.key, false]))
   );
@@ -55,6 +60,7 @@ export function NovoPlanoForm() {
     for (const [key, checked] of Object.entries(areas)) {
       formData.set(`features_${key}`, checked ? "true" : "false");
     }
+    formData.set("process_management_version", processManagementVersion);
 
     const result = await createPlan(formData);
 
@@ -147,6 +153,25 @@ export function NovoPlanoForm() {
                 defaultValue={0}
                 required
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="process_management_version">
+                Versão da gestão de processos
+              </Label>
+              <Select
+                id="process_management_version"
+                value={processManagementVersion}
+                onChange={(e) =>
+                  setProcessManagementVersion(e.target.value as ProcessManagementVersion)
+                }
+              >
+                <option value="complete">Gestão completa</option>
+                <option value="simple">Gestão simples</option>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Define qual experiência será exibida para os processos dos escritórios deste plano.
+              </p>
             </div>
 
             <div className="space-y-3">

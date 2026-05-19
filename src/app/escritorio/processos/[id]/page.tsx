@@ -5,6 +5,7 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { ClipboardList } from "lucide-react";
 import { ProcessManagementClient } from "./process-management-client";
 import { normalizeProcessTypeOptions } from "@/lib/process-type-options";
+import { getOfficeProcessManagementVersion } from "@/lib/process-management-version";
 
 export default async function OfficeProcessDetailPage({
   params,
@@ -30,6 +31,7 @@ export default async function OfficeProcessDetailPage({
     { data: attachments },
     { data: history },
     { data: bpmPhases },
+    processManagementVersion,
   ] = await Promise.all([
     supabase
       .from("office_processes")
@@ -61,6 +63,7 @@ export default async function OfficeProcessDetailPage({
       .from("office_process_bpm_phases")
       .select("id, phase, stage_status, completed_at, updated_at")
       .eq("office_process_id", id),
+    getOfficeProcessManagementVersion(profile.office_id),
   ]);
 
   if (processError || !officeProcess) {
@@ -91,6 +94,7 @@ export default async function OfficeProcessDetailPage({
     >
       <ProcessManagementClient
         officeProcess={officeProcess}
+        managementVersion={processManagementVersion}
         processTypeOptions={processTypeOptions}
         ownerOptions={ownerOptions ?? []}
         checklistItems={checklistItems ?? []}
