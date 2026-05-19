@@ -84,12 +84,17 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/primeiro-acesso") ||
     pathname === "/esqueci-senha" ||
     pathname === "/redefinir-senha";
-  const isPublicRoute = pathname === "/" || isAuthRoute;
+  const isPublicDemandRoute = pathname.startsWith("/demandas/abrir/");
+  const isPublicRoute = pathname === "/" || isAuthRoute || isPublicDemandRoute;
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
+  }
+
+  if (isPublicDemandRoute) {
+    return supabaseResponse;
   }
 
   const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

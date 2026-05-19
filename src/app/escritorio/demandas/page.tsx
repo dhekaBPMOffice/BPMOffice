@@ -21,7 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/layout/page-layout";
 import { buttonVariants } from "@/components/ui/button";
-import { ClipboardList, LayoutGrid, List, Plus } from "lucide-react";
+import { ClipboardList, LayoutGrid, List, Plus, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DemandasPageProps {
@@ -51,7 +51,11 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
       priority,
       assigned_to,
       created_at,
-      assigned_profile:assigned_to (full_name)
+      assigned_profile:assigned_to (full_name),
+      public_submission:demand_form_submissions (
+        requester_name,
+        requester_area
+      )
     `)
     .eq("office_id", profile.office_id)
     .order("created_at", { ascending: false });
@@ -105,16 +109,25 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
       description="Gerencie as demandas do ciclo BPM."
       iconName="ClipboardList"
       actions={
-        <Link
-          href="/escritorio/demandas/nova"
-          className={cn(
-            buttonVariants({ variant: "default", size: "default" }),
-            "gap-2"
-          )}
-        >
-          <Plus className="h-4 w-4" />
-          Nova Demanda
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/escritorio/demandas/formulario"
+            className={cn(buttonVariants({ variant: "outline", size: "default" }), "gap-2")}
+          >
+            <Settings className="h-4 w-4" />
+            Formulário público
+          </Link>
+          <Link
+            href="/escritorio/demandas/nova"
+            className={cn(
+              buttonVariants({ variant: "default", size: "default" }),
+              "gap-2"
+            )}
+          >
+            <Plus className="h-4 w-4" />
+            Nova Demanda
+          </Link>
+        </div>
       }
     >
       {/* Toolbar: abas + toggle de visualização */}
@@ -188,6 +201,11 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
                     const assignedName = assigned && typeof assigned === "object" && "full_name" in assigned
                       ? (assigned as { full_name: string }).full_name
                       : "—";
+                    const submission = d.public_submission as unknown;
+                    const publicRequester =
+                      Array.isArray(submission) && submission.length > 0
+                        ? (submission[0] as { requester_name?: string; requester_area?: string | null })
+                        : null;
                     return (
                       <TableRow key={d.id}>
                         <TableCell className="font-medium">
@@ -200,7 +218,14 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
                         </TableCell>
                         <TableCell>{getStatusBadge(d.status)}</TableCell>
                         <TableCell>{getPriorityLabel(d.priority)}</TableCell>
-                        <TableCell className="text-muted-foreground">{assignedName}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          <div>{assignedName}</div>
+                          {publicRequester && (
+                            <div className="text-xs">
+                              Solicitante: {publicRequester.requester_name}
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell className="text-muted-foreground">
                           {formatDate(d.created_at)}
                         </TableCell>
@@ -231,6 +256,11 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
             const assignedName = assigned && typeof assigned === "object" && "full_name" in assigned
               ? (assigned as { full_name: string }).full_name
               : "—";
+            const submission = d.public_submission as unknown;
+            const publicRequester =
+              Array.isArray(submission) && submission.length > 0
+                ? (submission[0] as { requester_name?: string; requester_area?: string | null })
+                : null;
 
             return (
               <Card key={d.id} className="card-hover-shadow hover:-translate-y-0.5"
@@ -246,6 +276,11 @@ export default async function DemandasPage({ searchParams: searchParamsPromise }
                   <p className="text-muted-foreground">
                     Responsável: <span className="text-foreground">{assignedName}</span>
                   </p>
+                  {publicRequester && (
+                    <p className="text-muted-foreground">
+                      Solicitante: <span className="text-foreground">{publicRequester.requester_name}</span>
+                    </p>
+                  )}
                   <p className="text-muted-foreground">
                     Criado em: <span className="text-foreground">{formatDate(d.created_at)}</span>
                   </p>

@@ -58,6 +58,7 @@ export type CreateFormInput = {
   enableProcessLinking: boolean;
   isProcessActivationForm: boolean;
   isRequiredFirstAccess?: boolean;
+  isDemandIntakeTemplate?: boolean;
 };
 
 export async function createForm(input: CreateFormInput) {
@@ -75,6 +76,17 @@ export async function createForm(input: CreateFormInput) {
       .maybeSingle();
     if (existing) {
       return { error: "Já existe um formulário de ativação. Desative-o antes de criar outro." };
+    }
+  }
+
+  if (input.isDemandIntakeTemplate) {
+    const { data: existing } = await supabase
+      .from("process_questionnaires")
+      .select("id")
+      .eq("is_demand_intake_template", true)
+      .maybeSingle();
+    if (existing) {
+      return { error: "Já existe um formulário padrão para abertura de demandas. Desmarque-o antes." };
     }
   }
 
@@ -96,6 +108,7 @@ export async function createForm(input: CreateFormInput) {
         input.isRequiredFirstAccess ?? input.isProcessActivationForm,
       enable_process_linking: input.enableProcessLinking,
       is_process_activation_form: input.isProcessActivationForm,
+      is_demand_intake_template: input.isDemandIntakeTemplate ?? false,
     })
     .select("id")
     .single();
@@ -130,6 +143,7 @@ export async function updateForm(
     isRequiredFirstAccess: boolean;
     enableProcessLinking: boolean;
     isProcessActivationForm: boolean;
+    isDemandIntakeTemplate: boolean;
   }
 ) {
   if (!input.title?.trim()) {
@@ -150,6 +164,18 @@ export async function updateForm(
     }
   }
 
+  if (input.isDemandIntakeTemplate) {
+    const { data: existing } = await supabase
+      .from("process_questionnaires")
+      .select("id")
+      .eq("is_demand_intake_template", true)
+      .neq("id", id)
+      .maybeSingle();
+    if (existing) {
+      return { error: "Já existe um formulário padrão para abertura de demandas. Desmarque-o antes." };
+    }
+  }
+
   const { error } = await supabase
     .from("process_questionnaires")
     .update({
@@ -158,6 +184,7 @@ export async function updateForm(
       is_required_first_access: input.isRequiredFirstAccess,
       enable_process_linking: input.enableProcessLinking,
       is_process_activation_form: input.isProcessActivationForm,
+      is_demand_intake_template: input.isDemandIntakeTemplate,
     })
     .eq("id", id);
 

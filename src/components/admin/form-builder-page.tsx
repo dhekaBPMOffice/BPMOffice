@@ -173,6 +173,7 @@ export function FormBuilderPage({
   const [isProcessActivationForm, setIsProcessActivationForm] = useState(
     lockActivationForm
   );
+  const [isDemandIntakeTemplate, setIsDemandIntakeTemplate] = useState(false);
   const [savingMeta, setSavingMeta] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
 
@@ -251,6 +252,7 @@ export function FormBuilderPage({
     setIsRequiredFirstAccess(currentForm.is_required_first_access);
     setEnableProcessLinking(currentForm.enable_process_linking ?? true);
     setIsProcessActivationForm(lockActivationForm || currentForm.is_process_activation_form);
+    setIsDemandIntakeTemplate(currentForm.is_demand_intake_template ?? false);
     setProcesses((processData ?? []) as BaseProcess[]);
     setSections(
       groupSections(
@@ -287,6 +289,7 @@ export function FormBuilderPage({
       isRequiredFirstAccess,
       enableProcessLinking,
       isProcessActivationForm: lockActivationForm ? true : isProcessActivationForm,
+      isDemandIntakeTemplate,
     });
 
     if ("error" in result && result.error) {
@@ -408,6 +411,9 @@ export function FormBuilderPage({
               {(lockActivationForm || form?.is_process_activation_form) && (
                 <Badge variant="outline">Ativação</Badge>
               )}
+              {form?.is_demand_intake_template && (
+                <Badge variant="outline">Padrão demandas</Badge>
+              )}
               <Badge variant="outline">
                 {sections.length} etapa{sections.length === 1 ? "" : "s"}
               </Badge>
@@ -472,6 +478,13 @@ export function FormBuilderPage({
                       onCheckedChange={setEnableProcessLinking}
                     />
                     <span className="text-sm">Permitir vínculo com processos</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <Switch
+                      checked={isDemandIntakeTemplate}
+                      onCheckedChange={setIsDemandIntakeTemplate}
+                    />
+                    <span className="text-sm">Padrão para abertura de demandas</span>
                   </label>
                 </div>
                 <Button type="submit" disabled={savingMeta}>

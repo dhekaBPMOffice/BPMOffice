@@ -47,6 +47,7 @@ export async function updateDemand(
     status?: string;
     priority?: string;
     assigned_to?: string | null;
+    internal_observation?: string | null;
   }
 ) {
   const profile = await getProfile();

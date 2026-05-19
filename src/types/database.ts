@@ -124,6 +124,14 @@ export type FormQuestionType =
   | "single_select"
   | "multi_select";
 
+export type DemandFieldKey =
+  | "requester_name"
+  | "requester_email"
+  | "requester_area"
+  | "demand_title"
+  | "demand_description"
+  | "priority";
+
 export const FORM_QUESTION_TYPES: FormQuestionType[] = [
   "short_text",
   "long_text",
@@ -182,6 +190,7 @@ export interface ProcessQuestionnaire {
   is_required_first_access: boolean;
   enable_process_linking: boolean;
   is_process_activation_form: boolean;
+  is_demand_intake_template: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -207,6 +216,7 @@ export interface ProcessQuestionnaireQuestion {
   is_required: boolean;
   enable_process_linking: boolean;
   sort_order: number;
+  demand_field_key: DemandFieldKey | null;
   created_at: string;
 }
 
@@ -252,6 +262,76 @@ export interface OfficeQuestionnaireAnswer {
   question_id: string;
   answer_text: string | null;
   selected_option_ids: string[];
+  created_at: string;
+}
+
+export interface OfficeDemandForm {
+  id: string;
+  office_id: string;
+  source_questionnaire_id: string | null;
+  title: string;
+  description: string | null;
+  is_active: boolean;
+  public_token: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OfficeDemandFormSection {
+  id: string;
+  office_demand_form_id: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OfficeDemandFormQuestion {
+  id: string;
+  office_demand_form_id: string;
+  section_id: string;
+  prompt: string;
+  helper_text: string | null;
+  question_type: FormQuestionType;
+  is_required: boolean;
+  sort_order: number;
+  demand_field_key: DemandFieldKey | null;
+  created_at: string;
+}
+
+export interface OfficeDemandFormOption {
+  id: string;
+  question_id: string;
+  label: string;
+  value: string | null;
+  helper_text: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DemandFormSubmission {
+  id: string;
+  demand_id: string;
+  office_demand_form_id: string;
+  office_id: string;
+  requester_name: string;
+  requester_email: string;
+  requester_area: string | null;
+  created_at: string;
+  submitted_at: string;
+}
+
+export interface DemandFormAnswer {
+  id: string;
+  submission_id: string;
+  question_id: string;
+  question_prompt: string;
+  answer_text: string | null;
+  selected_option_ids: string[];
+  selected_option_labels: string[];
   created_at: string;
 }
 

@@ -25,6 +25,7 @@ export default function FormulariosPage() {
   const [newDescription, setNewDescription] = useState("");
   const [newIsProcessActivation, setNewIsProcessActivation] = useState(false);
   const [newEnableProcessLinking, setNewEnableProcessLinking] = useState(true);
+  const [newIsDemandIntakeTemplate, setNewIsDemandIntakeTemplate] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -57,6 +58,7 @@ export default function FormulariosPage() {
       description: newDescription.trim() || undefined,
       isProcessActivationForm: newIsProcessActivation,
       enableProcessLinking: newEnableProcessLinking,
+      isDemandIntakeTemplate: newIsDemandIntakeTemplate,
     });
     if ("error" in result && result.error) {
       setError(result.error);
@@ -67,6 +69,7 @@ export default function FormulariosPage() {
     setNewDescription("");
     setNewIsProcessActivation(false);
     setNewEnableProcessLinking(true);
+    setNewIsDemandIntakeTemplate(false);
     setShowNew(false);
     setSaving(false);
     load();
@@ -160,6 +163,14 @@ export default function FormulariosPage() {
                   />
                   <span className="text-sm">Vincular processos nas perguntas/alternativas</span>
                 </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newIsDemandIntakeTemplate}
+                    onChange={(e) => setNewIsDemandIntakeTemplate(e.target.checked)}
+                  />
+                  <span className="text-sm">Padrão para abertura de demandas</span>
+                </label>
               </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={saving}>
@@ -224,6 +235,9 @@ export default function FormulariosPage() {
                   </Badge>
                   {form.is_process_activation_form && (
                     <Badge variant="outline">Ativação</Badge>
+                  )}
+                  {form.is_demand_intake_template && (
+                    <Badge variant="outline">Padrão demandas</Badge>
                   )}
                   {form.enable_process_linking && (
                     <Badge variant="outline">Vínculo processos</Badge>

@@ -14,6 +14,8 @@ import { ImplantacaoPhase } from "./implantacao/implantacao-phase";
 import { EncerramentoPhase } from "./encerramento/encerramento-phase";
 import { getEffectiveOfficeTimeZone } from "@/lib/timezone-server";
 import { formatDatePtBr } from "@/lib/timezone";
+import { DemandManagementPanel } from "./demand-management-panel";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function DemandaDetailPage({
   params,
@@ -43,6 +45,7 @@ export default async function DemandaDetailPage({
       status,
       priority,
       external_ticket_id,
+      internal_observation,
       assigned_to,
       created_at,
       assigned_profile:assigned_to (full_name)
@@ -54,6 +57,33 @@ export default async function DemandaDetailPage({
   if (error || !demand) {
     notFound();
   }
+
+  const [{ data: profiles }, { data: submission }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .eq("office_id", profile.office_id)
+      .eq("is_active", true)
+      .order("full_name", { ascending: true }),
+    supabase
+      .from("demand_form_submissions")
+      .select(`
+        id,
+        requester_name,
+        requester_email,
+        requester_area,
+        submitted_at,
+        demand_form_answers (
+          id,
+          question_prompt,
+          answer_text,
+          selected_option_labels
+        )
+      `)
+      .eq("demand_id", id)
+      .eq("office_id", profile.office_id)
+      .maybeSingle(),
+  ]);
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning"; label: string }> = {
@@ -105,6 +135,53 @@ export default async function DemandaDetailPage({
             {formatDatePtBr(demand.created_at, timeZone)}
           </span>
         </div>
+
+        <DemandManagementPanel
+          demandId={id}
+          status={demand.status}
+          assignedTo={demand.assigned_to}
+          internalObservation={demand.internal_observation}
+          profiles={(profiles ?? []) as { id: string; full_name: string; email: string }[]}
+        />
+
+        {submission && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Solicitação pública</CardTitle>
+              <CardDescription>
+                Dados enviados pelo formulário compartilhável de abertura de demandas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div>
+                  <p className="text-muted-foreground">Solicitante</p>
+                  <p className="font-medium">{submission.requester_name}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">E-mail</p>
+                  <p className="font-medium">{submission.requester_email}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Área</p>
+                  <p className="font-medium">{submission.requester_area ?? "—"}</p>
+                </div>
+              </div>
+              <div className="space-y-3 border-t pt-4">
+                {(submission.demand_form_answers ?? []).map((answer) => {
+                  const labels = answer.selected_option_labels as string[] | null;
+                  const value = labels && labels.length > 0 ? labels.join(", ") : answer.answer_text;
+                  return (
+                    <div key={answer.id}>
+                      <p className="font-medium">{answer.question_prompt}</p>
+                      <p className="text-muted-foreground">{value || "—"}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs defaultValue="planejamento" className="w-full">
         <TabsList className="flex flex-wrap h-auto gap-1">
