@@ -27,6 +27,8 @@ export interface AIGeneratedAction {
   action: string;
   description: string;
   objective_title: string;
+  objective_id?: string;
+  office_objective_id?: string | null;
   responsible: string;
   deadline: string;
   priority: "alta" | "media" | "baixa";

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Map } from "lucide-react";
 import { PageLayout } from "@/components/layout/page-layout";
-import { getTacticalPlanDocument, getDocumentActions } from "../actions";
+import { getAllStrategicData, getTacticalPlanDocument, getDocumentActions } from "../actions";
 import { DocumentDetail } from "../components/document-detail";
 
 interface PageProps {
@@ -11,9 +11,10 @@ interface PageProps {
 export default async function PlanoTaticoDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  const [docResult, actionsResult] = await Promise.all([
+  const [docResult, actionsResult, strategicDataResult] = await Promise.all([
     getTacticalPlanDocument(id),
     getDocumentActions(id),
+    getAllStrategicData(),
   ]);
 
   if (docResult.error || !docResult.data) {
@@ -30,6 +31,7 @@ export default async function PlanoTaticoDetailPage({ params }: PageProps) {
       <DocumentDetail
         document={docResult.data}
         actions={actionsResult.data ?? []}
+        strategicObjectives={strategicDataResult.data?.strategicObjectives ?? []}
       />
     </PageLayout>
   );

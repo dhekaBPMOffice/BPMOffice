@@ -97,9 +97,14 @@ const CATEGORY_LABELS: Record<string, string> = {
 interface DocumentDetailProps {
   document: TacticalPlanDocument;
   actions: TacticalAction[];
+  strategicObjectives: { id: string; title: string }[];
 }
 
-export function DocumentDetail({ document: initialDoc, actions: initialActions }: DocumentDetailProps) {
+export function DocumentDetail({
+  document: initialDoc,
+  actions: initialActions,
+  strategicObjectives,
+}: DocumentDetailProps) {
   const timeZone = useTimeZone();
   const router = useRouter();
   const [doc, setDoc] = useState(initialDoc);
@@ -131,6 +136,7 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
   });
 
   function openNewAction() {
+    const defaultObjective = strategicObjectives[0];
     setEditingActionId(null);
     setActionForm({
       action: "",
@@ -141,7 +147,7 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
       kpi: "",
       category: "",
       notes: "",
-      objective_id: "",
+      objective_id: defaultObjective?.id ?? "",
     });
     setShowActionDialog(true);
   }
@@ -165,6 +171,13 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
   async function handleSaveAction() {
     setError(null);
     if (!actionForm.action.trim()) return;
+    const selectedObjective = strategicObjectives.find(
+      (objective) => objective.id === actionForm.objective_id
+    );
+    if (!selectedObjective) {
+      setError("Selecione um objetivo estratégico válido antes de salvar a ação.");
+      return;
+    }
 
     if (editingActionId) {
       const result = await updateDocumentAction(editingActionId, {
@@ -176,6 +189,7 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
         kpi: actionForm.kpi.trim() || null,
         category: (actionForm.category || null) as TacticalCategory | null,
         notes: actionForm.notes.trim() || null,
+        objective_id: selectedObjective.id,
       });
       if (result.error) {
         setError(result.error);
@@ -194,6 +208,7 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
                 kpi: actionForm.kpi.trim() || null,
                 category: (actionForm.category || null) as TacticalCategory | null,
                 notes: actionForm.notes.trim() || null,
+                objective_id: selectedObjective.id,
               }
             : a
         )
@@ -201,7 +216,7 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
     } else {
       const result = await createDocumentAction({
         document_id: doc.id,
-        objective_id: actionForm.objective_id || actions[0]?.objective_id || doc.id,
+        objective_id: selectedObjective.id,
         action: actionForm.action.trim(),
         description: actionForm.description.trim() || undefined,
         responsible: actionForm.responsible.trim() || undefined,
@@ -446,6 +461,26 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
                 rows={2}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Objetivo Estratégico *</Label>
+              <Select
+                value={actionForm.objective_id}
+                onChange={(e) => setActionForm({ ...actionForm, objective_id: e.target.value })}
+                disabled={strategicObjectives.length === 0}
+              >
+                <option value="">Selecione um objetivo estratégico</option>
+                {strategicObjectives.map((objective) => (
+                  <option key={objective.id} value={objective.id}>
+                    {objective.title}
+                  </option>
+                ))}
+              </Select>
+              {strategicObjectives.length === 0 && (
+                <p className="text-xs text-destructive">
+                  Cadastre ou importe um objetivo estratégico antes de adicionar ações.
+                </p>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Responsável</Label>
@@ -509,7 +544,7 @@ export function DocumentDetail({ document: initialDoc, actions: initialActions }
             <Button variant="outline" onClick={() => setShowActionDialog(false)}>Cancelar</Button>
             <Button
               onClick={handleSaveAction}
-              disabled={!actionForm.action.trim()}
+              disabled={!actionForm.action.trim() || !actionForm.objective_id}
               className="bg-teal-600 hover:bg-teal-700"
             >
               <CheckCircle2 className="h-4 w-4 mr-1" />

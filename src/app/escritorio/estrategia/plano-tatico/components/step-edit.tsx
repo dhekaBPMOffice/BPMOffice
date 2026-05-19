@@ -34,6 +34,11 @@ import type { AIGeneratedAction } from "./step-preview";
 import { useTimeZone } from "@/components/providers/timezone-provider";
 import { formatDatePtBr } from "@/lib/timezone";
 
+type StrategicObjectiveOption = {
+  id: string;
+  title: string;
+};
+
 const PRIORITY_STYLES: Record<string, { label: string; className: string }> = {
   alta: { label: "Alta", className: "bg-red-100 text-red-700" },
   media: { label: "Média", className: "bg-amber-100 text-amber-700" },
@@ -61,6 +66,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 interface StepEditProps {
   actions: AIGeneratedAction[];
+  strategicObjectives: StrategicObjectiveOption[];
   onActionsChange: (actions: AIGeneratedAction[]) => void;
   onBack: () => void;
   onSave: () => void;
@@ -70,6 +76,7 @@ interface StepEditProps {
 
 export function StepEdit({
   actions,
+  strategicObjectives,
   onActionsChange,
   onBack,
   onSave,
@@ -91,11 +98,14 @@ export function StepEdit({
   });
 
   function openNew() {
+    const defaultObjective = strategicObjectives[0];
     setEditingIndex(null);
     setForm({
       action: "",
       description: "",
-      objective_title: "",
+      objective_title: defaultObjective?.title ?? "",
+      objective_id: defaultObjective?.id ?? "",
+      office_objective_id: null,
       responsible: "",
       deadline: "",
       priority: "media",
@@ -113,11 +123,21 @@ export function StepEdit({
 
   function handleSaveAction() {
     if (!form.action.trim()) return;
+    const selectedObjective = strategicObjectives.find(
+      (objective) => objective.id === form.objective_id
+    );
+    if (!selectedObjective) return;
+
+    const actionToSave = {
+      ...form,
+      objective_id: selectedObjective.id,
+      objective_title: selectedObjective.title,
+    };
     const updated = [...actions];
     if (editingIndex !== null) {
-      updated[editingIndex] = { ...form };
+      updated[editingIndex] = actionToSave;
     } else {
-      updated.push({ ...form });
+      updated.push(actionToSave);
     }
     onActionsChange(updated);
     setShowDialog(false);
@@ -155,6 +175,11 @@ export function StepEdit({
       {saveError && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive text-center max-w-xl mx-auto">
           {saveError}
+        </div>
+      )}
+      {strategicObjectives.length === 0 && (
+        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive text-center max-w-xl mx-auto">
+          Cadastre ou importe pelo menos um objetivo estratégico antes de salvar o plano tático.
         </div>
       )}
 
@@ -252,7 +277,7 @@ export function StepEdit({
         </Button>
         <Button
           onClick={onSave}
-          disabled={actions.length === 0 || isSaving}
+          disabled={actions.length === 0 || strategicObjectives.length === 0 || isSaving}
           className="gap-2 bg-teal-600 hover:bg-teal-700"
         >
           {isSaving ? (
@@ -292,11 +317,32 @@ export function StepEdit({
             </div>
             <div className="space-y-2">
               <Label>Objetivo Vinculado</Label>
-              <Input
-                value={form.objective_title}
-                onChange={(e) => setForm({ ...form, objective_title: e.target.value })}
-                placeholder="Título do objetivo"
-              />
+              <Select
+                value={form.objective_id ?? ""}
+                onChange={(e) => {
+                  const selectedObjective = strategicObjectives.find(
+                    (objective) => objective.id === e.target.value
+                  );
+                  setForm({
+                    ...form,
+                    objective_id: selectedObjective?.id ?? "",
+                    objective_title: selectedObjective?.title ?? "",
+                  });
+                }}
+                disabled={strategicObjectives.length === 0}
+              >
+                <option value="">Selecione um objetivo estratégico</option>
+                {strategicObjectives.map((objective) => (
+                  <option key={objective.id} value={objective.id}>
+                    {objective.title}
+                  </option>
+                ))}
+              </Select>
+              {strategicObjectives.length === 0 && (
+                <p className="text-xs text-destructive">
+                  Cadastre ou importe um objetivo estratégico antes de adicionar ações.
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -359,7 +405,7 @@ export function StepEdit({
             </Button>
             <Button
               onClick={handleSaveAction}
-              disabled={!form.action.trim()}
+              disabled={!form.action.trim() || !form.objective_id}
               className="bg-teal-600 hover:bg-teal-700"
             >
               <CheckCircle2 className="h-4 w-4 mr-1" />

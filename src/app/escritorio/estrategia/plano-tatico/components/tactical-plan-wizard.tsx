@@ -24,6 +24,32 @@ const STEPS = [
   { label: "Editar & Salvar", icon: PenLine },
 ];
 
+function normalizeTitle(title: string) {
+  return title.trim().toLowerCase();
+}
+
+function findObjectiveByTitle<T extends { title: string }>(
+  objectives: T[],
+  title: string
+): T | undefined {
+  const normalizedTitle = normalizeTitle(title);
+  if (!normalizedTitle) return undefined;
+
+  return objectives.find((objective) => {
+    const candidate = normalizeTitle(objective.title);
+    if (!candidate) return false;
+
+    const titleStart = normalizedTitle.slice(0, 20);
+    const candidateStart = candidate.slice(0, 20);
+
+    return (
+      candidate === normalizedTitle ||
+      candidate.includes(titleStart) ||
+      normalizedTitle.includes(candidateStart)
+    );
+  });
+}
+
 interface TacticalPlanWizardProps {
   strategicData: StrategicDataBundle;
 }
@@ -65,7 +91,27 @@ export function TacticalPlanWizard({ strategicData }: TacticalPlanWizardProps) {
       if (!res.ok) throw new Error(data.error ?? "Erro ao gerar plano.");
 
       if (data.parsed?.actions) {
-        setGeneratedActions(data.parsed.actions);
+        const fallbackObjective = strategicData.strategicObjectives[0];
+        const normalizedActions = (data.parsed.actions as AIGeneratedAction[]).map((action) => {
+          const matchedStrategicObjective = findObjectiveByTitle(
+            strategicData.strategicObjectives,
+            action.objective_title
+          );
+          const matchedOfficeObjective = findObjectiveByTitle(
+            strategicData.officeObjectives,
+            action.objective_title
+          );
+          const objective = matchedStrategicObjective ?? fallbackObjective;
+
+          return {
+            ...action,
+            objective_id: objective?.id ?? "",
+            office_objective_id: matchedOfficeObjective?.id ?? null,
+            objective_title: objective?.title ?? action.objective_title,
+          };
+        });
+
+        setGeneratedActions(normalizedActions);
       } else {
         throw new Error(
           "A IA não retornou o plano no formato esperado. Tente novamente."
@@ -83,6 +129,49 @@ export function TacticalPlanWizard({ strategicData }: TacticalPlanWizardProps) {
     setSaveError(null);
 
     try {
+      const strategicObjectiveIds = new Set(
+        strategicData.strategicObjectives.map((objective) => objective.id)
+      );
+
+      if (strategicObjectiveIds.size === 0) {
+        throw new Error(
+          "Cadastre ou importe pelo menos um objetivo estratégico antes de salvar o plano tático."
+        );
+      }
+
+      const fallbackObjective = strategicData.strategicObjectives[0];
+      const actionsToInsert = generatedActions.map((a) => {
+        const matchedStrategicObjective = findObjectiveByTitle(
+          strategicData.strategicObjectives,
+          a.objective_title
+        );
+        const objectiveId = strategicObjectiveIds.has(a.objective_id ?? "")
+          ? a.objective_id!
+          : matchedStrategicObjective?.id ?? fallbackObjective.id;
+
+        return {
+          objective_id: objectiveId,
+          office_objective_id: a.office_objective_id ?? null,
+          action: a.action,
+          description: a.description || undefined,
+          responsible: a.responsible || undefined,
+          deadline: a.deadline || undefined,
+          priority: (a.priority || "media") as TacticalPriority,
+          kpi: a.kpi || undefined,
+          category: (a.category || undefined) as TacticalCategory | undefined,
+        };
+      });
+
+      const invalidActions = actionsToInsert.filter(
+        (action) => !strategicObjectiveIds.has(action.objective_id)
+      );
+
+      if (invalidActions.length > 0) {
+        throw new Error(
+          "Revise os objetivos vinculados às ações. Cada ação deve estar ligada a um objetivo estratégico válido."
+        );
+      }
+
       const docResult = await createTacticalPlanDocument({
         title: config.title,
         period_start: config.period_start,
@@ -98,49 +187,6 @@ export function TacticalPlanWizard({ strategicData }: TacticalPlanWizardProps) {
 
       await updateTacticalPlanDocument(documentId, {
         ai_context: { interviewAnswers, generatedAt: new Date().toISOString() },
-      });
-
-      const allObjectives = [
-        ...strategicData.strategicObjectives.map((o) => ({
-          id: o.id,
-          title: o.title,
-          type: "strategic" as const,
-        })),
-        ...strategicData.officeObjectives.map((o) => ({
-          id: o.id,
-          title: o.title,
-          type: "office" as const,
-        })),
-      ];
-
-      const fallbackObjectiveId = allObjectives[0]?.id;
-
-      const actionsToInsert = generatedActions.map((a) => {
-        const matchedObj = allObjectives.find(
-          (o) =>
-            o.title.toLowerCase() === a.objective_title.toLowerCase() ||
-            o.title.toLowerCase().includes(a.objective_title.toLowerCase().slice(0, 20)) ||
-            a.objective_title.toLowerCase().includes(o.title.toLowerCase().slice(0, 20))
-        );
-
-        const isStrategic = matchedObj?.type === "strategic";
-        const objectiveId = isStrategic
-          ? matchedObj.id
-          : fallbackObjectiveId ?? matchedObj?.id ?? "";
-        const officeObjectiveId =
-          matchedObj?.type === "office" ? matchedObj.id : null;
-
-        return {
-          objective_id: objectiveId,
-          office_objective_id: officeObjectiveId,
-          action: a.action,
-          description: a.description || undefined,
-          responsible: a.responsible || undefined,
-          deadline: a.deadline || undefined,
-          priority: (a.priority || "media") as TacticalPriority,
-          kpi: a.kpi || undefined,
-          category: (a.category || undefined) as TacticalCategory | undefined,
-        };
       });
 
       const validActions = actionsToInsert.filter((a) => a.objective_id);
@@ -240,6 +286,7 @@ export function TacticalPlanWizard({ strategicData }: TacticalPlanWizardProps) {
       {currentStep === 3 && (
         <StepEdit
           actions={generatedActions}
+          strategicObjectives={strategicData.strategicObjectives}
           onActionsChange={setGeneratedActions}
           onBack={() => setCurrentStep(2)}
           onSave={handleSave}
