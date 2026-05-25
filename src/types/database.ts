@@ -342,7 +342,7 @@ export interface DemandFormSubmission {
 export interface DemandFormAnswer {
   id: string;
   submission_id: string;
-  question_id: string;
+  question_id: string | null;
   question_prompt: string;
   answer_text: string | null;
   selected_option_ids: string[];
