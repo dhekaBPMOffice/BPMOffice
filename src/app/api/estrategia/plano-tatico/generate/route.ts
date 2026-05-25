@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const interviewSummary = buildInterviewSummary(interviewAnswers);
 
     const input = `
-CONFIGURAÇÃO DO PLANO:
+CONFIGURAÇÃO DO PLANO TÁTICO DO ESCRITÓRIO DE PROCESSOS:
 - Título: ${config.title}
 - Período: ${config.period_start} a ${config.period_end}
 - Horizonte: ${config.horizon}
@@ -54,10 +54,10 @@ CONFIGURAÇÃO DO PLANO:
 ANÁLISE SWOT (F.O.F.A) DO ESCRITÓRIO:
 ${swotSummary}
 
-OBJETIVOS (use estes títulos exatos ao vincular ações):
+OBJETIVOS DO ESCRITÓRIO DE PROCESSOS (use estes títulos exatos em objective_title ao vincular ações):
 ${objectivesList}
 
-PORTFÓLIO DE SERVIÇOS:
+PORTFÓLIO DE SERVIÇOS DO ESCRITÓRIO DE PROCESSOS:
 ${portfolioSummary}
 
 RESPOSTAS DA ENTREVISTA GUIADA:
@@ -128,17 +128,17 @@ function buildObjectivesList(
 ): string {
   const parts: string[] = [];
 
-  if (strategic.length > 0) {
-    parts.push("Objetivos Estratégicos:");
-    for (const o of strategic) {
-      parts.push(`  - ${o.title}${o.description ? ` (${o.description})` : ""}`);
+  if (office.length > 0) {
+    parts.push("Objetivos do Escritório (usar como vínculo principal):");
+    for (const o of office) {
+      parts.push(`  - [${o.type}] ${o.title}${o.description ? ` (${o.description})` : ""}`);
     }
   }
 
-  if (office.length > 0) {
-    parts.push("Objetivos do Escritório:");
-    for (const o of office) {
-      parts.push(`  - [${o.type}] ${o.title}${o.description ? ` (${o.description})` : ""}`);
+  if (strategic.length > 0) {
+    parts.push("Objetivos Estratégicos para alinhamento (não usar como vínculo principal):");
+    for (const o of strategic) {
+      parts.push(`  - ${o.title}${o.description ? ` (${o.description})` : ""}`);
     }
   }
 

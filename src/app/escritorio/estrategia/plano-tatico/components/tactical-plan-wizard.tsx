@@ -91,23 +91,23 @@ export function TacticalPlanWizard({ strategicData }: TacticalPlanWizardProps) {
       if (!res.ok) throw new Error(data.error ?? "Erro ao gerar plano.");
 
       if (data.parsed?.actions) {
-        const fallbackObjective = strategicData.strategicObjectives[0];
+        const fallbackOfficeObjective = strategicData.officeObjectives[0];
         const normalizedActions = (data.parsed.actions as AIGeneratedAction[]).map((action) => {
-          const matchedStrategicObjective = findObjectiveByTitle(
-            strategicData.strategicObjectives,
-            action.objective_title
-          );
           const matchedOfficeObjective = findObjectiveByTitle(
             strategicData.officeObjectives,
             action.objective_title
           );
-          const objective = matchedStrategicObjective ?? fallbackObjective;
+          const matchedStrategicObjective = findObjectiveByTitle(
+            strategicData.strategicObjectives,
+            action.objective_title
+          );
+          const officeObjective = matchedOfficeObjective ?? fallbackOfficeObjective;
 
           return {
             ...action,
-            objective_id: objective?.id ?? "",
-            office_objective_id: matchedOfficeObjective?.id ?? null,
-            objective_title: objective?.title ?? action.objective_title,
+            objective_id: matchedStrategicObjective?.id ?? null,
+            office_objective_id: officeObjective?.id ?? null,
+            objective_title: officeObjective?.title ?? action.objective_title,
           };
         });
 
@@ -129,29 +129,39 @@ export function TacticalPlanWizard({ strategicData }: TacticalPlanWizardProps) {
     setSaveError(null);
 
     try {
-      const strategicObjectiveIds = new Set(
-        strategicData.strategicObjectives.map((objective) => objective.id)
+      const officeObjectiveIds = new Set(
+        strategicData.officeObjectives.map((objective) => objective.id)
       );
 
-      if (strategicObjectiveIds.size === 0) {
+      if (officeObjectiveIds.size === 0) {
         throw new Error(
-          "Cadastre ou importe pelo menos um objetivo estratégico antes de salvar o plano tático."
+          "Cadastre pelo menos um objetivo do escritório antes de salvar o plano tático."
         );
       }
 
-      const fallbackObjective = strategicData.strategicObjectives[0];
+      const strategicObjectiveIds = new Set(
+        strategicData.strategicObjectives.map((objective) => objective.id)
+      );
+      const fallbackOfficeObjective = strategicData.officeObjectives[0];
       const actionsToInsert = generatedActions.map((a) => {
+        const matchedOfficeObjective = findObjectiveByTitle(
+          strategicData.officeObjectives,
+          a.objective_title
+        );
         const matchedStrategicObjective = findObjectiveByTitle(
           strategicData.strategicObjectives,
           a.objective_title
         );
+        const officeObjectiveId = officeObjectiveIds.has(a.office_objective_id ?? "")
+          ? a.office_objective_id!
+          : matchedOfficeObjective?.id ?? fallbackOfficeObjective.id;
         const objectiveId = strategicObjectiveIds.has(a.objective_id ?? "")
           ? a.objective_id!
-          : matchedStrategicObjective?.id ?? fallbackObjective.id;
+          : matchedStrategicObjective?.id ?? null;
 
         return {
           objective_id: objectiveId,
-          office_objective_id: a.office_objective_id ?? null,
+          office_objective_id: officeObjectiveId,
           action: a.action,
           description: a.description || undefined,
           responsible: a.responsible || undefined,
@@ -163,12 +173,12 @@ export function TacticalPlanWizard({ strategicData }: TacticalPlanWizardProps) {
       });
 
       const invalidActions = actionsToInsert.filter(
-        (action) => !strategicObjectiveIds.has(action.objective_id)
+        (action) => !officeObjectiveIds.has(action.office_objective_id)
       );
 
       if (invalidActions.length > 0) {
         throw new Error(
-          "Revise os objetivos vinculados às ações. Cada ação deve estar ligada a um objetivo estratégico válido."
+          "Revise os objetivos vinculados às ações. Cada ação deve estar ligada a um objetivo do escritório válido."
         );
       }
 
@@ -189,7 +199,7 @@ export function TacticalPlanWizard({ strategicData }: TacticalPlanWizardProps) {
         ai_context: { interviewAnswers, generatedAt: new Date().toISOString() },
       });
 
-      const validActions = actionsToInsert.filter((a) => a.objective_id);
+      const validActions = actionsToInsert.filter((a) => a.office_objective_id);
 
       if (validActions.length > 0) {
         const bulkResult = await bulkCreateDocumentActions(documentId, validActions);
@@ -286,7 +296,7 @@ export function TacticalPlanWizard({ strategicData }: TacticalPlanWizardProps) {
       {currentStep === 3 && (
         <StepEdit
           actions={generatedActions}
-          strategicObjectives={strategicData.strategicObjectives}
+          officeObjectives={strategicData.officeObjectives}
           onActionsChange={setGeneratedActions}
           onBack={() => setCurrentStep(2)}
           onSave={handleSave}

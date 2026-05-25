@@ -34,9 +34,10 @@ import type { AIGeneratedAction } from "./step-preview";
 import { useTimeZone } from "@/components/providers/timezone-provider";
 import { formatDatePtBr } from "@/lib/timezone";
 
-type StrategicObjectiveOption = {
+type OfficeObjectiveOption = {
   id: string;
   title: string;
+  type: string;
 };
 
 const PRIORITY_STYLES: Record<string, { label: string; className: string }> = {
@@ -66,7 +67,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 interface StepEditProps {
   actions: AIGeneratedAction[];
-  strategicObjectives: StrategicObjectiveOption[];
+  officeObjectives: OfficeObjectiveOption[];
   onActionsChange: (actions: AIGeneratedAction[]) => void;
   onBack: () => void;
   onSave: () => void;
@@ -76,7 +77,7 @@ interface StepEditProps {
 
 export function StepEdit({
   actions,
-  strategicObjectives,
+  officeObjectives,
   onActionsChange,
   onBack,
   onSave,
@@ -98,14 +99,14 @@ export function StepEdit({
   });
 
   function openNew() {
-    const defaultObjective = strategicObjectives[0];
+    const defaultObjective = officeObjectives[0];
     setEditingIndex(null);
     setForm({
       action: "",
       description: "",
       objective_title: defaultObjective?.title ?? "",
-      objective_id: defaultObjective?.id ?? "",
-      office_objective_id: null,
+      objective_id: null,
+      office_objective_id: defaultObjective?.id ?? null,
       responsible: "",
       deadline: "",
       priority: "media",
@@ -123,14 +124,15 @@ export function StepEdit({
 
   function handleSaveAction() {
     if (!form.action.trim()) return;
-    const selectedObjective = strategicObjectives.find(
-      (objective) => objective.id === form.objective_id
+    const selectedObjective = officeObjectives.find(
+      (objective) => objective.id === form.office_objective_id
     );
     if (!selectedObjective) return;
 
     const actionToSave = {
       ...form,
-      objective_id: selectedObjective.id,
+      objective_id: form.objective_id ?? null,
+      office_objective_id: selectedObjective.id,
       objective_title: selectedObjective.title,
     };
     const updated = [...actions];
@@ -177,9 +179,9 @@ export function StepEdit({
           {saveError}
         </div>
       )}
-      {strategicObjectives.length === 0 && (
+      {officeObjectives.length === 0 && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive text-center max-w-xl mx-auto">
-          Cadastre ou importe pelo menos um objetivo estratégico antes de salvar o plano tático.
+          Cadastre pelo menos um objetivo do escritório antes de salvar o plano tático.
         </div>
       )}
 
@@ -277,7 +279,7 @@ export function StepEdit({
         </Button>
         <Button
           onClick={onSave}
-          disabled={actions.length === 0 || strategicObjectives.length === 0 || isSaving}
+          disabled={actions.length === 0 || officeObjectives.length === 0 || isSaving}
           className="gap-2 bg-teal-600 hover:bg-teal-700"
         >
           {isSaving ? (
@@ -318,29 +320,29 @@ export function StepEdit({
             <div className="space-y-2">
               <Label>Objetivo Vinculado</Label>
               <Select
-                value={form.objective_id ?? ""}
+                value={form.office_objective_id ?? ""}
                 onChange={(e) => {
-                  const selectedObjective = strategicObjectives.find(
+                  const selectedObjective = officeObjectives.find(
                     (objective) => objective.id === e.target.value
                   );
                   setForm({
                     ...form,
-                    objective_id: selectedObjective?.id ?? "",
+                    office_objective_id: selectedObjective?.id ?? null,
                     objective_title: selectedObjective?.title ?? "",
                   });
                 }}
-                disabled={strategicObjectives.length === 0}
+                disabled={officeObjectives.length === 0}
               >
-                <option value="">Selecione um objetivo estratégico</option>
-                {strategicObjectives.map((objective) => (
+                <option value="">Selecione um objetivo do escritório</option>
+                {officeObjectives.map((objective) => (
                   <option key={objective.id} value={objective.id}>
                     {objective.title}
                   </option>
                 ))}
               </Select>
-              {strategicObjectives.length === 0 && (
+              {officeObjectives.length === 0 && (
                 <p className="text-xs text-destructive">
-                  Cadastre ou importe um objetivo estratégico antes de adicionar ações.
+                  Cadastre um objetivo do escritório antes de adicionar ações.
                 </p>
               )}
             </div>
@@ -405,7 +407,7 @@ export function StepEdit({
             </Button>
             <Button
               onClick={handleSaveAction}
-              disabled={!form.action.trim() || !form.objective_id}
+              disabled={!form.action.trim() || !form.office_objective_id}
               className="bg-teal-600 hover:bg-teal-700"
             >
               <CheckCircle2 className="h-4 w-4 mr-1" />

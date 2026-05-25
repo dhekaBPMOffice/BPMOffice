@@ -32,6 +32,7 @@ export default async function PlanoTaticoDetailPage({ params }: PageProps) {
         document={docResult.data}
         actions={actionsResult.data ?? []}
         strategicObjectives={strategicDataResult.data?.strategicObjectives ?? []}
+        officeObjectives={strategicDataResult.data?.officeObjectives ?? []}
       />
     </PageLayout>
   );

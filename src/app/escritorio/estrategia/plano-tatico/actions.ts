@@ -31,7 +31,7 @@ export interface TacticalAction {
   id: string;
   office_id: string;
   document_id: string | null;
-  objective_id: string;
+  objective_id: string | null;
   office_objective_id: string | null;
   action: string;
   description: string | null;
@@ -239,8 +239,8 @@ export async function getDocumentActions(documentId: string): Promise<{
 
 export async function createDocumentAction(input: {
   document_id: string;
-  objective_id: string;
-  office_objective_id?: string | null;
+  objective_id?: string | null;
+  office_objective_id: string;
   action: string;
   description?: string;
   responsible?: string;
@@ -259,8 +259,8 @@ export async function createDocumentAction(input: {
     .insert({
       office_id: auth.officeId,
       document_id: input.document_id,
-      objective_id: input.objective_id,
-      office_objective_id: input.office_objective_id ?? null,
+      objective_id: input.objective_id ?? null,
+      office_objective_id: input.office_objective_id,
       action: input.action.trim(),
       description: input.description?.trim() || null,
       responsible: input.responsible?.trim() || null,
@@ -290,7 +290,7 @@ export async function updateDocumentAction(
     category?: TacticalCategory | null;
     status?: string;
     notes?: string | null;
-    objective_id?: string;
+    objective_id?: string | null;
     office_objective_id?: string | null;
   }
 ): Promise<{ error: string | null }> {
@@ -381,8 +381,8 @@ export async function getAllStrategicData(): Promise<{
 export async function bulkCreateDocumentActions(
   documentId: string,
   actions: {
-    objective_id: string;
-    office_objective_id?: string | null;
+    objective_id?: string | null;
+    office_objective_id: string;
     action: string;
     description?: string;
     responsible?: string;
@@ -399,8 +399,8 @@ export async function bulkCreateDocumentActions(
   const rows = actions.map((a) => ({
     office_id: auth.officeId,
     document_id: documentId,
-    objective_id: a.objective_id,
-    office_objective_id: a.office_objective_id ?? null,
+    objective_id: a.objective_id ?? null,
+    office_objective_id: a.office_objective_id,
     action: a.action.trim(),
     description: a.description?.trim() || null,
     responsible: a.responsible?.trim() || null,

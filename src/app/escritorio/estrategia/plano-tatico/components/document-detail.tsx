@@ -98,12 +98,14 @@ interface DocumentDetailProps {
   document: TacticalPlanDocument;
   actions: TacticalAction[];
   strategicObjectives: { id: string; title: string }[];
+  officeObjectives: { id: string; title: string; type: string }[];
 }
 
 export function DocumentDetail({
   document: initialDoc,
   actions: initialActions,
   strategicObjectives,
+  officeObjectives,
 }: DocumentDetailProps) {
   const timeZone = useTimeZone();
   const router = useRouter();
@@ -133,10 +135,11 @@ export function DocumentDetail({
     category: "" as string,
     notes: "",
     objective_id: "",
+    office_objective_id: "",
   });
 
   function openNewAction() {
-    const defaultObjective = strategicObjectives[0];
+    const defaultObjective = officeObjectives[0];
     setEditingActionId(null);
     setActionForm({
       action: "",
@@ -147,7 +150,8 @@ export function DocumentDetail({
       kpi: "",
       category: "",
       notes: "",
-      objective_id: defaultObjective?.id ?? "",
+      objective_id: "",
+      office_objective_id: defaultObjective?.id ?? "",
     });
     setShowActionDialog(true);
   }
@@ -163,7 +167,8 @@ export function DocumentDetail({
       kpi: a.kpi ?? "",
       category: a.category ?? "",
       notes: a.notes ?? "",
-      objective_id: a.objective_id,
+      objective_id: a.objective_id ?? "",
+      office_objective_id: a.office_objective_id ?? "",
     });
     setShowActionDialog(true);
   }
@@ -171,11 +176,11 @@ export function DocumentDetail({
   async function handleSaveAction() {
     setError(null);
     if (!actionForm.action.trim()) return;
-    const selectedObjective = strategicObjectives.find(
-      (objective) => objective.id === actionForm.objective_id
+    const selectedObjective = officeObjectives.find(
+      (objective) => objective.id === actionForm.office_objective_id
     );
     if (!selectedObjective) {
-      setError("Selecione um objetivo estratégico válido antes de salvar a ação.");
+      setError("Selecione um objetivo do escritório válido antes de salvar a ação.");
       return;
     }
 
@@ -189,7 +194,8 @@ export function DocumentDetail({
         kpi: actionForm.kpi.trim() || null,
         category: (actionForm.category || null) as TacticalCategory | null,
         notes: actionForm.notes.trim() || null,
-        objective_id: selectedObjective.id,
+        objective_id: actionForm.objective_id || null,
+        office_objective_id: selectedObjective.id,
       });
       if (result.error) {
         setError(result.error);
@@ -208,7 +214,8 @@ export function DocumentDetail({
                 kpi: actionForm.kpi.trim() || null,
                 category: (actionForm.category || null) as TacticalCategory | null,
                 notes: actionForm.notes.trim() || null,
-                objective_id: selectedObjective.id,
+                objective_id: actionForm.objective_id || null,
+                office_objective_id: selectedObjective.id,
               }
             : a
         )
@@ -216,7 +223,8 @@ export function DocumentDetail({
     } else {
       const result = await createDocumentAction({
         document_id: doc.id,
-        objective_id: selectedObjective.id,
+        objective_id: actionForm.objective_id || null,
+        office_objective_id: selectedObjective.id,
         action: actionForm.action.trim(),
         description: actionForm.description.trim() || undefined,
         responsible: actionForm.responsible.trim() || undefined,
@@ -296,6 +304,20 @@ export function DocumentDetail({
 
   const completedCount = actions.filter((a) => a.status === "completed").length;
   const progress = actions.length > 0 ? Math.round((completedCount / actions.length) * 100) : 0;
+  const officeObjectiveById = new Map(officeObjectives.map((objective) => [objective.id, objective]));
+  const strategicObjectiveById = new Map(strategicObjectives.map((objective) => [objective.id, objective]));
+  const groupedByObjective = new Map<string, TacticalAction[]>();
+
+  for (const action of actions) {
+    const objectiveTitle = action.office_objective_id
+      ? officeObjectiveById.get(action.office_objective_id)?.title ?? "Objetivo do escritório não encontrado"
+      : action.objective_id
+      ? strategicObjectiveById.get(action.objective_id)?.title ?? "Objetivo estratégico legado"
+      : "Sem objetivo vinculado";
+    const group = groupedByObjective.get(objectiveTitle) ?? [];
+    group.push(action);
+    groupedByObjective.set(objectiveTitle, group);
+  }
 
   return (
     <div className="space-y-6">
@@ -366,73 +388,86 @@ export function DocumentDetail({
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {actions.map((a) => {
-            const statusStyle = ACTION_STATUS_STYLES[a.status] ?? ACTION_STATUS_STYLES.pending;
-            const priorityStyle = PRIORITY_STYLES[a.priority ?? "media"] ?? PRIORITY_STYLES.media;
-            return (
-              <Card key={a.id} className="border">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm">{a.action}</p>
-                        <Badge className={`text-[10px] shrink-0 ${priorityStyle.className}`}>
-                          <Flag className="h-2.5 w-2.5 mr-0.5" />
-                          {priorityStyle.label}
-                        </Badge>
-                      </div>
-                      {a.description && (
-                        <p className="text-xs text-muted-foreground">{a.description}</p>
-                      )}
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        {a.responsible && (
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" /> {a.responsible}
-                          </span>
-                        )}
-                        {a.deadline && (
-                          <span className="flex items-center gap-1">
-                            <CalendarDays className="h-3 w-3" />{" "}
-                            {formatDatePtBr(a.deadline + "T00:00:00", timeZone)}
-                          </span>
-                        )}
-                        {a.category && (
-                          <span className="flex items-center gap-1">
-                            <Tag className="h-3 w-3" /> {CATEGORY_LABELS[a.category] ?? a.category}
-                          </span>
-                        )}
-                        {a.kpi && (
-                          <span className="flex items-center gap-1">
-                            <BarChart3 className="h-3 w-3" /> {a.kpi}
-                          </span>
-                        )}
-                        <Select
-                          value={a.status}
-                          onChange={(e) => handleStatusChange(a.id, e.target.value)}
-                          className="text-xs h-6 py-0 w-auto"
-                        >
-                          {ACTION_STATUS_OPTIONS.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditAction(a)}>
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteAction(a.id)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+        <div className="space-y-6">
+          {Array.from(groupedByObjective.entries()).map(([objectiveTitle, objectiveActions]) => (
+            <div key={objectiveTitle}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-2 w-2 rounded-full bg-teal-500" />
+                <h3 className="font-semibold text-foreground text-sm">{objectiveTitle}</h3>
+                <Badge variant="outline" className="text-xs ml-auto">
+                  {objectiveActions.length} ações
+                </Badge>
+              </div>
+
+              <div className="space-y-3 pl-4 border-l-2 border-teal-100">
+                {objectiveActions.map((a) => {
+                  const priorityStyle = PRIORITY_STYLES[a.priority ?? "media"] ?? PRIORITY_STYLES.media;
+                  return (
+                    <Card key={a.id} className="border">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm">{a.action}</p>
+                              <Badge className={`text-[10px] shrink-0 ${priorityStyle.className}`}>
+                                <Flag className="h-2.5 w-2.5 mr-0.5" />
+                                {priorityStyle.label}
+                              </Badge>
+                            </div>
+                            {a.description && (
+                              <p className="text-xs text-muted-foreground">{a.description}</p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                              {a.responsible && (
+                                <span className="flex items-center gap-1">
+                                  <User className="h-3 w-3" /> {a.responsible}
+                                </span>
+                              )}
+                              {a.deadline && (
+                                <span className="flex items-center gap-1">
+                                  <CalendarDays className="h-3 w-3" />{" "}
+                                  {formatDatePtBr(a.deadline + "T00:00:00", timeZone)}
+                                </span>
+                              )}
+                              {a.category && (
+                                <span className="flex items-center gap-1">
+                                  <Tag className="h-3 w-3" /> {CATEGORY_LABELS[a.category] ?? a.category}
+                                </span>
+                              )}
+                              {a.kpi && (
+                                <span className="flex items-center gap-1">
+                                  <BarChart3 className="h-3 w-3" /> {a.kpi}
+                                </span>
+                              )}
+                              <Select
+                                value={a.status}
+                                onChange={(e) => handleStatusChange(a.id, e.target.value)}
+                                className="text-xs h-6 py-0 w-auto"
+                              >
+                                {ACTION_STATUS_OPTIONS.map((s) => (
+                                  <option key={s.value} value={s.value}>
+                                    {s.label}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditAction(a)}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteAction(a.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -462,22 +497,22 @@ export function DocumentDetail({
               />
             </div>
             <div className="space-y-2">
-              <Label>Objetivo Estratégico *</Label>
+              <Label>Objetivo do Escritório *</Label>
               <Select
-                value={actionForm.objective_id}
-                onChange={(e) => setActionForm({ ...actionForm, objective_id: e.target.value })}
-                disabled={strategicObjectives.length === 0}
+                value={actionForm.office_objective_id}
+                onChange={(e) => setActionForm({ ...actionForm, office_objective_id: e.target.value })}
+                disabled={officeObjectives.length === 0}
               >
-                <option value="">Selecione um objetivo estratégico</option>
-                {strategicObjectives.map((objective) => (
+                <option value="">Selecione um objetivo do escritório</option>
+                {officeObjectives.map((objective) => (
                   <option key={objective.id} value={objective.id}>
                     {objective.title}
                   </option>
                 ))}
               </Select>
-              {strategicObjectives.length === 0 && (
+              {officeObjectives.length === 0 && (
                 <p className="text-xs text-destructive">
-                  Cadastre ou importe um objetivo estratégico antes de adicionar ações.
+                  Cadastre um objetivo do escritório antes de adicionar ações.
                 </p>
               )}
             </div>
@@ -544,7 +579,7 @@ export function DocumentDetail({
             <Button variant="outline" onClick={() => setShowActionDialog(false)}>Cancelar</Button>
             <Button
               onClick={handleSaveAction}
-              disabled={!actionForm.action.trim() || !actionForm.objective_id}
+              disabled={!actionForm.action.trim() || !actionForm.office_objective_id}
               className="bg-teal-600 hover:bg-teal-700"
             >
               <CheckCircle2 className="h-4 w-4 mr-1" />

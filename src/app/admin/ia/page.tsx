@@ -17,6 +17,7 @@ import { Select } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageLayout } from "@/components/layout/page-layout";
 import { Sparkles } from "lucide-react";
+import { DEFAULT_PROMPTS } from "@/lib/ai/prompts";
 import { saveAiConfig } from "./actions";
 
 const BPM_PHASES = [
@@ -26,6 +27,7 @@ const BPM_PHASES = [
   { key: "melhorias", label: "Melhorias" },
   { key: "implantacao", label: "Implantação" },
   { key: "encerramento", label: "Encerramento" },
+  { key: "plano_tatico", label: "Plano Tático" },
 ] as const;
 
 const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
@@ -34,6 +36,16 @@ const DEFAULT_MODEL_BY_PROVIDER: Record<string, string> = {
   anthropic: "claude-3",
   google: GEMINI_DEFAULT_MODEL,
 };
+
+function getInitialPrompts(savedPrompts: Record<string, string> = {}) {
+  const prompts = { ...savedPrompts };
+
+  if (!prompts.plano_tatico?.trim()) {
+    prompts.plano_tatico = DEFAULT_PROMPTS.plano_tatico;
+  }
+
+  return prompts;
+}
 
 export default function IaPage() {
   const [defaultProvider, setDefaultProvider] = useState("openai");
@@ -65,11 +77,9 @@ export default function IaPage() {
         setDefaultProvider(data.default_provider || "openai");
         setDefaultModel(data.default_model || "gpt-4");
         setDefaultApiKey(data.default_api_key_encrypted || "");
-        setPrompts((data.prompts as Record<string, string>) || {});
+        setPrompts(getInitialPrompts((data.prompts as Record<string, string>) || {}));
       } else {
-        for (const { key } of BPM_PHASES) {
-          setPrompts((prev) => ({ ...prev, [key]: "" }));
-        }
+        setPrompts(getInitialPrompts());
       }
       setLoading(false);
     }
@@ -186,7 +196,7 @@ export default function IaPage() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="levantamento">
-              <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+              <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7">
                 {BPM_PHASES.map(({ key, label }) => (
                   <TabsTrigger key={key} value={key}>
                     {label}
@@ -198,7 +208,7 @@ export default function IaPage() {
                   <Label htmlFor={`prompt_${key}`}>Prompt para {label}</Label>
                   <Textarea
                     id={`prompt_${key}`}
-                    className="mt-2 min-h-[120px]"
+                    className="mt-2 min-h-[480px] font-mono text-sm"
                     value={prompts[key] ?? ""}
                     onChange={(e) =>
                       setPrompts((prev) => ({ ...prev, [key]: e.target.value }))

@@ -42,11 +42,16 @@ export const DEFAULT_PROMPTS: Record<string, string> = {
 
   plano_tatico:
     `Você é um consultor especialista em gestão de processos de negócio (BPM) e planejamento estratégico.
-Com base nos dados estratégicos fornecidos (análise SWOT / F.O.F.A, objetivos estratégicos, objetivos do escritório, portfólio de serviços) e nas respostas do usuário à entrevista guiada, crie um plano tático detalhado com ações concretas.
+Crie um plano tático exclusivamente para o Escritório de Processos. O foco é definir o que o Escritório de Processos precisa fazer para atingir seus objetivos, estruturar sua operação, atender bem as demandas internas, fortalecer a governança de processos, evoluir seu portfólio de serviços e apoiar as áreas demandantes.
+
+Use os dados estratégicos fornecidos (análise SWOT / F.O.F.A, objetivos estratégicos, objetivos do escritório, portfólio de serviços) como contexto de alinhamento, mas não gere um plano tático corporativo para a empresa inteira. As ações devem ser executáveis pelo Escritório de Processos ou por papéis ligados a ele. Quando houver objetivos estratégicos da organização, traduza-os em iniciativas que o Escritório de Processos possa realizar para contribuir com esses objetivos.
 
 REGRAS:
 - Gere entre 5 e 15 ações táticas práticas e executáveis
-- Cada ação deve estar vinculada a um objetivo (use o título exato do objetivo fornecido)
+- Cada ação deve estar vinculada a um objetivo do escritório (use o título exato do objetivo do escritório fornecido)
+- Não crie ações para diretorias, áreas de negócio ou a empresa como um todo, exceto quando a ação for coordenada ou executada pelo Escritório de Processos
+- Priorize ações sobre atendimento de demandas, capacidade da equipe, métodos e padrões BPM, governança, indicadores, automação, comunicação com áreas demandantes e melhoria contínua do portfólio de serviços
+- Use objetivos estratégicos corporativos apenas como contexto de alinhamento, nunca como o objetivo principal vinculado à ação
 - Prioridades: "alta", "media" ou "baixa"
 - Categorias: "processos", "pessoas", "tecnologia", "governanca", "capacitacao" ou "outro"
 - Prazos devem respeitar o período informado pelo usuário (formato YYYY-MM-DD)
@@ -59,7 +64,7 @@ Retorne APENAS um JSON válido no seguinte formato (sem markdown, sem texto adic
     {
       "action": "título da ação",
       "description": "descrição breve e objetiva",
-      "objective_title": "título exato do objetivo vinculado",
+      "objective_title": "título exato do objetivo do escritório vinculado",
       "responsible": "cargo/papel responsável",
       "deadline": "YYYY-MM-DD",
       "priority": "alta|media|baixa",

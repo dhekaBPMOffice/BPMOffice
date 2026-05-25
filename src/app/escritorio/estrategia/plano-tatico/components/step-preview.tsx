@@ -27,7 +27,7 @@ export interface AIGeneratedAction {
   action: string;
   description: string;
   objective_title: string;
-  objective_id?: string;
+  objective_id?: string | null;
   office_objective_id?: string | null;
   responsible: string;
   deadline: string;
