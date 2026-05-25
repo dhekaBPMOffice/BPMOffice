@@ -5,13 +5,6 @@ const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 /** Evita `fetch` pendurada ao obter ficheiro remoto (ex.: importação de processos do catálogo). */
 const DUPLICATE_FILE_FETCH_TIMEOUT_MS = 60_000;
 
-const TEMPLATE_BLOCKED_EXTENSIONS = new Set([
-  "exe", "bat", "cmd", "sh", "ps1", "vbs", "js", "jar", "dll", "msi",
-  "php", "py", "rb", "pl", "cgi", "asp", "aspx", "jsp", "htaccess",
-]);
-
-const FLOWCHART_EXTENSIONS = new Set(["png", "bpm", "bpmn", "bpms"]);
-
 const COMMON_MIME_TYPES: Record<string, string> = {
   pdf: "application/pdf",
   png: "image/png",
@@ -110,19 +103,9 @@ function isBucketAlreadyExistsError(error: unknown) {
 }
 
 async function ensureProcessFilesBucket(supabase: SupabaseClient) {
-  const allowedMimeTypes = [
-    "application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp",
-    "image/bmp", "image/svg+xml", "application/xml", "text/xml",
-    "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "text/plain", "text/csv", "application/octet-stream",
-    "application/vnd.oasis.opendocument.text", "application/vnd.oasis.opendocument.spreadsheet",
-  ];
   const { error } = await supabase.storage.createBucket(PROCESS_FILES_BUCKET, {
     public: true,
     fileSizeLimit: MAX_FILE_SIZE_BYTES,
-    allowedMimeTypes,
   });
   if (error && !isBucketAlreadyExistsError(error)) {
     return { error: error.message };
@@ -141,31 +124,10 @@ export type ProcessFileUploadResult =
   | { error: string };
 
 function validateFilenameForKind(
-  filename: string,
+  _filename: string,
   kind: ProcessFileKind
 ): { ok: true } | { error: string } {
-  const ext = getExtension(filename);
-
-  if (kind === "template") {
-    if (TEMPLATE_BLOCKED_EXTENSIONS.has(ext)) {
-      return { error: `Formato não permitido por segurança: .${ext}` };
-    }
-    return { ok: true };
-  }
-
-  if (kind === "flowchart") {
-    if (!FLOWCHART_EXTENSIONS.has(ext)) {
-      return {
-        error: `Fluxograma deve ser PNG ou BPM (.png, .bpm, .bpmn, .bpms). Recebido: ${ext || "desconhecido"}`,
-      };
-    }
-    return { ok: true };
-  }
-
-  if (kind === "attachment") {
-    if (TEMPLATE_BLOCKED_EXTENSIONS.has(ext)) {
-      return { error: `Formato não permitido por segurança: .${ext}` };
-    }
+  if (kind === "template" || kind === "flowchart" || kind === "attachment") {
     return { ok: true };
   }
 
@@ -181,9 +143,7 @@ function validateFileForKind(
 
 /**
  * Faz upload de arquivo para o bucket de processos.
- * - template: aceita qualquer formato (exceto executáveis e scripts).
- * - flowchart: apenas PNG ou BPM (.png, .bpm, .bpmn, .bpms).
- * - attachment: aceita qualquer formato (exceto executáveis e scripts).
+ * Templates, fluxogramas e anexos aceitam qualquer formato, respeitando o limite de tamanho.
  */
 export async function uploadProcessFile(
   supabase: SupabaseClient,

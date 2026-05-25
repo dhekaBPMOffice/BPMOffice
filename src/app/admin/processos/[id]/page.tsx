@@ -709,7 +709,7 @@ export default function AdminProcessoDetailPage() {
                   </span>
                 </div>
                 <CardDescription>
-                  Diagramas do processo (.png, .bpm, .bpmn, .bpms).
+                  Diagramas e arquivos de apoio do processo em qualquer formato.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -783,7 +783,7 @@ export default function AdminProcessoDetailPage() {
                 )}
 
                 <DropZone
-                  accept=".png,.bpm,.bpmn,.bpms"
+                  accept="*/*"
                   label="Arraste ficheiros ou clique para adicionar fluxogramas"
                   onFiles={addFlowchartFiles}
                   disabled={saving}

@@ -1231,7 +1231,7 @@ function ProcessManagementClientInner({
                           ref={flowchartFileInputRef}
                           type="file"
                           className="hidden"
-                          accept=".png,.bpm,.bpmn,.bpms"
+                          accept="*/*"
                           onChange={(e) => {
                             void handleMaterialFileSelected("flowchart", e.target.files);
                             e.target.value = "";
@@ -2034,7 +2034,7 @@ function ProcessManagementSimpleClient({
                     ref={flowchartFileInputRef}
                     type="file"
                     className="hidden"
-                    accept=".png,.jpg,.jpeg,.gif,.webp,.bpm,.bpmn,.bpms,.pdf"
+                    accept="*/*"
                     onChange={(e) => {
                       void handleFlowchartFileSelected(e.target.files);
                       e.target.value = "";

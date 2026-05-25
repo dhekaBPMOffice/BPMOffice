@@ -528,7 +528,7 @@ export default function AdminProcessosPage() {
               <div className="space-y-2 md:col-span-2">
                 <Label>Arquivos do fluxograma</Label>
                 <p className="text-xs text-muted-foreground">
-                  PNG ou BPM (.png, .bpm, .bpmn, .bpms).
+                  Aceita arquivos em qualquer formato.
                 </p>
                 {flowchartFilesToAdd.map((file, i) => (
                   <div
@@ -557,7 +557,7 @@ export default function AdminProcessosPage() {
                     id="newProcessFlowchartFiles"
                     type="file"
                     multiple
-                    accept=".png,.bpm,.bpmn,.bpms"
+                    accept="*/*"
                     className="hidden"
                     onChange={(e) => {
                       const files = e.target.files;
