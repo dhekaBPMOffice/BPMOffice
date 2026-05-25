@@ -21,7 +21,13 @@ type SourceQuestion = {
 
 function normalizeQuestionType(type: string): FormQuestionType {
   if (type === "text" || type === "short_text") return "short_text";
-  if (type === "long_text" || type === "single_select" || type === "multi_select") {
+  if (
+    type === "long_text" ||
+    type === "single_select" ||
+    type === "multi_select" ||
+    type === "date" ||
+    type === "file_upload"
+  ) {
     return type;
   }
   return "short_text";
@@ -58,7 +64,7 @@ async function ensureOfficeForm(supabase: SupabaseService, officeId: string) {
 
   const { data: template, error: templateError } = await supabase
     .from("process_questionnaires")
-    .select("id, title, description")
+    .select("id, title, description, uses_sections")
     .eq("is_demand_intake_template", true)
     .maybeSingle();
 
@@ -81,6 +87,7 @@ async function ensureOfficeForm(supabase: SupabaseService, officeId: string) {
       title: template.title,
       description: template.description,
       is_active: true,
+      uses_sections: template.uses_sections ?? true,
       public_token: randomUUID().replaceAll("-", ""),
     })
     .select("*")
@@ -228,6 +235,7 @@ export async function updateOfficeDemandForm(input: {
   title: string;
   description?: string;
   isActive: boolean;
+  usesSections?: boolean;
 }) {
   const officeId = await getOfficeId();
   const supabase = await createServiceClient();
@@ -244,6 +252,7 @@ export async function updateOfficeDemandForm(input: {
       title: input.title.trim(),
       description: input.description?.trim() || null,
       is_active: input.isActive,
+      ...(typeof input.usesSections === "boolean" ? { uses_sections: input.usesSections } : {}),
     })
     .eq("id", form.id)
     .eq("office_id", officeId);

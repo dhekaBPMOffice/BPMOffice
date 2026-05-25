@@ -1,18 +1,12 @@
 "use server";
 
 import { createServiceClient } from "@/lib/supabase/server";
-
-type PublicDemandAnswer = {
-  questionId: string;
-  answerText?: string;
-  selectedOptionIds?: string[];
-};
+import { uploadFormAnswerFile } from "@/lib/form-answer-files";
+import type { FormAnswerFile } from "@/types/database";
 
 export async function submitPublicDemand(
   token: string,
-  input: {
-    answers: PublicDemandAnswer[];
-  }
+  formData: FormData
 ) {
   const supabase = await createServiceClient();
 
@@ -45,21 +39,53 @@ export async function submitPublicDemand(
 
   if (questionsError) return { error: questionsError.message };
 
-  const answersByQuestion = new Map(input.answers.map((answer) => [answer.questionId, answer]));
   const valueByFieldKey = new Map<string, string>();
+  const uploadedFilesByQuestion = new Map<string, FormAnswerFile[]>();
 
   for (const question of questions ?? []) {
-    const answer = answersByQuestion.get(question.id);
+    if (question.question_type !== "file_upload") continue;
+
+    const files = formData
+      .getAll(`question_${question.id}`)
+      .filter((value): value is File => value instanceof File && value.size > 0);
+
+    const uploadedFiles = [];
+    for (const file of files) {
+      const uploaded = await uploadFormAnswerFile(
+        supabase,
+        file,
+        `public-demand/${form.id}/${question.id}/${Date.now()}`
+      );
+      if ("error" in uploaded) return { error: uploaded.error };
+      uploadedFiles.push(uploaded);
+    }
+    uploadedFilesByQuestion.set(question.id, uploadedFiles);
+  }
+
+  for (const question of questions ?? []) {
     const options = (question.office_demand_form_options ?? []) as {
       id: string;
       label: string;
       value: string | null;
       is_active: boolean;
     }[];
-    const selectedIds = answer?.selectedOptionIds ?? [];
+    const fieldName = `question_${question.id}`;
+    const selectedIds =
+      question.question_type === "multi_select"
+        ? formData.getAll(fieldName).map(String)
+        : question.question_type === "single_select"
+          ? [formData.get(fieldName)].filter(Boolean).map(String)
+          : [];
     const selectedOption = options.find((option) => selectedIds.includes(option.id));
+    const answerText =
+      question.question_type === "short_text" ||
+      question.question_type === "long_text" ||
+      question.question_type === "date"
+        ? String(formData.get(fieldName) ?? "")
+        : "";
+    const uploadedFiles = uploadedFilesByQuestion.get(question.id) ?? [];
     const value =
-      answer?.answerText?.trim() ||
+      answerText.trim() ||
       selectedOption?.value?.trim() ||
       selectedOption?.label?.trim() ||
       "";
@@ -69,9 +95,10 @@ export async function submitPublicDemand(
     }
 
     if (!question.is_required) continue;
-    const hasText = Boolean(answer?.answerText?.trim());
-    const hasOptions = (answer?.selectedOptionIds ?? []).length > 0;
-    if (!hasText && !hasOptions) {
+    const hasText = Boolean(answerText.trim());
+    const hasOptions = selectedIds.length > 0;
+    const hasFiles = uploadedFiles.length > 0;
+    if (!hasText && !hasOptions && !hasFiles) {
       return { error: `Responda a pergunta obrigatória: ${question.prompt}` };
     }
   }
@@ -130,8 +157,13 @@ export async function submitPublicDemand(
   }
 
   const answerRows = (questions ?? []).map((question) => {
-    const answer = answersByQuestion.get(question.id);
-    const selectedIds = answer?.selectedOptionIds ?? [];
+    const fieldName = `question_${question.id}`;
+    const selectedIds =
+      question.question_type === "multi_select"
+        ? formData.getAll(fieldName).map(String)
+        : question.question_type === "single_select"
+          ? [formData.get(fieldName)].filter(Boolean).map(String)
+          : [];
     const options = (question.office_demand_form_options ?? []) as {
       id: string;
       label: string;
@@ -146,9 +178,15 @@ export async function submitPublicDemand(
       submission_id: submission.id,
       question_id: question.id,
       question_prompt: question.prompt,
-      answer_text: answer?.answerText?.trim() || null,
+      answer_text:
+        question.question_type === "short_text" ||
+        question.question_type === "long_text" ||
+        question.question_type === "date"
+          ? String(formData.get(fieldName) ?? "").trim() || null
+          : null,
       selected_option_ids: selectedIds,
       selected_option_labels: selectedLabels,
+      uploaded_files: uploadedFilesByQuestion.get(question.id) ?? [],
     };
   });
 

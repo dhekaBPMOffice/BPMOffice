@@ -122,7 +122,9 @@ export type FormQuestionType =
   | "short_text"
   | "long_text"
   | "single_select"
-  | "multi_select";
+  | "multi_select"
+  | "date"
+  | "file_upload";
 
 export type DemandFieldKey =
   | "requester_name"
@@ -137,6 +139,8 @@ export const FORM_QUESTION_TYPES: FormQuestionType[] = [
   "long_text",
   "single_select",
   "multi_select",
+  "date",
+  "file_upload",
 ];
 export type OfficeProcessOrigin = "questionnaire" | "manual" | "value_chain";
 export type OfficeProcessCreationSource = "from_catalog" | "created_in_value_chain";
@@ -191,6 +195,7 @@ export interface ProcessQuestionnaire {
   enable_process_linking: boolean;
   is_process_activation_form: boolean;
   is_demand_intake_template: boolean;
+  uses_sections: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -262,7 +267,16 @@ export interface OfficeQuestionnaireAnswer {
   question_id: string;
   answer_text: string | null;
   selected_option_ids: string[];
+  uploaded_files: FormAnswerFile[];
   created_at: string;
+}
+
+export interface FormAnswerFile {
+  bucket: string;
+  path: string;
+  filename: string;
+  size: number;
+  contentType: string | null;
 }
 
 export interface OfficeDemandForm {
@@ -272,6 +286,7 @@ export interface OfficeDemandForm {
   title: string;
   description: string | null;
   is_active: boolean;
+  uses_sections: boolean;
   public_token: string;
   created_at: string;
   updated_at: string;
@@ -332,6 +347,7 @@ export interface DemandFormAnswer {
   answer_text: string | null;
   selected_option_ids: string[];
   selected_option_labels: string[];
+  uploaded_files: FormAnswerFile[];
   created_at: string;
 }
 

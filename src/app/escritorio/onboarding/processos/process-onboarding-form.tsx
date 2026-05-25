@@ -40,7 +40,7 @@ type QuestionnaireQuestion = {
   section_id: string;
   prompt: string;
   helper_text: string | null;
-  question_type: "text" | "short_text" | "long_text" | "single_select" | "multi_select";
+  question_type: "text" | "short_text" | "long_text" | "single_select" | "multi_select" | "date" | "file_upload";
   is_required: boolean;
   sort_order: number;
   process_questionnaire_options?: QuestionnaireOption[];
@@ -59,10 +59,12 @@ type Questionnaire = {
   id: string;
   title: string;
   description: string | null;
+  uses_sections?: boolean;
   process_questionnaire_sections?: QuestionnaireSection[];
 };
 
 type Phase = "welcome" | "questions" | "section-done" | "submitting-done";
+type AnswerValue = string | string[] | File[];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,7 +81,7 @@ function getSectionIcon(index: number) {
 
 function isQuestionAnswered(
   question: QuestionnaireQuestion,
-  answers: Record<string, string | string[]>
+  answers: Record<string, AnswerValue>
 ) {
   const ans = answers[question.id];
   return Array.isArray(ans)
@@ -89,7 +91,7 @@ function isQuestionAnswered(
 
 function isSectionComplete(
   section: QuestionnaireSection,
-  answers: Record<string, string | string[]>
+  answers: Record<string, AnswerValue>
 ) {
   const required = (section.process_questionnaire_questions ?? []).filter((q) => q.is_required);
   return required.every((q) => isQuestionAnswered(q, answers));
@@ -132,7 +134,7 @@ export function ProcessOnboardingForm({
   const [phase, setPhase] = useState<Phase>("welcome");
   const [currentStep, setCurrentStep] = useState(0);
   const [qIndex, setQIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -190,7 +192,18 @@ export function ProcessOnboardingForm({
     setLoading(true);
     setError(null);
     try {
-      const result = await submitProcessOnboarding(answers);
+      const formData = new FormData();
+      for (const [questionId, answer] of Object.entries(answers)) {
+        const fieldName = `question_${questionId}`;
+        if (Array.isArray(answer)) {
+          for (const value of answer) {
+            formData.append(fieldName, value);
+          }
+        } else {
+          formData.set(fieldName, answer);
+        }
+      }
+      const result = await submitProcessOnboarding(formData);
       if ("error" in result && result.error) {
         setError(result.error);
         return;
@@ -327,7 +340,9 @@ export function ProcessOnboardingForm({
           <div className="mb-8 flex flex-wrap justify-center gap-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-4 py-2 text-sm">
               <ListChecks className="h-4 w-4 text-primary" />
-              {sections.length} etapas temáticas
+              {questionnaire.uses_sections === false
+                ? `${totalQuestions} perguntas`
+                : `${sections.length} etapas temáticas`}
             </span>
             <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-4 py-2 text-sm">
               <Clock className="h-4 w-4 text-primary" />~{estimatedMinutes} min
@@ -678,6 +693,46 @@ export function ProcessOnboardingForm({
               className="rounded-xl text-base"
               autoFocus
             />
+          )}
+
+          {/* ── date ── */}
+          {currentQuestion.question_type === "date" && (
+            <Input
+              type="date"
+              value={
+                typeof answers[currentQuestion.id] === "string"
+                  ? (answers[currentQuestion.id] as string)
+                  : ""
+              }
+              onChange={(e) =>
+                setAnswers((curr) => ({ ...curr, [currentQuestion.id]: e.target.value }))
+              }
+              className="h-12 rounded-xl text-base"
+              autoFocus
+            />
+          )}
+
+          {/* ── file_upload ── */}
+          {currentQuestion.question_type === "file_upload" && (
+            <div className="space-y-2">
+              <Input
+                type="file"
+                multiple
+                onChange={(e) =>
+                  setAnswers((curr) => ({
+                    ...curr,
+                    [currentQuestion.id]: Array.from(e.target.files ?? []),
+                  }))
+                }
+                className="h-12 rounded-xl text-base"
+              />
+              {Array.isArray(answers[currentQuestion.id]) &&
+                (answers[currentQuestion.id] as File[]).length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {(answers[currentQuestion.id] as File[]).length} arquivo(s) selecionado(s).
+                  </p>
+                )}
+            </div>
           )}
 
           {/* ── single_select ── */}

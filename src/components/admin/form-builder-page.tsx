@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type {
   BaseProcess,
@@ -18,6 +18,7 @@ import {
   reorderQuestions,
   reorderSections,
   setActiveForm,
+  setFormUsesSections,
   updateForm,
   updateOption,
   updateQuestion,
@@ -33,6 +34,14 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageLayout } from "@/components/layout/page-layout";
 import { ProcessSelector } from "@/components/admin/process-selector";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   ArrowDown,
   ArrowUp,
@@ -112,14 +121,47 @@ const QUESTION_TYPES: { value: FormQuestionType; label: string }[] = [
   { value: "long_text", label: "Parágrafo" },
   { value: "single_select", label: "Escolha única" },
   { value: "multi_select", label: "Caixas de seleção" },
+  { value: "date", label: "Data" },
+  { value: "file_upload", label: "Upload de arquivos" },
 ];
 
 function normalizeDisplayType(type: string): FormQuestionType {
   if (type === "text" || type === "short_text") return "short_text";
-  if (type === "long_text" || type === "single_select" || type === "multi_select") {
+  if (
+    type === "long_text" ||
+    type === "single_select" ||
+    type === "multi_select" ||
+    type === "date" ||
+    type === "file_upload"
+  ) {
     return type;
   }
   return "short_text";
+}
+
+type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+function useAutosave(
+  enabled: boolean,
+  save: () => Promise<void>,
+  deps: React.DependencyList,
+  delay = 700
+) {
+  const didStart = useRef(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (!didStart.current) {
+      didStart.current = true;
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void save();
+    }, delay);
+
+    return () => window.clearTimeout(timeout);
+  }, deps);
 }
 
 function buildOptionDrafts(options: QuestionOption[]): OptionDraft[] {
@@ -174,7 +216,10 @@ export function FormBuilderPage({
     lockActivationForm
   );
   const [isDemandIntakeTemplate, setIsDemandIntakeTemplate] = useState(false);
-  const [savingMeta, setSavingMeta] = useState(false);
+  const [usesSections, setUsesSections] = useState(true);
+  const [metaStatus, setMetaStatus] = useState<SaveStatus>("idle");
+  const [sectionModeDialogOpen, setSectionModeDialogOpen] = useState(false);
+  const [updatingSectionMode, setUpdatingSectionMode] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
 
   const [newSectionTitle, setNewSectionTitle] = useState("");
@@ -253,6 +298,7 @@ export function FormBuilderPage({
     setEnableProcessLinking(currentForm.enable_process_linking ?? true);
     setIsProcessActivationForm(lockActivationForm || currentForm.is_process_activation_form);
     setIsDemandIntakeTemplate(currentForm.is_demand_intake_template ?? false);
+    setUsesSections(currentForm.uses_sections ?? true);
     setProcesses((processData ?? []) as BaseProcess[]);
     setSections(
       groupSections(
@@ -278,9 +324,9 @@ export function FormBuilderPage({
     [sections]
   );
 
-  async function handleSaveMeta(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingMeta(true);
+  const handleSaveMeta = useCallback(async () => {
+    if (!form || !title.trim()) return;
+    setMetaStatus("saving");
     setError(null);
 
     const result = await updateForm(formId, {
@@ -290,16 +336,71 @@ export function FormBuilderPage({
       enableProcessLinking,
       isProcessActivationForm: lockActivationForm ? true : isProcessActivationForm,
       isDemandIntakeTemplate,
+      usesSections,
     });
 
     if ("error" in result && result.error) {
       setError(result.error);
-      setSavingMeta(false);
+      setMetaStatus("error");
       return;
     }
 
+    setForm((current) =>
+      current
+        ? {
+            ...current,
+            title: title.trim(),
+            description: description.trim() || null,
+            is_required_first_access: isRequiredFirstAccess,
+            enable_process_linking: enableProcessLinking,
+            is_process_activation_form: lockActivationForm ? true : isProcessActivationForm,
+            is_demand_intake_template: isDemandIntakeTemplate,
+            uses_sections: usesSections,
+          }
+        : current
+    );
+    setMetaStatus("saved");
+  }, [
+    description,
+    enableProcessLinking,
+    form,
+    formId,
+    isDemandIntakeTemplate,
+    isProcessActivationForm,
+    isRequiredFirstAccess,
+    lockActivationForm,
+    title,
+    usesSections,
+  ]);
+
+  useAutosave(
+    Boolean(form),
+    handleSaveMeta,
+    [
+      title,
+      description,
+      isRequiredFirstAccess,
+      enableProcessLinking,
+      isProcessActivationForm,
+      isDemandIntakeTemplate,
+      usesSections,
+    ]
+  );
+
+  async function updateUsesSections(nextUsesSections: boolean) {
+    setUpdatingSectionMode(true);
+    setError(null);
+    const result = await setFormUsesSections(formId, nextUsesSections);
+    if ("error" in result && result.error) {
+      setError(result.error);
+      setUpdatingSectionMode(false);
+      return;
+    }
+
+    setUsesSections(nextUsesSections);
+    setSectionModeDialogOpen(false);
     await load();
-    setSavingMeta(false);
+    setUpdatingSectionMode(false);
   }
 
   async function handleActivate() {
@@ -386,14 +487,6 @@ export function FormBuilderPage({
       iconName="ClipboardList"
       backHref={listHref}
       backLabel={listLabel}
-      actions={
-        !form?.is_active ? (
-          <Button onClick={handleActivate}>
-            <Rocket className="mr-2 h-4 w-4" />
-            Ativar
-          </Button>
-        ) : undefined
-      }
     >
       {error && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
@@ -415,11 +508,16 @@ export function FormBuilderPage({
                 <Badge variant="outline">Padrão demandas</Badge>
               )}
               <Badge variant="outline">
-                {sections.length} etapa{sections.length === 1 ? "" : "s"}
+                {usesSections
+                  ? `${sections.length} etapa${sections.length === 1 ? "" : "s"}`
+                  : "Sem etapas"}
               </Badge>
               <Badge variant="outline">
                 {totalQuestions} pergunta{totalQuestions === 1 ? "" : "s"}
               </Badge>
+              {metaStatus === "saving" && <Badge variant="outline">Salvando...</Badge>}
+              {metaStatus === "saved" && <Badge variant="outline">Salvo</Badge>}
+              {metaStatus === "error" && <Badge variant="destructive">Erro ao salvar</Badge>}
             </div>
 
             <button
@@ -441,7 +539,7 @@ export function FormBuilderPage({
             </button>
 
             {showConfig && (
-              <form onSubmit={handleSaveMeta} className="mt-4 space-y-4 border-t pt-4">
+              <div className="mt-4 space-y-4 border-t pt-4">
                 <div className="space-y-2">
                   <Label>Título</Label>
                   <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
@@ -486,19 +584,36 @@ export function FormBuilderPage({
                     />
                     <span className="text-sm">Padrão para abertura de demandas</span>
                   </label>
+                  <label className="flex items-center gap-2">
+                    <Switch
+                      checked={usesSections}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          void updateUsesSections(true);
+                          return;
+                        }
+                        setSectionModeDialogOpen(true);
+                      }}
+                    />
+                    <span className="text-sm">Organizar em etapas</span>
+                  </label>
                 </div>
-                <Button type="submit" disabled={savingMeta}>
-                  {savingMeta ? "Salvando..." : "Salvar configuração"}
-                </Button>
-              </form>
+                <p className="text-xs text-muted-foreground">
+                  As alterações são salvas automaticamente.
+                </p>
+              </div>
             )}
           </div>
 
           {sections.length === 0 ? (
             <EmptyState
               icon={Layers}
-              title="Nenhuma etapa cadastrada"
-              description="Crie a primeira etapa para começar a estruturar a jornada do formulário."
+              title={usesSections ? "Nenhuma etapa cadastrada" : "Nenhuma pergunta cadastrada"}
+              description={
+                usesSections
+                  ? "Crie a primeira etapa para começar a estruturar a jornada do formulário."
+                  : "Adicione a primeira pergunta para começar a montar o formulário."
+              }
             />
           ) : (
             <div className="space-y-4">
@@ -512,6 +627,7 @@ export function FormBuilderPage({
                   processes={processes}
                   allSections={sections}
                   enableProcessLinking={enableProcessLinking}
+                  usesSections={usesSections}
                   isOpen={expandedSectionId === section.id}
                   expandedQuestionId={expandedQuestionId}
                   onToggle={() =>
@@ -529,22 +645,24 @@ export function FormBuilderPage({
             </div>
           )}
 
-          <form
-            onSubmit={handleAddSection}
-            className="flex items-center gap-3 rounded-2xl border border-dashed border-border/60 bg-muted/20 p-4"
-          >
-            <Plus className="h-5 w-5 shrink-0 text-muted-foreground" />
-            <Input
-              value={newSectionTitle}
-              onChange={(e) => setNewSectionTitle(e.target.value)}
-              placeholder="Adicionar nova etapa"
-              required
-              className="border-0 bg-transparent shadow-none"
-            />
-            <Button type="submit" disabled={addingSection}>
-              {addingSection ? "Criando..." : "Criar etapa"}
-            </Button>
-          </form>
+          {usesSections && (
+            <form
+              onSubmit={handleAddSection}
+              className="flex items-center gap-3 rounded-2xl border border-dashed border-border/60 bg-muted/20 p-4"
+            >
+              <Plus className="h-5 w-5 shrink-0 text-muted-foreground" />
+              <Input
+                value={newSectionTitle}
+                onChange={(e) => setNewSectionTitle(e.target.value)}
+                placeholder="Adicionar nova etapa"
+                required
+                className="border-0 bg-transparent shadow-none"
+              />
+              <Button type="submit" disabled={addingSection}>
+                {addingSection ? "Criando..." : "Criar etapa"}
+              </Button>
+            </form>
+          )}
         </div>
 
         <aside className="space-y-4">
@@ -552,14 +670,17 @@ export function FormBuilderPage({
             <div className="flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-primary" />
               <div>
-                <p className="font-medium">Jornada em etapas</p>
+                <p className="font-medium">{usesSections ? "Jornada em etapas" : "Formulário simples"}</p>
                 <p className="text-sm text-muted-foreground">
-                  Cada bloco pode ter subtítulo, descrição e perguntas próprias.
+                  {usesSections
+                    ? "Cada bloco pode ter subtítulo, descrição e perguntas próprias."
+                    : "As perguntas aparecem em sequência, sem divisão visual por etapas."}
                 </p>
               </div>
             </div>
           </div>
 
+          {usesSections && (
           <div className="rounded-2xl border border-border/60 bg-card p-5">
             <div className="flex items-center gap-3">
               <BookOpenText className="h-5 w-5 text-primary" />
@@ -593,8 +714,42 @@ export function FormBuilderPage({
               ))}
             </div>
           </div>
+          )}
+
+          <Button className="w-full" onClick={handleActivate}>
+            <Rocket className="mr-2 h-4 w-4" />
+            Finalizar formulário
+          </Button>
         </aside>
       </div>
+      <Dialog open={sectionModeDialogOpen} onOpenChange={setSectionModeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover etapas do formulário?</DialogTitle>
+            <DialogDescription>
+              As perguntas serão mantidas em uma lista única. Os títulos e descrições das etapas
+              deixam de aparecer no formulário.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSectionModeDialogOpen(false)}
+              disabled={updatingSectionMode}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => updateUsesSections(false)}
+              disabled={updatingSectionMode}
+            >
+              {updatingSectionMode ? "Atualizando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   );
 }
@@ -607,6 +762,7 @@ function SectionCard({
   processes,
   allSections,
   enableProcessLinking,
+  usesSections,
   isOpen,
   expandedQuestionId,
   onToggle,
@@ -623,6 +779,7 @@ function SectionCard({
   processes: BaseProcess[];
   allSections: SectionItem[];
   enableProcessLinking: boolean;
+  usesSections: boolean;
   isOpen: boolean;
   expandedQuestionId: string | null;
   onToggle: () => void;
@@ -635,7 +792,7 @@ function SectionCard({
   const [title, setTitle] = useState(section.title);
   const [subtitle, setSubtitle] = useState(section.subtitle ?? "");
   const [description, setDescription] = useState(section.description ?? "");
-  const [savingSection, setSavingSection] = useState(false);
+  const [sectionStatus, setSectionStatus] = useState<SaveStatus>("idle");
   const [sectionError, setSectionError] = useState<string | null>(null);
   const [addingQuestion, setAddingQuestion] = useState(false);
   const [newQuestionPrompt, setNewQuestionPrompt] = useState("");
@@ -648,9 +805,10 @@ function SectionCard({
     setDescription(section.description ?? "");
   }, [section]);
 
-  async function handleSaveSection() {
+  const handleSaveSection = useCallback(async () => {
+    if (!usesSections || !title.trim()) return;
     setSectionError(null);
-    setSavingSection(true);
+    setSectionStatus("saving");
     const result = await updateSection(section.id, formId, {
       title,
       subtitle,
@@ -658,12 +816,13 @@ function SectionCard({
     });
     if ("error" in result && result.error) {
       setSectionError(result.error);
-      setSavingSection(false);
+      setSectionStatus("error");
       return;
     }
-    await onChanged();
-    setSavingSection(false);
-  }
+    setSectionStatus("saved");
+  }, [description, formId, onChanged, section.id, subtitle, title, usesSections]);
+
+  useAutosave(usesSections, handleSaveSection, [title, subtitle, description, usesSections]);
 
   async function handleAddQuestion(e: React.FormEvent) {
     e.preventDefault();
@@ -738,8 +897,11 @@ function SectionCard({
           )}
           <div className="flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">Etapa {index + 1}</Badge>
-              <span className="font-medium">{section.title}</span>
+              {usesSections && <Badge variant="outline">Etapa {index + 1}</Badge>}
+              <span className="font-medium">{usesSections ? title : "Perguntas"}</span>
+              {sectionStatus === "saving" && <Badge variant="outline">Salvando...</Badge>}
+              {sectionStatus === "saved" && <Badge variant="outline">Salvo</Badge>}
+              {sectionStatus === "error" && <Badge variant="destructive">Erro</Badge>}
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {section.questions.length} pergunta
@@ -748,6 +910,7 @@ function SectionCard({
           </div>
         </button>
 
+        {usesSections && (
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -777,6 +940,7 @@ function SectionCard({
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
+        )}
       </div>
 
       {isOpen && (
@@ -787,34 +951,34 @@ function SectionCard({
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Título da etapa</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Subtítulo</Label>
-              <Input
-                value={subtitle}
-                onChange={(e) => setSubtitle(e.target.value)}
-                placeholder="Ex: Conheça melhor a operação"
-              />
-            </div>
-          </div>
+          {usesSections && (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Título da etapa</Label>
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Subtítulo</Label>
+                  <Input
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    placeholder="Ex: Conheça melhor a operação"
+                  />
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <Label>Breve descrição</Label>
-            <Textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Explique o objetivo desta etapa antes das perguntas."
-            />
-          </div>
-
-          <Button onClick={handleSaveSection} disabled={savingSection}>
-            {savingSection ? "Salvando etapa..." : "Salvar etapa"}
-          </Button>
+              <div className="space-y-2">
+                <Label>Breve descrição</Label>
+                <Textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Explique o objetivo desta etapa antes das perguntas."
+                />
+              </div>
+            </div>
+          )}
 
           {section.questions.length === 0 ? (
             <EmptyState
@@ -835,6 +999,7 @@ function SectionCard({
                   allSections={allSections}
                   processes={processes}
                   enableProcessLinking={enableProcessLinking}
+                  usesSections={usesSections}
                   isOpen={expandedQuestionId === question.id}
                   onToggle={() =>
                     onExpandQuestion(expandedQuestionId === question.id ? null : question.id)
@@ -890,6 +1055,7 @@ function QuestionCard({
   allSections,
   processes,
   enableProcessLinking,
+  usesSections,
   isOpen,
   onToggle,
   onMoveUp,
@@ -905,6 +1071,7 @@ function QuestionCard({
   allSections: SectionItem[];
   processes: BaseProcess[];
   enableProcessLinking: boolean;
+  usesSections: boolean;
   isOpen: boolean;
   onToggle: () => void;
   onMoveUp: () => void;
@@ -930,7 +1097,7 @@ function QuestionCard({
   const [optionDrafts, setOptionDrafts] = useState<OptionDraft[]>(
     buildOptionDrafts(question.process_questionnaire_options ?? [])
   );
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -952,6 +1119,21 @@ function QuestionCard({
     questionType === "single_select" || questionType === "multi_select";
   const questionTypeLabel =
     QUESTION_TYPES.find((type) => type.value === questionType)?.label ?? questionType;
+  const optionSignature = useMemo(
+    () =>
+      JSON.stringify(
+        optionDrafts.map((draft) => ({
+          id: draft.id,
+          label: draft.label,
+          value: draft.value,
+          helperText: draft.helperText,
+          isActive: draft.isActive,
+          enableProcessLinking: draft.enableProcessLinking,
+          linkedProcessIds: draft.linkedProcessIds,
+        }))
+      ),
+    [optionDrafts]
+  );
 
   function updateDraft(
     localId: string,
@@ -982,17 +1164,22 @@ function QuestionCard({
   }
 
   function removeOptionRow(localId: string) {
+    const option = optionDrafts.find((draft) => draft.localId === localId);
     setOptionDrafts((current) => current.filter((draft) => draft.localId !== localId));
+    if (option?.id) {
+      void deleteOption(option.id, formId);
+    }
   }
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
+    if (!prompt.trim()) return;
     setError(null);
-    setSaving(true);
+    setSaveStatus("saving");
 
     const invalidOption = optionDrafts.find((draft) => draft.id && !draft.label.trim());
     if (invalidOption) {
       setError("Preencha ou remova as alternativas vazias antes de salvar.");
-      setSaving(false);
+      setSaveStatus("error");
       return;
     }
 
@@ -1008,7 +1195,7 @@ function QuestionCard({
 
     if ("error" in questionResult && questionResult.error) {
       setError(questionResult.error);
-      setSaving(false);
+      setSaveStatus("error");
       return;
     }
 
@@ -1021,7 +1208,7 @@ function QuestionCard({
       const result = await deleteOption(optionId, formId);
       if ("error" in result && result.error) {
         setError(result.error);
-        setSaving(false);
+        setSaveStatus("error");
         return;
       }
     }
@@ -1038,7 +1225,7 @@ function QuestionCard({
 
       if ("error" in result && result.error) {
         setError(result.error);
-        setSaving(false);
+        setSaveStatus("error");
         return;
       }
     }
@@ -1054,14 +1241,53 @@ function QuestionCard({
 
       if ("error" in result && result.error) {
         setError(result.error);
-        setSaving(false);
+        setSaveStatus("error");
         return;
       }
+
+      setOptionDrafts((current) =>
+        current.map((item) =>
+          item.localId === draft.localId ? { ...item, id: result.id } : item
+        )
+      );
     }
 
-    await onChanged();
-    setSaving(false);
-  }
+    if (questionSectionId !== sectionId) {
+      await onChanged();
+    }
+    setSaveStatus("saved");
+  }, [
+    enableQuestionProcessLinking,
+    formId,
+    helperText,
+    isRequired,
+    onChanged,
+    optionDrafts,
+    prompt,
+    question.id,
+    question.process_questionnaire_options,
+    questionLinkedProcessIds,
+    sectionId,
+    questionSectionId,
+    questionType,
+  ]);
+
+  useAutosave(
+    isOpen,
+    handleSave,
+    [
+      prompt,
+      helperText,
+      questionType,
+      questionSectionId,
+      isRequired,
+      enableQuestionProcessLinking,
+      questionLinkedProcessIds.join("|"),
+      optionSignature,
+      isOpen,
+    ],
+    800
+  );
 
   async function handleDelete() {
     if (!confirm("Excluir esta pergunta?")) return;
@@ -1088,9 +1314,12 @@ function QuestionCard({
           )}
           <span className="text-sm text-muted-foreground">
             {questionIndex + 1}. {questionTypeLabel}
-            {question.is_required ? " *" : ""}
+            {isRequired ? " *" : ""}
           </span>
-          <span className="truncate font-medium">{question.prompt}</span>
+          <span className="truncate font-medium">{prompt}</span>
+          {saveStatus === "saving" && <Badge variant="outline">Salvando...</Badge>}
+          {saveStatus === "saved" && <Badge variant="outline">Salvo</Badge>}
+          {saveStatus === "error" && <Badge variant="destructive">Erro</Badge>}
         </button>
 
         <div className="flex items-center gap-1">
@@ -1155,7 +1384,7 @@ function QuestionCard({
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className={`grid gap-4 ${usesSections ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
             <div className="space-y-2">
               <Label>Tipo</Label>
               <Select
@@ -1169,19 +1398,21 @@ function QuestionCard({
                 ))}
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Etapa</Label>
-              <Select
-                value={questionSectionId}
-                onChange={(e) => setQuestionSectionId(e.target.value)}
-              >
-                {allSections.map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.title}
-                  </option>
-                ))}
-              </Select>
-            </div>
+            {usesSections && (
+              <div className="space-y-2">
+                <Label>Etapa</Label>
+                <Select
+                  value={questionSectionId}
+                  onChange={(e) => setQuestionSectionId(e.target.value)}
+                >
+                  {allSections.map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {section.title}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
             <div className="flex items-center gap-2 pt-7">
               <Switch checked={isRequired} onCheckedChange={setIsRequired} />
               <span className="text-sm">Obrigatória</span>
@@ -1245,9 +1476,9 @@ function QuestionCard({
             </div>
           )}
 
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Salvando..." : "Salvar pergunta"}
-          </Button>
+          <p className="text-xs text-muted-foreground">
+            As alterações desta pergunta são salvas automaticamente.
+          </p>
         </div>
       )}
     </div>

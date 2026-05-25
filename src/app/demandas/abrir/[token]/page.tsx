@@ -12,7 +12,7 @@ export default async function AbrirDemandaPage({
 
   const { data: form } = await supabase
     .from("office_demand_forms")
-    .select("id, title, description, public_token, is_active, offices ( name )")
+    .select("id, title, description, public_token, is_active, uses_sections, offices ( name )")
     .eq("public_token", token)
     .eq("is_active", true)
     .maybeSingle();

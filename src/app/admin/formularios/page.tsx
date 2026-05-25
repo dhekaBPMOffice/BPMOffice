@@ -26,6 +26,7 @@ export default function FormulariosPage() {
   const [newIsProcessActivation, setNewIsProcessActivation] = useState(false);
   const [newEnableProcessLinking, setNewEnableProcessLinking] = useState(true);
   const [newIsDemandIntakeTemplate, setNewIsDemandIntakeTemplate] = useState(false);
+  const [newUsesSections, setNewUsesSections] = useState(true);
 
   async function load() {
     setLoading(true);
@@ -59,6 +60,7 @@ export default function FormulariosPage() {
       isProcessActivationForm: newIsProcessActivation,
       enableProcessLinking: newEnableProcessLinking,
       isDemandIntakeTemplate: newIsDemandIntakeTemplate,
+      usesSections: newUsesSections,
     });
     if ("error" in result && result.error) {
       setError(result.error);
@@ -70,6 +72,7 @@ export default function FormulariosPage() {
     setNewIsProcessActivation(false);
     setNewEnableProcessLinking(true);
     setNewIsDemandIntakeTemplate(false);
+    setNewUsesSections(true);
     setShowNew(false);
     setSaving(false);
     load();
@@ -171,6 +174,14 @@ export default function FormulariosPage() {
                   />
                   <span className="text-sm">Padrão para abertura de demandas</span>
                 </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newUsesSections}
+                    onChange={(e) => setNewUsesSections(e.target.checked)}
+                  />
+                  <span className="text-sm">Organizar em etapas</span>
+                </label>
               </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={saving}>
@@ -242,6 +253,9 @@ export default function FormulariosPage() {
                   {form.enable_process_linking && (
                     <Badge variant="outline">Vínculo processos</Badge>
                   )}
+                  <Badge variant="outline">
+                    {form.uses_sections ? "Com etapas" : "Sem etapas"}
+                  </Badge>
                 </div>
                 <Link
                   href={`/admin/formularios/${form.id}`}

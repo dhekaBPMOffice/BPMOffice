@@ -17,6 +17,7 @@ import type {
   ProcessFlowchartFile,
   ProcessTemplateFile,
   Profile,
+  FormAnswerFile,
 } from "@/types/database";
 import { BPM_PHASE_LABELS, bpmStageStatusToLabel, type BpmPhaseSlug } from "@/lib/bpm-phases";
 import {
@@ -24,6 +25,7 @@ import {
   duplicateProcessFileFromUrl,
   uploadProcessFile,
 } from "@/lib/process-file-upload";
+import { uploadFormAnswerFile } from "@/lib/form-answer-files";
 import {
   compactLevelsForPersist,
   levelsFromRow,
@@ -313,9 +315,7 @@ async function importBaseProcessToOffice(input: {
   }
 }
 
-export async function submitProcessOnboarding(
-  answers: Record<string, string | string[]>
-) {
+export async function submitProcessOnboarding(formData: FormData) {
   const access = await assertLeaderProfile();
   if ("error" in access) return { error: access.error };
 
@@ -385,6 +385,40 @@ export async function submitProcessOnboarding(
     if (sectionA !== sectionB) return sectionA - sectionB;
     return a.sort_order - b.sort_order;
   });
+  const answers: Record<string, string | string[]> = {};
+  const uploadedFilesByQuestion = new Map<string, FormAnswerFile[]>();
+
+  for (const question of questions) {
+    const fieldName = `question_${question.id}`;
+
+    if (question.question_type === "multi_select") {
+      answers[question.id] = formData.getAll(fieldName).map(String);
+      continue;
+    }
+
+    if (question.question_type === "file_upload") {
+      const files = formData
+        .getAll(fieldName)
+        .filter((value): value is File => value instanceof File && value.size > 0);
+      const uploadedFiles: FormAnswerFile[] = [];
+
+      for (const file of files) {
+        const uploaded = await uploadFormAnswerFile(
+          supabase,
+          file,
+          `process-onboarding/${profile.office_id}/${question.id}/${Date.now()}`
+        );
+        if ("error" in uploaded) return { error: uploaded.error };
+        uploadedFiles.push(uploaded);
+      }
+
+      uploadedFilesByQuestion.set(question.id, uploadedFiles);
+      answers[question.id] = uploadedFiles.map((file) => file.filename);
+      continue;
+    }
+
+    answers[question.id] = String(formData.get(fieldName) ?? "");
+  }
 
   for (const question of questions) {
     const rawAnswer = answers[question.id];
@@ -423,7 +457,7 @@ export async function submitProcessOnboarding(
           ? [rawAnswer]
           : [];
 
-    const isTextQuestion = ["text", "short_text", "long_text"].includes(
+    const isTextQuestion = ["text", "short_text", "long_text", "date"].includes(
       question.question_type
     );
     const answerText =
@@ -436,6 +470,7 @@ export async function submitProcessOnboarding(
       question_id: question.id,
       answer_text: answerText,
       selected_option_ids: selectedOptionIds,
+      uploaded_files: uploadedFilesByQuestion.get(question.id) ?? [],
     };
   });
 

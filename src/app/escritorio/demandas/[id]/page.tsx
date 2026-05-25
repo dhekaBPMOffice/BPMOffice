@@ -16,6 +16,8 @@ import { getEffectiveOfficeTimeZone } from "@/lib/timezone-server";
 import { formatDatePtBr } from "@/lib/timezone";
 import { DemandManagementPanel } from "./demand-management-panel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { createFormAnswerFileSignedUrls } from "@/lib/form-answer-files";
+import type { FormAnswerFile } from "@/types/database";
 
 export default async function DemandaDetailPage({
   params,
@@ -77,13 +79,29 @@ export default async function DemandaDetailPage({
           id,
           question_prompt,
           answer_text,
-          selected_option_labels
+          selected_option_labels,
+          uploaded_files
         )
       `)
       .eq("demand_id", id)
       .eq("office_id", profile.office_id)
       .maybeSingle(),
   ]);
+  const submissionAnswers = await Promise.all(
+    ((submission?.demand_form_answers ?? []) as {
+      id: string;
+      question_prompt: string;
+      answer_text: string | null;
+      selected_option_labels: string[] | null;
+      uploaded_files: FormAnswerFile[] | null;
+    }[]).map(async (answer) => ({
+      ...answer,
+      signedFiles: await createFormAnswerFileSignedUrls(
+        supabase,
+        Array.isArray(answer.uploaded_files) ? answer.uploaded_files : []
+      ),
+    }))
+  );
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning"; label: string }> = {
@@ -168,13 +186,28 @@ export default async function DemandaDetailPage({
                 </div>
               </div>
               <div className="space-y-3 border-t pt-4">
-                {(submission.demand_form_answers ?? []).map((answer) => {
+                {submissionAnswers.map((answer) => {
                   const labels = answer.selected_option_labels as string[] | null;
                   const value = labels && labels.length > 0 ? labels.join(", ") : answer.answer_text;
                   return (
                     <div key={answer.id}>
                       <p className="font-medium">{answer.question_prompt}</p>
                       <p className="text-muted-foreground">{value || "—"}</p>
+                      {answer.signedFiles.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {answer.signedFiles.map((file) => (
+                            <a
+                              key={file.path}
+                              href={file.signedUrl ?? "#"}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-md border border-border/60 px-3 py-1 text-xs text-primary hover:bg-accent/20"
+                            >
+                              {file.filename}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

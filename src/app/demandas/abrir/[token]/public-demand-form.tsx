@@ -23,7 +23,7 @@ type QuestionRow = {
   section_id: string;
   prompt: string;
   helper_text: string | null;
-  question_type: "short_text" | "long_text" | "single_select" | "multi_select";
+  question_type: "short_text" | "long_text" | "single_select" | "multi_select" | "date" | "file_upload";
   is_required: boolean;
   demand_field_key: string | null;
   sort_order: number;
@@ -44,6 +44,7 @@ type FormRow = {
   description: string | null;
   public_token: string;
   is_active: boolean;
+  uses_sections: boolean;
   offices?: { name: string } | { name: string }[] | null;
 };
 
@@ -86,30 +87,7 @@ export function PublicDemandForm({
     setError(null);
     setSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
-    const answers = questions.map((question) => {
-      if (question.question_type === "multi_select") {
-        return {
-          questionId: question.id,
-          selectedOptionIds: formData.getAll(`question_${question.id}`).map(String),
-        };
-      }
-      if (question.question_type === "single_select") {
-        const selected = formData.get(`question_${question.id}`);
-        return {
-          questionId: question.id,
-          selectedOptionIds: selected ? [String(selected)] : [],
-        };
-      }
-      return {
-        questionId: question.id,
-        answerText: String(formData.get(`question_${question.id}`) ?? ""),
-      };
-    });
-
-    const result = await submitPublicDemand(token, {
-      answers,
-    });
+    const result = await submitPublicDemand(token, new FormData(event.currentTarget));
 
     setSubmitting(false);
     if (result.error) {
@@ -158,11 +136,13 @@ export function PublicDemandForm({
           )}
           {groupedSections.map((section) => (
             <section key={section.id} className="space-y-4 border-t pt-6 first:border-t-0 first:pt-0">
-              <div>
-                <h2 className="text-base font-semibold">{section.title}</h2>
-                {section.subtitle && <p className="text-sm text-muted-foreground">{section.subtitle}</p>}
-                {section.description && <p className="text-sm text-muted-foreground">{section.description}</p>}
-              </div>
+              {form.uses_sections && (
+                <div>
+                  <h2 className="text-base font-semibold">{section.title}</h2>
+                  {section.subtitle && <p className="text-sm text-muted-foreground">{section.subtitle}</p>}
+                  {section.description && <p className="text-sm text-muted-foreground">{section.description}</p>}
+                </div>
+              )}
               {section.questions.map((question) => (
                 <QuestionField key={question.id} question={question} />
               ))}
@@ -203,6 +183,12 @@ function QuestionField({ question }: { question: QuestionRow }) {
           type={question.demand_field_key === "requester_email" ? "email" : "text"}
           required={question.is_required}
         />
+      )}
+      {question.question_type === "date" && (
+        <Input id={name} name={name} type="date" required={question.is_required} />
+      )}
+      {question.question_type === "file_upload" && (
+        <Input id={name} name={name} type="file" required={question.is_required} multiple />
       )}
       {question.question_type === "single_select" && (
         <Select id={name} name={name} required={question.is_required} defaultValue="">

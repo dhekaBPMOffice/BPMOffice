@@ -52,6 +52,43 @@ async function getLatestQuestionOrder(
   return (data?.sort_order ?? -1) + 1;
 }
 
+async function ensureDefaultSection(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  formId: string
+) {
+  const { data: existing, error: existingError } = await supabase
+    .from("process_questionnaire_sections")
+    .select("id")
+    .eq("questionnaire_id", formId)
+    .order("sort_order", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) {
+    return { error: existingError.message };
+  }
+
+  if (existing?.id) {
+    return { id: existing.id as string };
+  }
+
+  const { data, error } = await supabase
+    .from("process_questionnaire_sections")
+    .insert({
+      questionnaire_id: formId,
+      title: "Perguntas",
+      sort_order: 0,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    return { error: error?.message ?? "Não foi possível criar a seção padrão." };
+  }
+
+  return { id: data.id as string };
+}
+
 export type CreateFormInput = {
   title: string;
   description?: string;
@@ -59,6 +96,7 @@ export type CreateFormInput = {
   isProcessActivationForm: boolean;
   isRequiredFirstAccess?: boolean;
   isDemandIntakeTemplate?: boolean;
+  usesSections?: boolean;
 };
 
 export async function createForm(input: CreateFormInput) {
@@ -109,6 +147,7 @@ export async function createForm(input: CreateFormInput) {
       enable_process_linking: input.enableProcessLinking,
       is_process_activation_form: input.isProcessActivationForm,
       is_demand_intake_template: input.isDemandIntakeTemplate ?? false,
+      uses_sections: input.usesSections ?? true,
     })
     .select("id")
     .single();
@@ -121,8 +160,11 @@ export async function createForm(input: CreateFormInput) {
     .from("process_questionnaire_sections")
     .insert({
       questionnaire_id: data.id,
-      title: "Etapa 1",
-      description: "Apresente as perguntas iniciais desta etapa.",
+      title: input.usesSections === false ? "Perguntas" : "Etapa 1",
+      description:
+        input.usesSections === false
+          ? null
+          : "Apresente as perguntas iniciais desta etapa.",
       sort_order: 0,
     });
 
@@ -144,6 +186,7 @@ export async function updateForm(
     enableProcessLinking: boolean;
     isProcessActivationForm: boolean;
     isDemandIntakeTemplate: boolean;
+    usesSections: boolean;
   }
 ) {
   if (!input.title?.trim()) {
@@ -185,7 +228,85 @@ export async function updateForm(
       enable_process_linking: input.enableProcessLinking,
       is_process_activation_form: input.isProcessActivationForm,
       is_demand_intake_template: input.isDemandIntakeTemplate,
+      uses_sections: input.usesSections,
     })
+    .eq("id", id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidateFormPaths(id);
+  return { success: true };
+}
+
+export async function setFormUsesSections(id: string, usesSections: boolean) {
+  const supabase = await createServiceClient();
+  const ensured = await ensureDefaultSection(supabase, id);
+  if ("error" in ensured) {
+    return { error: ensured.error };
+  }
+
+  if (!usesSections) {
+    const { data: sections, error: sectionsError } = await supabase
+      .from("process_questionnaire_sections")
+      .select("id")
+      .eq("questionnaire_id", id)
+      .order("sort_order", { ascending: true });
+
+    if (sectionsError) {
+      return { error: sectionsError.message };
+    }
+
+    const keepSectionId = ensured.id;
+    const sectionIds = (sections ?? []).map((section) => section.id as string);
+    let nextOrder = 0;
+
+    for (const sectionId of sectionIds) {
+      const { data: questions, error: questionsError } = await supabase
+        .from("process_questionnaire_questions")
+        .select("id")
+        .eq("section_id", sectionId)
+        .order("sort_order", { ascending: true });
+
+      if (questionsError) {
+        return { error: questionsError.message };
+      }
+
+      for (const question of questions ?? []) {
+        const { error } = await supabase
+          .from("process_questionnaire_questions")
+          .update({ section_id: keepSectionId, sort_order: nextOrder })
+          .eq("id", question.id);
+
+        if (error) {
+          return { error: error.message };
+        }
+        nextOrder += 1;
+      }
+    }
+
+    const extraSectionIds = sectionIds.filter((sectionId) => sectionId !== keepSectionId);
+    if (extraSectionIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("process_questionnaire_sections")
+        .delete()
+        .in("id", extraSectionIds);
+
+      if (deleteError) {
+        return { error: deleteError.message };
+      }
+    }
+
+    await supabase
+      .from("process_questionnaire_sections")
+      .update({ title: "Perguntas", subtitle: null, description: null, sort_order: 0 })
+      .eq("id", keepSectionId);
+  }
+
+  const { error } = await supabase
+    .from("process_questionnaires")
+    .update({ uses_sections: usesSections })
     .eq("id", id);
 
   if (error) {

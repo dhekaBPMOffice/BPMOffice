@@ -33,7 +33,7 @@ export default async function ProcessOnboardingPage() {
       .single(),
     supabase
       .from("process_questionnaires")
-      .select("id, title, description")
+      .select("id, title, description, uses_sections")
       .eq("is_process_activation_form", true)
       .single(),
     supabase
