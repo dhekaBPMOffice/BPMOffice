@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const PROCESS_FILES_BUCKET = "process-files";
-const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 /** Evita `fetch` pendurada ao obter ficheiro remoto (ex.: importação de processos do catálogo). */
 const DUPLICATE_FILE_FETCH_TIMEOUT_MS = 60_000;
 

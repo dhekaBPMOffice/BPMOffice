@@ -16,9 +16,8 @@ import {
   toggleOfficeProcessChecklistItem,
   updateOfficeProcessBpmPhase,
   updateOfficeProcessDetails,
-  uploadOfficeAttachmentFile,
-  uploadOfficeProcessMaterialFile,
 } from "../actions";
+import { uploadOfficeProcessFileViaApi } from "@/lib/office-process-file-upload-client";
 import { displayTemplateName, fileNameFromUrl } from "@/lib/process-file-display";
 import {
   BPM_PHASE_LABELS,
@@ -499,11 +498,11 @@ function ProcessManagementClientInner({
     if (!file?.size) return;
     setMaterialError(null);
     setMaterialUploading(kind);
-    const formData = new FormData();
-    formData.set("officeProcessId", officeProcess.id);
-    formData.set("kind", kind);
-    formData.set("file", file);
-    const result = await uploadOfficeProcessMaterialFile(formData);
+    const result = await uploadOfficeProcessFileViaApi({
+      officeProcessId: officeProcess.id,
+      kind,
+      file,
+    });
     setMaterialUploading(null);
     if ("error" in result && result.error) {
       setMaterialError(result.error);
@@ -576,11 +575,11 @@ function ProcessManagementClientInner({
 
     setAttachmentUploading(true);
     for (const item of toAdd) {
-      const formData = new FormData();
-      formData.set("file", item.file);
-      formData.set("officeProcessId", officeProcess.id);
-
-      const uploadResult = await uploadOfficeAttachmentFile(formData);
+      const uploadResult = await uploadOfficeProcessFileViaApi({
+        officeProcessId: officeProcess.id,
+        kind: "attachment",
+        file: item.file,
+      });
       if ("error" in uploadResult) {
         setAttachmentError(uploadResult.error ?? null);
         setAttachmentUploading(false);
@@ -1735,11 +1734,11 @@ function ProcessManagementSimpleClient({
     if (!file?.size) return;
     setMaterialError(null);
     setMaterialUploading("flowchart");
-    const formData = new FormData();
-    formData.set("officeProcessId", officeProcess.id);
-    formData.set("kind", "flowchart");
-    formData.set("file", file);
-    const result = await uploadOfficeProcessMaterialFile(formData);
+    const result = await uploadOfficeProcessFileViaApi({
+      officeProcessId: officeProcess.id,
+      kind: "flowchart",
+      file,
+    });
     setMaterialUploading(null);
     if ("error" in result && result.error) {
       setMaterialError(result.error);
@@ -1775,11 +1774,11 @@ function ProcessManagementSimpleClient({
 
     setAttachmentUploading(true);
     for (const item of toAdd) {
-      const formData = new FormData();
-      formData.set("file", item.file);
-      formData.set("officeProcessId", officeProcess.id);
-
-      const uploadResult = await uploadOfficeAttachmentFile(formData);
+      const uploadResult = await uploadOfficeProcessFileViaApi({
+        officeProcessId: officeProcess.id,
+        kind: "attachment",
+        file: item.file,
+      });
       if ("error" in uploadResult) {
         setAttachmentError(uploadResult.error ?? null);
         setAttachmentUploading(false);
