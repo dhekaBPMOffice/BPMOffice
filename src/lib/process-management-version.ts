@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 
-export const PROCESS_MANAGEMENT_VERSIONS = ["complete", "simple"] as const;
+export const PROCESS_MANAGEMENT_VERSIONS = ["essential", "professional", "complete"] as const;
 export type ProcessManagementVersion = (typeof PROCESS_MANAGEMENT_VERSIONS)[number];
 
 export const DEFAULT_PROCESS_MANAGEMENT_VERSION: ProcessManagementVersion = "complete";
@@ -15,8 +15,9 @@ export function resolveProcessManagementVersion(features: unknown): ProcessManag
   }
 
   const value = (features as Record<string, unknown>).process_management_version;
-  return value === "simple" || value === "complete"
-    ? value
+  if (value === "simple") return "essential";
+  return PROCESS_MANAGEMENT_VERSIONS.includes(value as ProcessManagementVersion)
+    ? (value as ProcessManagementVersion)
     : DEFAULT_PROCESS_MANAGEMENT_VERSION;
 }
 

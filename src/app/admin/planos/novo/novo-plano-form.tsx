@@ -33,14 +33,14 @@ const FEATURES = [
   { key: "backup_auto", label: "Backup Automático" },
 ] as const;
 
-type ProcessManagementVersion = "complete" | "simple";
+type ProcessManagementVersion = "essential" | "professional" | "complete";
 
 export function NovoPlanoForm() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processManagementVersion, setProcessManagementVersion] =
-    useState<ProcessManagementVersion>("complete");
+    useState<ProcessManagementVersion>("essential");
   const [features, setFeatures] = useState<Record<string, boolean>>(
     Object.fromEntries(FEATURES.map((f) => [f.key, false]))
   );
@@ -166,8 +166,9 @@ export function NovoPlanoForm() {
                   setProcessManagementVersion(e.target.value as ProcessManagementVersion)
                 }
               >
-                <option value="complete">Gestão completa</option>
-                <option value="simple">Gestão simples</option>
+                <option value="essential">Plano Essencial</option>
+                <option value="professional">Plano Profissional</option>
+                <option value="complete">Plano Completo</option>
               </Select>
               <p className="text-xs text-muted-foreground">
                 Define qual experiência será exibida para os processos dos escritórios deste plano.

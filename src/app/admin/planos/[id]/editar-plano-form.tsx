@@ -33,7 +33,7 @@ const FEATURES = [
   { key: "backup_auto", label: "Backup Automático" },
 ] as const;
 
-type ProcessManagementVersion = "complete" | "simple";
+type ProcessManagementVersion = "essential" | "professional" | "complete";
 
 interface Plan {
   id: string;
@@ -51,9 +51,12 @@ export function EditarPlanoForm({ plan }: { plan: Plan }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processManagementVersion, setProcessManagementVersion] =
-    useState<ProcessManagementVersion>(() =>
-      plan.features?.process_management_version === "simple" ? "simple" : "complete"
-    );
+    useState<ProcessManagementVersion>(() => {
+      const version = plan.features?.process_management_version;
+      if (version === "simple" || version === "essential") return "essential";
+      if (version === "professional") return "professional";
+      return "complete";
+    });
   const [features, setFeatures] = useState<Record<string, boolean>>(() => {
     const f: Record<string, boolean> = {};
     for (const { key } of FEATURES) {
@@ -191,8 +194,9 @@ export function EditarPlanoForm({ plan }: { plan: Plan }) {
                   setProcessManagementVersion(e.target.value as ProcessManagementVersion)
                 }
               >
-                <option value="complete">Gestão completa</option>
-                <option value="simple">Gestão simples</option>
+                <option value="essential">Plano Essencial</option>
+                <option value="professional">Plano Profissional</option>
+                <option value="complete">Plano Completo</option>
               </Select>
               <p className="text-xs text-muted-foreground">
                 Define qual experiência será exibida para os processos dos escritórios deste plano.

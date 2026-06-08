@@ -14,6 +14,7 @@ import type {
   BaseProcess,
   OfficeProcessStatus,
   OfficeProcessAttachmentType,
+  OfficeProcessEssentialDetails,
   ProcessFlowchartFile,
   ProcessTemplateFile,
   Profile,
@@ -162,6 +163,21 @@ function buildOfficeProcessMaterialPayload(input: {
     template_label: input.templateFiles[0]?.label?.trim() || null,
     flowchart_files: input.flowchartFiles,
     flowchart_image_url: input.flowchartFiles[0]?.url ?? null,
+  };
+}
+
+function normalizeEssentialDetailsForPersist(
+  details: OfficeProcessEssentialDetails | undefined
+): OfficeProcessEssentialDetails | undefined {
+  if (typeof details === "undefined") return undefined;
+  return {
+    objective: details.objective?.trim() || "",
+    main_activities: details.main_activities?.trim() || "",
+    how_it_works: details.how_it_works?.trim() || "",
+    responsible_area: details.responsible_area?.trim() || "",
+    participants: details.participants?.trim() || "",
+    general_observations: details.general_observations?.trim() || "",
+    essential_status: details.essential_status ?? "active",
   };
 }
 
@@ -684,6 +700,8 @@ export async function updateOfficeProcessDetails(input: {
   vcTipoLabel?: string | null;
   /** Lista de níveis (ordem hierárquica). */
   vcLevels?: string[];
+  /** Campos complementares exibidos no Plano Essencial. */
+  essentialDetails?: OfficeProcessEssentialDetails;
 }) {
   const processAccess = await getOfficeProcessOrError(input.officeProcessId);
   if ("error" in processAccess) return { error: processAccess.error };
@@ -700,6 +718,7 @@ export async function updateOfficeProcessDetails(input: {
   const normalizedFlowchartFiles = input.flowchartFiles?.filter(
     (file) => typeof file.url === "string" && file.url.trim().length > 0
   );
+  const normalizedEssentialDetails = normalizeEssentialDetailsForPersist(input.essentialDetails);
 
   const payload: Record<string, unknown> = {
     status: input.status,
@@ -742,6 +761,9 @@ export async function updateOfficeProcessDetails(input: {
   if (typeof input.flowchartFiles !== "undefined") {
     payload.flowchart_files = normalizedFlowchartFiles ?? [];
     payload.flowchart_image_url = normalizedFlowchartFiles?.[0]?.url?.trim() || null;
+  }
+  if (typeof normalizedEssentialDetails !== "undefined") {
+    payload.essential_details = normalizedEssentialDetails;
   }
 
   if (input.status === "in_progress" && !officeProcess.started_at) {
@@ -837,6 +859,12 @@ export async function updateOfficeProcessDetails(input: {
     const next = compactLevelsForPersist(input.vcLevels);
     if (JSON.stringify(prev) !== JSON.stringify(next)) {
       changes.push("níveis (cadeia de valor) atualizados");
+    }
+  }
+  if (typeof normalizedEssentialDetails !== "undefined") {
+    const prev = officeProcess.essential_details ?? {};
+    if (JSON.stringify(prev) !== JSON.stringify(normalizedEssentialDetails)) {
+      changes.push("campos do Plano Essencial atualizados");
     }
   }
 

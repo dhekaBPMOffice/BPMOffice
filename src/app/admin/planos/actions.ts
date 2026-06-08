@@ -21,11 +21,12 @@ const PLAN_FEATURE_KEYS = [
   ...SYSTEM_AREAS.map((area) => area.featureKey),
 ];
 
-const PROCESS_MANAGEMENT_VERSIONS = ["complete", "simple"] as const;
+const PROCESS_MANAGEMENT_VERSIONS = ["essential", "professional", "complete"] as const;
 type ProcessManagementVersion = (typeof PROCESS_MANAGEMENT_VERSIONS)[number];
 
 function readProcessManagementVersion(formData: FormData): ProcessManagementVersion {
   const value = formData.get("process_management_version");
+  if (value === "simple") return "essential";
   return PROCESS_MANAGEMENT_VERSIONS.includes(value as ProcessManagementVersion)
     ? (value as ProcessManagementVersion)
     : "complete";

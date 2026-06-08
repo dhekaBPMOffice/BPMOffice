@@ -5,10 +5,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { OFFICE_PROCESS_STATUS_META } from "@/lib/processes";
 import type {
   OfficeProcessAttachmentType,
+  OfficeProcessEssentialDetails,
   OfficeProcessStatus,
   ProcessFlowchartFile,
   ProcessTemplateFile,
 } from "@/types/database";
+import type { ProcessManagementVersion } from "@/lib/process-management-version";
 import {
   addOfficeProcessAttachment,
   addOfficeProcessChecklistItem,
@@ -61,6 +63,7 @@ import { ProcessWorkspaceJourneyBar } from "./process-workspace-journey-bar";
 import { ProcessWorkspaceFormSection } from "./process-workspace-form-section";
 import { ProcessWorkspaceSidebar } from "./process-workspace-sidebar";
 import { ProcessWorkspaceStageLayout } from "./process-workspace-stage-layout";
+import { ProcessManagementEssentialClient } from "./process-management-essential-client";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -125,8 +128,14 @@ type ProcessManagementClientProps = {
     vc_level1?: string | null;
     vc_level2?: string | null;
     vc_level3?: string | null;
+    vc_priority?: string | null;
+    vc_gestor_label?: string | null;
+    vc_general_status?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    essential_details?: OfficeProcessEssentialDetails | null;
   };
-  managementVersion?: "complete" | "simple";
+  managementVersion?: ProcessManagementVersion;
   processTypeOptions: string[];
   ownerOptions: { id: string; full_name: string }[];
   checklistItems: {
@@ -2209,7 +2218,9 @@ function ProcessManagementSimpleClient({
 export function ProcessManagementClient(props: ProcessManagementClientProps) {
   return (
     <Suspense>
-      {props.managementVersion === "simple" ? (
+      {props.managementVersion === "essential" ? (
+        <ProcessManagementEssentialClient {...props} />
+      ) : props.managementVersion === "professional" ? (
         <ProcessManagementSimpleClient {...props} />
       ) : (
         <ProcessManagementClientInner {...props} />

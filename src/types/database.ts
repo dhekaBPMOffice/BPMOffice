@@ -164,6 +164,22 @@ export interface ProcessFlowchartFile {
   url: string;
 }
 
+export type OfficeProcessEssentialStatus =
+  | "active"
+  | "in_review"
+  | "inactive"
+  | "paused";
+
+export interface OfficeProcessEssentialDetails {
+  objective?: string;
+  main_activities?: string;
+  how_it_works?: string;
+  responsible_area?: string;
+  participants?: string;
+  general_observations?: string;
+  essential_status?: OfficeProcessEssentialStatus;
+}
+
 export interface BaseProcess {
   id: string;
   name: string;
@@ -389,6 +405,7 @@ export interface OfficeProcess {
   vc_priority: string | null;
   vc_gestor_label: string | null;
   vc_general_status: string | null;
+  essential_details: OfficeProcessEssentialDetails;
 }
 
 export interface OfficeProcessBpmPhase {
