@@ -15,6 +15,11 @@ import type {
   OfficeProcessStatus,
   OfficeProcessAttachmentType,
   OfficeProcessEssentialDetails,
+  OfficeProcessProfessionalDetails,
+  OfficeProcessProfessionalProblemStatus,
+  OfficeProcessProfessionalActionStatus,
+  OfficeProcessProfessionalComplexity,
+  OfficeProcessProfessionalPriority,
   ProcessFlowchartFile,
   ProcessTemplateFile,
   Profile,
@@ -178,6 +183,130 @@ function normalizeEssentialDetailsForPersist(
     participants: details.participants?.trim() || "",
     general_observations: details.general_observations?.trim() || "",
     essential_status: details.essential_status ?? "active",
+  };
+}
+
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeId(value: unknown): string {
+  const text = normalizeText(value);
+  return text || crypto.randomUUID();
+}
+
+function normalizeProblemStatus(value: unknown): OfficeProcessProfessionalProblemStatus {
+  if (
+    value === "identified" ||
+    value === "in_analysis" ||
+    value === "in_treatment" ||
+    value === "resolved"
+  ) {
+    return value;
+  }
+  return "identified";
+}
+
+function normalizeActionStatus(value: unknown): OfficeProcessProfessionalActionStatus {
+  if (
+    value === "not_started" ||
+    value === "in_progress" ||
+    value === "completed" ||
+    value === "paused" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+  return "not_started";
+}
+
+function normalizeComplexity(value: unknown): OfficeProcessProfessionalComplexity {
+  if (value === "low" || value === "medium" || value === "high") return value;
+  return "medium";
+}
+
+function normalizePriority(value: unknown): OfficeProcessProfessionalPriority {
+  if (value === "low" || value === "medium" || value === "high") return value;
+  return "medium";
+}
+
+function normalizeProfessionalDetailsForPersist(
+  details: OfficeProcessProfessionalDetails | undefined
+): OfficeProcessProfessionalDetails | undefined {
+  if (typeof details === "undefined") return undefined;
+
+  return {
+    objective: normalizeText(details.objective),
+    main_activities: normalizeText(details.main_activities),
+    how_it_works: normalizeText(details.how_it_works),
+    responsible_area: normalizeText(details.responsible_area),
+    participants: normalizeText(details.participants),
+    general_observations: normalizeText(details.general_observations),
+    survey_date: normalizeText(details.survey_date),
+    interviewed_people: normalizeText(details.interviewed_people),
+    current_execution: normalizeText(details.current_execution),
+    identified_steps: normalizeText(details.identified_steps),
+    systems_used: normalizeText(details.systems_used),
+    documents_used: normalizeText(details.documents_used),
+    process_inputs: normalizeText(details.process_inputs),
+    process_outputs: normalizeText(details.process_outputs),
+    involved_areas: normalizeText(details.involved_areas),
+    pending_questions: normalizeText(details.pending_questions),
+    survey_observations: normalizeText(details.survey_observations),
+    questions: (details.questions ?? [])
+      .map((question) => ({
+        id: normalizeId(question.id),
+        question: normalizeText(question.question),
+      }))
+      .filter((question) => question.question),
+    records: (details.records ?? [])
+      .map((record) => ({
+        id: normalizeId(record.id),
+        title: normalizeText(record.title),
+        date: normalizeText(record.date),
+        source: normalizeText(record.source),
+        description: normalizeText(record.description),
+        people_involved: normalizeText(record.people_involved),
+        related_links: normalizeText(record.related_links),
+      }))
+      .filter((record) => record.title || record.description),
+    problems: (details.problems ?? [])
+      .map((problem) => ({
+        id: normalizeId(problem.id),
+        description: normalizeText(problem.description),
+        process_step: normalizeText(problem.process_step),
+        related_area_or_owner: normalizeText(problem.related_area_or_owner),
+        perceived_frequency: normalizeText(problem.perceived_frequency),
+        perceived_impact: normalizeText(problem.perceived_impact),
+        evidence_or_comment: normalizeText(problem.evidence_or_comment),
+        status: normalizeProblemStatus(problem.status),
+      }))
+      .filter((problem) => problem.description),
+    opportunities: (details.opportunities ?? [])
+      .map((opportunity) => ({
+        id: normalizeId(opportunity.id),
+        description: normalizeText(opportunity.description),
+        related_problem_id: normalizeText(opportunity.related_problem_id),
+        improvement_type: normalizeText(opportunity.improvement_type),
+        expected_benefit: normalizeText(opportunity.expected_benefit),
+        estimated_complexity: normalizeComplexity(opportunity.estimated_complexity),
+        priority: normalizePriority(opportunity.priority),
+        complementary_notes: normalizeText(opportunity.complementary_notes),
+      }))
+      .filter((opportunity) => opportunity.description),
+    actions: (details.actions ?? [])
+      .map((action) => ({
+        id: normalizeId(action.id),
+        action: normalizeText(action.action),
+        related_item: normalizeText(action.related_item),
+        responsible: normalizeText(action.responsible),
+        deadline: normalizeText(action.deadline),
+        status: normalizeActionStatus(action.status),
+        notes: normalizeText(action.notes),
+        completion_evidence: normalizeText(action.completion_evidence),
+      }))
+      .filter((action) => action.action),
+    status_summary: normalizeText(details.status_summary),
   };
 }
 
@@ -702,6 +831,8 @@ export async function updateOfficeProcessDetails(input: {
   vcLevels?: string[];
   /** Campos complementares exibidos no Plano Essencial. */
   essentialDetails?: OfficeProcessEssentialDetails;
+  /** Campos intermediários exibidos no Plano Profissional. */
+  professionalDetails?: OfficeProcessProfessionalDetails;
 }) {
   const processAccess = await getOfficeProcessOrError(input.officeProcessId);
   if ("error" in processAccess) return { error: processAccess.error };
@@ -719,6 +850,9 @@ export async function updateOfficeProcessDetails(input: {
     (file) => typeof file.url === "string" && file.url.trim().length > 0
   );
   const normalizedEssentialDetails = normalizeEssentialDetailsForPersist(input.essentialDetails);
+  const normalizedProfessionalDetails = normalizeProfessionalDetailsForPersist(
+    input.professionalDetails
+  );
 
   const payload: Record<string, unknown> = {
     status: input.status,
@@ -764,6 +898,9 @@ export async function updateOfficeProcessDetails(input: {
   }
   if (typeof normalizedEssentialDetails !== "undefined") {
     payload.essential_details = normalizedEssentialDetails;
+  }
+  if (typeof normalizedProfessionalDetails !== "undefined") {
+    payload.professional_details = normalizedProfessionalDetails;
   }
 
   if (input.status === "in_progress" && !officeProcess.started_at) {
@@ -865,6 +1002,12 @@ export async function updateOfficeProcessDetails(input: {
     const prev = officeProcess.essential_details ?? {};
     if (JSON.stringify(prev) !== JSON.stringify(normalizedEssentialDetails)) {
       changes.push("campos do Plano Essencial atualizados");
+    }
+  }
+  if (typeof normalizedProfessionalDetails !== "undefined") {
+    const prev = officeProcess.professional_details ?? {};
+    if (JSON.stringify(prev) !== JSON.stringify(normalizedProfessionalDetails)) {
+      changes.push("campos do Plano Profissional atualizados");
     }
   }
 

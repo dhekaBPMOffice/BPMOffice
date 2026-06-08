@@ -180,6 +180,96 @@ export interface OfficeProcessEssentialDetails {
   essential_status?: OfficeProcessEssentialStatus;
 }
 
+export type OfficeProcessProfessionalProblemStatus =
+  | "identified"
+  | "in_analysis"
+  | "in_treatment"
+  | "resolved";
+
+export type OfficeProcessProfessionalActionStatus =
+  | "not_started"
+  | "in_progress"
+  | "completed"
+  | "paused"
+  | "cancelled";
+
+export type OfficeProcessProfessionalComplexity = "low" | "medium" | "high";
+export type OfficeProcessProfessionalPriority = "low" | "medium" | "high";
+
+export interface OfficeProcessProfessionalQuestion {
+  id?: string;
+  question?: string;
+}
+
+export interface OfficeProcessProfessionalRecord {
+  id?: string;
+  title?: string;
+  date?: string;
+  source?: string;
+  description?: string;
+  people_involved?: string;
+  related_links?: string;
+}
+
+export interface OfficeProcessProfessionalProblem {
+  id?: string;
+  description?: string;
+  process_step?: string;
+  related_area_or_owner?: string;
+  perceived_frequency?: string;
+  perceived_impact?: string;
+  evidence_or_comment?: string;
+  status?: OfficeProcessProfessionalProblemStatus;
+}
+
+export interface OfficeProcessProfessionalOpportunity {
+  id?: string;
+  description?: string;
+  related_problem_id?: string;
+  improvement_type?: string;
+  expected_benefit?: string;
+  estimated_complexity?: OfficeProcessProfessionalComplexity;
+  priority?: OfficeProcessProfessionalPriority;
+  complementary_notes?: string;
+}
+
+export interface OfficeProcessProfessionalAction {
+  id?: string;
+  action?: string;
+  related_item?: string;
+  responsible?: string;
+  deadline?: string;
+  status?: OfficeProcessProfessionalActionStatus;
+  notes?: string;
+  completion_evidence?: string;
+}
+
+export interface OfficeProcessProfessionalDetails {
+  objective?: string;
+  main_activities?: string;
+  how_it_works?: string;
+  responsible_area?: string;
+  participants?: string;
+  general_observations?: string;
+  survey_date?: string;
+  interviewed_people?: string;
+  current_execution?: string;
+  identified_steps?: string;
+  systems_used?: string;
+  documents_used?: string;
+  process_inputs?: string;
+  process_outputs?: string;
+  involved_areas?: string;
+  pending_questions?: string;
+  survey_observations?: string;
+  questions?: OfficeProcessProfessionalQuestion[];
+  records?: OfficeProcessProfessionalRecord[];
+  problems?: OfficeProcessProfessionalProblem[];
+  opportunities?: OfficeProcessProfessionalOpportunity[];
+  actions?: OfficeProcessProfessionalAction[];
+  status_summary?: string;
+}
+
 export interface BaseProcess {
   id: string;
   name: string;
@@ -406,6 +496,7 @@ export interface OfficeProcess {
   vc_gestor_label: string | null;
   vc_general_status: string | null;
   essential_details: OfficeProcessEssentialDetails;
+  professional_details: OfficeProcessProfessionalDetails;
 }
 
 export interface OfficeProcessBpmPhase {

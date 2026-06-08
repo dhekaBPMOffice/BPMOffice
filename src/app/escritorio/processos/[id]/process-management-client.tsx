@@ -6,6 +6,7 @@ import { OFFICE_PROCESS_STATUS_META } from "@/lib/processes";
 import type {
   OfficeProcessAttachmentType,
   OfficeProcessEssentialDetails,
+  OfficeProcessProfessionalDetails,
   OfficeProcessStatus,
   ProcessFlowchartFile,
   ProcessTemplateFile,
@@ -64,6 +65,7 @@ import { ProcessWorkspaceFormSection } from "./process-workspace-form-section";
 import { ProcessWorkspaceSidebar } from "./process-workspace-sidebar";
 import { ProcessWorkspaceStageLayout } from "./process-workspace-stage-layout";
 import { ProcessManagementEssentialClient } from "./process-management-essential-client";
+import { ProcessManagementProfessionalClient } from "./process-management-professional-client";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -134,6 +136,7 @@ type ProcessManagementClientProps = {
     created_at?: string | null;
     updated_at?: string | null;
     essential_details?: OfficeProcessEssentialDetails | null;
+    professional_details?: OfficeProcessProfessionalDetails | null;
   };
   managementVersion?: ProcessManagementVersion;
   processTypeOptions: string[];
@@ -179,20 +182,20 @@ const WORKSPACE_TABS: WorkspaceTabDefinition[] = [
     phases: ["levantamento"],
   },
   {
-    id: "diagnostico",
-    label: "Diagnóstico",
-    description: "Leitura da situação atual, análises e registro de hipóteses.",
-    stageObjective: "Caracterizar o as-is, validar hipóteses e registrar achados com clareza.",
-    icon: FileText,
-    phases: ["validacao", "descritivo"],
-  },
-  {
     id: "modelagem",
     label: "Modelagem",
     description: "Estrutura do processo, templates e fluxogramas de apoio.",
     stageObjective: "Estruturar o processo de forma clara, partilhável e reproduzível.",
     icon: Workflow,
     phases: ["modelagem"],
+  },
+  {
+    id: "diagnostico",
+    label: "Diagnóstico",
+    description: "Leitura da situação atual, análises e registro de hipóteses.",
+    stageObjective: "Caracterizar o as-is, validar hipóteses e registrar achados com clareza.",
+    icon: FileText,
+    phases: ["validacao", "descritivo"],
   },
   {
     id: "melhorias",
@@ -229,6 +232,10 @@ const BPM_PHASE_TO_WORKSPACE_TAB: Record<BpmPhaseSlug, WorkspaceTabId> = {
   implantacao: "melhorias",
   acompanhamento: "acompanhamento",
 };
+
+function isWorkspaceTabId(value: string | null): value is WorkspaceTabId {
+  return WORKSPACE_TABS.some((tab) => tab.id === value);
+}
 
 function FileExtBadge({ name }: { name: string }) {
   const dot = name.lastIndexOf(".");
@@ -373,10 +380,10 @@ function ProcessManagementClientInner({
   const currentWorkspaceTab = currentBpmSlug
     ? BPM_PHASE_TO_WORKSPACE_TAB[currentBpmSlug]
     : "visao-geral";
-  const rawTab = searchParams.get("aba");
-  const activeTab = WORKSPACE_TABS.some((tab) => tab.id === rawTab)
-    ? (rawTab as WorkspaceTabId)
-    : currentWorkspaceTab;
+  const [activeTab, setActiveTab] = useState<WorkspaceTabId>(() => {
+    const rawTab = searchParams.get("aba");
+    return isWorkspaceTabId(rawTab) ? rawTab : currentWorkspaceTab;
+  });
   const statusMeta = OFFICE_PROCESS_STATUS_META[status];
   const completedCount = useMemo(
     () => checklistItems.filter((item) => item.is_completed).length,
@@ -458,11 +465,22 @@ function ProcessManagementClientInner({
     [history]
   );
 
+  useEffect(() => {
+    const rawTab = searchParams.get("aba");
+    setActiveTab(isWorkspaceTabId(rawTab) ? rawTab : currentWorkspaceTab);
+  }, [currentWorkspaceTab, searchParams]);
+
   function onTabChange(value: string) {
-    if (!WORKSPACE_TABS.some((tab) => tab.id === value)) return;
-    const params = new URLSearchParams(searchParams.toString());
+    if (!isWorkspaceTabId(value)) return;
+    setActiveTab(value);
+    const params = new URLSearchParams(window.location.search);
     params.set("aba", value);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    const query = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${pathname}${query ? `?${query}` : ""}${window.location.hash}`
+    );
   }
 
   async function handleSaveProcess(e: React.FormEvent) {
@@ -2221,7 +2239,7 @@ export function ProcessManagementClient(props: ProcessManagementClientProps) {
       {props.managementVersion === "essential" ? (
         <ProcessManagementEssentialClient {...props} />
       ) : props.managementVersion === "professional" ? (
-        <ProcessManagementSimpleClient {...props} />
+        <ProcessManagementProfessionalClient {...props} />
       ) : (
         <ProcessManagementClientInner {...props} />
       )}
