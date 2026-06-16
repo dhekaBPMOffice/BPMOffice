@@ -199,7 +199,64 @@ export type OfficeProcessProfessionalPriority = "low" | "medium" | "high";
 export interface OfficeProcessProfessionalQuestion {
   id?: string;
   question?: string;
+  answer?: string;
 }
+
+export type OfficeProcessProfessionalScriptStatus =
+  | "draft"
+  | "ready"
+  | "archived";
+
+export interface OfficeProcessProfessionalScriptQuestion {
+  id?: string;
+  question?: string;
+  sort_order?: number;
+}
+
+export interface OfficeProcessProfessionalScriptBlock {
+  id?: string;
+  title?: string;
+  sort_order?: number;
+  questions?: OfficeProcessProfessionalScriptQuestion[];
+}
+
+export interface OfficeProcessProfessionalSurveyScript {
+  id?: string;
+  name?: string;
+  description?: string;
+  status?: OfficeProcessProfessionalScriptStatus;
+  created_at?: string;
+  updated_at?: string;
+  blocks?: OfficeProcessProfessionalScriptBlock[];
+}
+
+export interface OfficeProcessProfessionalRecordAnswer {
+  question_id?: string;
+  answer?: string;
+}
+
+export interface OfficeProcessProfessionalRecordAttachment {
+  id?: string;
+  name?: string;
+  type?: string;
+  url?: string;
+}
+
+export type OfficeProcessProfessionalRecordType =
+  | "interview"
+  | "meeting"
+  | "workshop"
+  | "document_analysis"
+  | "observation"
+  | "other";
+
+export type OfficeProcessProfessionalRecordStatus =
+  | "draft"
+  | "filled"
+  | "reviewed"
+  | "consolidated";
+
+export type OfficeProcessProfessionalCollectionOrigin = "system" | "external";
 
 export interface OfficeProcessProfessionalRecord {
   id?: string;
@@ -209,6 +266,31 @@ export interface OfficeProcessProfessionalRecord {
   description?: string;
   people_involved?: string;
   related_links?: string;
+  type?: OfficeProcessProfessionalRecordType;
+  participants?: string;
+  areas_involved?: string;
+  responsible?: string;
+  status?: OfficeProcessProfessionalRecordStatus;
+  linked_questionnaire_id?: string;
+  attachment_url?: string;
+  attachments?: OfficeProcessProfessionalRecordAttachment[];
+  observations?: string;
+  use_in_consolidation?: boolean;
+  script_id?: string;
+  answers?: OfficeProcessProfessionalRecordAnswer[];
+  created_at?: string;
+  updated_at?: string;
+  collection_origin?: OfficeProcessProfessionalCollectionOrigin;
+}
+
+export interface OfficeProcessProfessionalMaterial {
+  id?: string;
+  name?: string;
+  type?: string;
+  date?: string;
+  description?: string;
+  url?: string;
+  related_record_id?: string;
 }
 
 export interface OfficeProcessProfessionalProblem {
@@ -254,6 +336,8 @@ export interface OfficeProcessProfessionalDetails {
   survey_date?: string;
   interviewed_people?: string;
   current_execution?: string;
+  process_start?: string;
+  process_end?: string;
   identified_steps?: string;
   systems_used?: string;
   documents_used?: string;
@@ -263,7 +347,9 @@ export interface OfficeProcessProfessionalDetails {
   pending_questions?: string;
   survey_observations?: string;
   questions?: OfficeProcessProfessionalQuestion[];
+  survey_scripts?: OfficeProcessProfessionalSurveyScript[];
   records?: OfficeProcessProfessionalRecord[];
+  materials?: OfficeProcessProfessionalMaterial[];
   problems?: OfficeProcessProfessionalProblem[];
   opportunities?: OfficeProcessProfessionalOpportunity[];
   actions?: OfficeProcessProfessionalAction[];
@@ -579,7 +665,12 @@ export interface DocumentTemplateStyles {
   margins: DocumentMargins;
 }
 
-export type DocumentSectionType = "title" | "rich_text" | "data_table" | "data_list";
+export type DocumentSectionType =
+  | "title"
+  | "rich_text"
+  | "data_table"
+  | "data_list"
+  | "data_fields";
 
 export interface DocumentSectionConfig {
   type: DocumentSectionType;

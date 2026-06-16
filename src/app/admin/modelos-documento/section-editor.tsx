@@ -26,6 +26,7 @@ const TYPE_META: Record<
   rich_text: { label: "Texto rico", icon: FileText, removable: true },
   data_table: { label: "Conteúdo do catálogo (serviços)", icon: Table2, removable: false },
   data_list: { label: "Lista de dados", icon: ListTree, removable: false },
+  data_fields: { label: "Campos da consolidação", icon: ListTree, removable: false },
 };
 
 interface SectionEditorProps {

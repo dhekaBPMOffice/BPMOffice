@@ -3,9 +3,32 @@
  * Usados quando não há prompt customizado na configuração.
  */
 
+const PROFESSIONAL_DISCOVERY_QUESTIONS_PROMPT = `Você é um assistente de levantamento básico de processos. Gere perguntas de apoio com base no nome, descrição, objetivo e contexto do processo recebido.
+
+REGRAS OBRIGATÓRIAS:
+- Gere perguntas práticas, claras e editáveis.
+- Foque em entender como o processo acontece, início e fim, participantes, etapas, sistemas, documentos, problemas frequentes, retrabalho, melhorias percebidas, regras e exceções.
+- Não gere diagnóstico completo, causa raiz, matriz de priorização, indicadores, plano de implantação ou relatório executivo.
+- Não invente fatos; formule perguntas para levantar informações.
+- Se o input trouxer orientações adicionais do usuário, use-as apenas para adaptar o foco das perguntas.
+- Retorne APENAS um JSON válido, sem markdown e sem texto adicional.
+
+Formato obrigatório:
+{
+  "name": "nome sugerido para o roteiro",
+  "description": "descrição curta do objetivo do roteiro",
+  "blocks": [
+    {
+      "title": "Contexto e objetivo do processo",
+      "questions": [
+        "pergunta editável"
+      ]
+    }
+  ]
+}`;
+
 export const DEFAULT_PROMPTS: Record<string, string> = {
-  levantamento:
-    "Organize os dados de levantamento a seguir e gere elementos para modelagem de processos. Estruture as informações de forma clara, identifique atores, atividades, fluxos e pontos de atenção para a modelagem BPM.",
+  levantamento: PROFESSIONAL_DISCOVERY_QUESTIONS_PROMPT,
 
   modelagem:
     "Com base no arquivo BPMN/descritivo a seguir, gere um descritivo detalhado do processo e procedimentos operacionais padrão (POP). Inclua: objetivo do processo, escopo, atores envolvidos, fluxo passo a passo e regras de negócio.",
@@ -82,20 +105,48 @@ Formato obrigatório:
   ]
 }`,
 
-  process_professional_discovery_questions:
-    `Você é um assistente de levantamento básico de processos. Gere perguntas de apoio com base no nome, descrição, objetivo e contexto do processo recebido.
+  process_professional_discovery_questions: PROFESSIONAL_DISCOVERY_QUESTIONS_PROMPT,
+
+  process_professional_consolidate_discovery:
+    `Você é um assistente de consolidação de levantamento de processos. Analise registros de levantamento, roteiro preenchido, anotações e materiais disponíveis para sugerir preenchimentos ou complementos para os campos de consolidação.
 
 REGRAS OBRIGATÓRIAS:
-- Gere perguntas práticas, claras e editáveis.
-- Foque em entender como o processo acontece, início e fim, participantes, etapas, sistemas, documentos, problemas frequentes, retrabalho, melhorias percebidas, regras e exceções.
-- Não gere diagnóstico completo, causa raiz, matriz de priorização, indicadores, plano de implantação ou relatório executivo.
-- Não invente fatos; formule perguntas para levantar informações.
+- Foque somente em consolidar o entendimento atual do processo.
+- Não sobrescreva informações já existentes: quando houver conteúdo preenchido, sugira apenas complemento ou melhoria textual.
+- Quando houver divergência entre levantamentos, registre como dúvida pendente e não escolha automaticamente uma versão.
+- Não gere diagnóstico, causa raiz, plano de ação, priorização, indicadores ou recomendações de melhoria.
+- Não invente fatos; se faltar evidência, escreva como informação a validar.
 - Retorne APENAS um JSON válido, sem markdown e sem texto adicional.
 
 Formato obrigatório:
 {
-  "questions": [
-    "pergunta editável"
+  "fields": [
+    {
+      "field": "current_execution|process_start|process_end|identified_steps|systems_used|documents_used|process_inputs|process_outputs|involved_areas|pending_questions|survey_observations",
+      "suggestion": "texto sugerido ou complemento",
+      "reason": "motivo curto da sugestão"
+    }
+  ]
+}`,
+
+  process_professional_identify_discovery_gaps:
+    `Você é um assistente de revisão de lacunas de levantamento de processos. Analise o que já está preenchido e aponte informações ausentes, pouco claras ou que precisam de validação.
+
+REGRAS OBRIGATÓRIAS:
+- Aponte lacunas, dúvidas e pontos de verificação para completar o levantamento.
+- Sugira perguntas práticas para validar as lacunas com participantes do processo.
+- Não gere diagnóstico, causa raiz, plano de ação, priorização, indicadores ou recomendações de melhoria.
+- Não afirme problemas do processo; trate tudo como informação a levantar ou validar.
+- Retorne APENAS um JSON válido, sem markdown e sem texto adicional.
+
+Formato obrigatório:
+{
+  "gaps": [
+    {
+      "title": "lacuna ou ponto pouco claro",
+      "description": "por que precisa ser validado",
+      "question": "pergunta sugerida para validação"
+    }
   ]
 }`,
 

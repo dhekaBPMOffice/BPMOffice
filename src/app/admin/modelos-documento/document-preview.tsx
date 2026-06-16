@@ -9,6 +9,10 @@
 
 import type { DocumentTemplateStyles, DocumentSectionConfig, BrandingMapping } from "@/types/database";
 import { getPortfolioFieldRows, normalizePortfolioService } from "@/lib/export/portfolio-service-fields";
+import {
+  getConsolidationFieldRows,
+  SAMPLE_CONSOLIDATION_EXPORT_DATA,
+} from "@/lib/export/consolidation-export-fields";
 
 interface DocumentPreviewProps {
   styles: DocumentTemplateStyles;
@@ -181,8 +185,17 @@ export function DocumentPreview({ styles, sections, brandingMapping }: DocumentP
 
   function renderSection(section: DocumentSectionConfig) {
     switch (section.type) {
-      case "title":
-        return <div style={titleStyle()}>{section.defaultText || "Título"}</div>;
+      case "title": {
+        const hasConsolidationFields = sections.some((item) => item.type === "data_fields");
+        const titleText = section.defaultText || "Título";
+        return (
+          <div style={titleStyle()}>
+            {hasConsolidationFields
+              ? `${titleText} - ${SAMPLE_CONSOLIDATION_EXPORT_DATA.processName}`
+              : titleText}
+          </div>
+        );
+      }
       case "rich_text":
         if (!section.content) return null;
         return (
@@ -214,6 +227,23 @@ export function DocumentPreview({ styles, sections, brandingMapping }: DocumentP
                 )}
               </div>
             ))}
+          </div>
+        );
+      case "data_fields":
+        return (
+          <div style={{ marginTop: `${styles.spacing.beforeSection}px` }}>
+            {getConsolidationFieldRows(SAMPLE_CONSOLIDATION_EXPORT_DATA.fields).map(
+              (row, idx) => (
+                <div key={row.label}>
+                  <div style={subtitleStyle(idx === 0)}>{row.label}</div>
+                  {row.value.split(/\r?\n/).map((line, lineIndex) => (
+                    <div key={`${row.label}-${lineIndex}`} style={bodyStyle()}>
+                      {line.trim() || "—"}
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
           </div>
         );
       default:

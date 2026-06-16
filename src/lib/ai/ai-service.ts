@@ -31,6 +31,18 @@ export interface GenerateResult {
   tokensUsed?: number;
 }
 
+function resolvePromptTemplate(prompts: Record<string, string>, phase: string): string {
+  const direct = (prompts[phase] as string)?.trim();
+  if (direct) return direct;
+
+  if (phase === "process_professional_discovery_questions") {
+    const levantamento = (prompts.levantamento as string)?.trim();
+    if (levantamento) return levantamento;
+  }
+
+  return getDefaultPrompt(phase);
+}
+
 export class AIService {
   /**
    * Obtém a configuração de IA: primeiro override do escritório (office_config),
@@ -101,8 +113,7 @@ export class AIService {
       throw new Error("Chave de API de IA não configurada. Configure em Configurações ou no painel admin.");
     }
 
-    const promptTemplate =
-      (config.prompts[phase] as string) || getDefaultPrompt(phase);
+    const promptTemplate = resolvePromptTemplate(config.prompts, phase);
     const promptUsed = promptTemplate;
     const fullPrompt = `${promptTemplate}\n\nDados de entrada:\n${input}`;
 

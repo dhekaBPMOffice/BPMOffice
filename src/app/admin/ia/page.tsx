@@ -21,7 +21,7 @@ import { DEFAULT_PROMPTS } from "@/lib/ai/prompts";
 import { saveAiConfig } from "./actions";
 
 const BPM_PHASES = [
-  { key: "levantamento", label: "Levantamento" },
+  { key: "levantamento", label: "Levantamento (roteiro)" },
   { key: "modelagem", label: "Modelagem" },
   { key: "analise", label: "Análise" },
   { key: "melhorias", label: "Melhorias" },
@@ -42,6 +42,10 @@ function getInitialPrompts(savedPrompts: Record<string, string> = {}) {
 
   if (!prompts.plano_tatico?.trim()) {
     prompts.plano_tatico = DEFAULT_PROMPTS.plano_tatico;
+  }
+
+  if (!prompts.levantamento?.trim()) {
+    prompts.levantamento = DEFAULT_PROMPTS.levantamento;
   }
 
   return prompts;
@@ -191,7 +195,9 @@ export default function IaPage() {
           <CardHeader>
             <CardTitle>Prompts por fase BPM</CardTitle>
             <CardDescription>
-              Personalize os prompts utilizados em cada fase do ciclo BPM.
+              Personalize os prompts utilizados em cada fase do ciclo BPM. O prompt de
+              Levantamento é usado para gerar roteiros de entrevista no Plano Profissional e
+              deve retornar JSON no formato indicado abaixo.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -205,7 +211,11 @@ export default function IaPage() {
               </TabsList>
               {BPM_PHASES.map(({ key, label }) => (
                 <TabsContent key={key} value={key} className="mt-4">
-                  <Label htmlFor={`prompt_${key}`}>Prompt para {label}</Label>
+                  <Label htmlFor={`prompt_${key}`}>
+                    {key === "levantamento"
+                      ? "Prompt para geração do roteiro de entrevistas"
+                      : `Prompt para ${label}`}
+                  </Label>
                   <Textarea
                     id={`prompt_${key}`}
                     className="mt-2 min-h-[480px] font-mono text-sm"
@@ -213,7 +223,11 @@ export default function IaPage() {
                     onChange={(e) =>
                       setPrompts((prev) => ({ ...prev, [key]: e.target.value }))
                     }
-                    placeholder={`Digite o prompt padrão para a fase de ${label.toLowerCase()}...`}
+                    placeholder={
+                      key === "levantamento"
+                        ? "Prompt para gerar roteiro (JSON com name, description e blocks)..."
+                        : `Digite o prompt padrão para a fase de ${label.toLowerCase()}...`
+                    }
                   />
                 </TabsContent>
               ))}

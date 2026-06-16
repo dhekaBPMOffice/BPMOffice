@@ -16,6 +16,9 @@ import type {
   OfficeProcessAttachmentType,
   OfficeProcessEssentialDetails,
   OfficeProcessProfessionalDetails,
+  OfficeProcessProfessionalScriptStatus,
+  OfficeProcessProfessionalRecordStatus,
+  OfficeProcessProfessionalRecordType,
   OfficeProcessProfessionalProblemStatus,
   OfficeProcessProfessionalActionStatus,
   OfficeProcessProfessionalComplexity,
@@ -230,6 +233,37 @@ function normalizePriority(value: unknown): OfficeProcessProfessionalPriority {
   return "medium";
 }
 
+function normalizeRecordType(value: unknown): OfficeProcessProfessionalRecordType {
+  if (
+    value === "interview" ||
+    value === "meeting" ||
+    value === "workshop" ||
+    value === "document_analysis" ||
+    value === "observation" ||
+    value === "other"
+  ) {
+    return value;
+  }
+  return "interview";
+}
+
+function normalizeRecordStatus(value: unknown): OfficeProcessProfessionalRecordStatus {
+  if (
+    value === "draft" ||
+    value === "filled" ||
+    value === "reviewed" ||
+    value === "consolidated"
+  ) {
+    return value;
+  }
+  return "draft";
+}
+
+function normalizeScriptStatus(value: unknown): OfficeProcessProfessionalScriptStatus {
+  if (value === "draft" || value === "ready" || value === "archived") return value;
+  return "draft";
+}
+
 function normalizeProfessionalDetailsForPersist(
   details: OfficeProcessProfessionalDetails | undefined
 ): OfficeProcessProfessionalDetails | undefined {
@@ -245,6 +279,8 @@ function normalizeProfessionalDetailsForPersist(
     survey_date: normalizeText(details.survey_date),
     interviewed_people: normalizeText(details.interviewed_people),
     current_execution: normalizeText(details.current_execution),
+    process_start: normalizeText(details.process_start),
+    process_end: normalizeText(details.process_end),
     identified_steps: normalizeText(details.identified_steps),
     systems_used: normalizeText(details.systems_used),
     documents_used: normalizeText(details.documents_used),
@@ -257,8 +293,35 @@ function normalizeProfessionalDetailsForPersist(
       .map((question) => ({
         id: normalizeId(question.id),
         question: normalizeText(question.question),
+        answer: normalizeText(question.answer),
       }))
-      .filter((question) => question.question),
+      .filter((question) => question.question || question.answer),
+    survey_scripts: (details.survey_scripts ?? [])
+      .map((script) => ({
+        id: normalizeId(script.id),
+        name: normalizeText(script.name),
+        description: normalizeText(script.description),
+        status: normalizeScriptStatus(script.status),
+        created_at: normalizeText(script.created_at),
+        updated_at: normalizeText(script.updated_at),
+        blocks: (script.blocks ?? [])
+          .map((block, blockIndex) => ({
+            id: normalizeId(block.id),
+            title: normalizeText(block.title),
+            sort_order: Number.isFinite(block.sort_order) ? block.sort_order : blockIndex,
+            questions: (block.questions ?? [])
+              .map((question, questionIndex) => ({
+                id: normalizeId(question.id),
+                question: normalizeText(question.question),
+                sort_order: Number.isFinite(question.sort_order)
+                  ? question.sort_order
+                  : questionIndex,
+              }))
+              .filter((question) => question.question),
+          }))
+          .filter((block) => block.title || block.questions.length > 0),
+      }))
+      .filter((script) => script.name || script.blocks.length > 0),
     records: (details.records ?? [])
       .map((record) => ({
         id: normalizeId(record.id),
@@ -268,8 +331,59 @@ function normalizeProfessionalDetailsForPersist(
         description: normalizeText(record.description),
         people_involved: normalizeText(record.people_involved),
         related_links: normalizeText(record.related_links),
+        type: normalizeRecordType(record.type),
+        participants: normalizeText(record.participants),
+        areas_involved: normalizeText(record.areas_involved),
+        responsible: normalizeText(record.responsible),
+        status: normalizeRecordStatus(record.status),
+        linked_questionnaire_id: normalizeText(record.linked_questionnaire_id),
+        attachment_url: normalizeText(record.attachment_url),
+        attachments: (record.attachments ?? [])
+          .map((attachment) => ({
+            id: normalizeId(attachment.id),
+            name: normalizeText(attachment.name),
+            type: normalizeText(attachment.type),
+            url: normalizeText(attachment.url),
+          }))
+          .filter((attachment) => attachment.url),
+        observations: normalizeText(record.observations),
+        use_in_consolidation: Boolean(record.use_in_consolidation),
+        script_id: normalizeText(record.script_id),
+        answers: (record.answers ?? [])
+          .map((answer) => ({
+            question_id: normalizeText(answer.question_id),
+            answer: normalizeText(answer.answer),
+          }))
+          .filter((answer) => answer.question_id || answer.answer),
+        created_at: normalizeText(record.created_at),
+        updated_at: normalizeText(record.updated_at),
+        collection_origin:
+          record.collection_origin === "external" || record.collection_origin === "system"
+            ? record.collection_origin
+            : normalizeText(record.script_id ?? record.linked_questionnaire_id)
+              ? "system"
+              : "external",
       }))
-      .filter((record) => record.title || record.description),
+      .filter(
+        (record) =>
+          record.title ||
+          record.description ||
+          record.participants ||
+          record.observations ||
+          record.attachment_url ||
+          (record.attachments?.length ?? 0) > 0
+      ),
+    materials: (details.materials ?? [])
+      .map((material) => ({
+        id: normalizeId(material.id),
+        name: normalizeText(material.name),
+        type: normalizeText(material.type),
+        date: normalizeText(material.date),
+        description: normalizeText(material.description),
+        url: normalizeText(material.url),
+        related_record_id: normalizeText(material.related_record_id),
+      }))
+      .filter((material) => material.name || material.url || material.description),
     problems: (details.problems ?? [])
       .map((problem) => ({
         id: normalizeId(problem.id),
