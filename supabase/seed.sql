@@ -9,7 +9,7 @@ VALUES (
   'Plano inicial com funcionalidades essenciais',
   5,
   20,
-  '{"value_chain": true, "swot": true, "portfolio": true, "bpm_cycle": true, "ai": false, "knowledge_management": false, "training": false, "area_dashboard": true, "area_estrategia": true, "area_processos": true, "area_demandas": true, "area_conhecimento": false, "area_capacitacao": false}',
+  '{"value_chain": true, "swot": true, "portfolio": true, "bpm_cycle": true, "ai": false, "knowledge_management": false, "training": false, "area_dashboard": true, "area_estrategia": true, "area_processos": true, "area_demandas": true, "area_conhecimento": false, "area_capacitacao": false, "process_management_version": "essential"}',
   0,
   true
 );
@@ -20,7 +20,7 @@ VALUES (
   'Para escritórios em crescimento com IA e gestão completa',
   20,
   100,
-  '{"value_chain": true, "swot": true, "portfolio": true, "bpm_cycle": true, "ai": true, "knowledge_management": true, "training": true, "area_dashboard": true, "area_estrategia": true, "area_processos": true, "area_demandas": true, "area_conhecimento": true, "area_capacitacao": true}',
+  '{"value_chain": true, "swot": true, "portfolio": true, "bpm_cycle": true, "ai": true, "knowledge_management": true, "training": true, "area_dashboard": true, "area_estrategia": true, "area_processos": true, "area_demandas": true, "area_conhecimento": true, "area_capacitacao": true, "process_management_version": "professional"}',
   199.90,
   true
 );
@@ -31,7 +31,7 @@ VALUES (
   'Escritórios de grande porte com recursos ilimitados',
   999,
   9999,
-  '{"value_chain": true, "swot": true, "portfolio": true, "bpm_cycle": true, "ai": true, "knowledge_management": true, "training": true, "custom_ai_api": true, "backup_auto": true, "area_dashboard": true, "area_estrategia": true, "area_processos": true, "area_demandas": true, "area_conhecimento": true, "area_capacitacao": true}',
+  '{"value_chain": true, "swot": true, "portfolio": true, "bpm_cycle": true, "ai": true, "knowledge_management": true, "training": true, "custom_ai_api": true, "backup_auto": true, "area_dashboard": true, "area_estrategia": true, "area_processos": true, "area_demandas": true, "area_conhecimento": true, "area_capacitacao": true, "process_management_version": "complete"}',
   499.90,
   true
 );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type {
   OfficeProcessAttachmentType,
   OfficeProcessEssentialDetails,
@@ -42,9 +42,13 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ProcessTypeSelect } from "@/components/processes/process-type-select";
 import { ProcessWorkspaceFormSection } from "./process-workspace-form-section";
 import { ProcessWorkspaceShell } from "./process-workspace-shell";
+import { ProcessWorkspaceJourneyBar, type JourneyBarTab } from "./process-workspace-journey-bar";
+import { ProcessWorkspaceSidebar } from "./process-workspace-sidebar";
+import { ProcessWorkspaceStageLayout } from "./process-workspace-stage-layout";
 import { compactLevelsForPersist, draftLevelsForForm } from "@/lib/office-process-levels";
 import {
   initialTipoLabelFromOfficeProcess,
@@ -52,14 +56,18 @@ import {
 } from "@/lib/process-type-options";
 import { cn } from "@/lib/utils";
 import {
+  AlertTriangle,
+  BarChart2,
   BookOpen,
+  ClipboardList,
   ExternalLink,
-  FileText,
+  LayoutDashboard,
   Loader2,
   Plus,
   Sparkles,
   Trash2,
   Workflow,
+  Zap,
 } from "lucide-react";
 
 const ATTACHMENT_TYPES: { value: OfficeProcessAttachmentType; label: string }[] = [
@@ -119,6 +127,66 @@ const DEFAULT_DISCOVERY_QUESTIONS = [
   "O que poderia funcionar melhor?",
   "Há alguma regra, exceção ou cuidado importante?",
 ];
+
+type ProfessionalWorkspaceTabId =
+  | "visao-geral"
+  | "levantamento"
+  | "diagnostico"
+  | "melhorias"
+  | "acompanhamento";
+
+const PROFESSIONAL_WORKSPACE_TABS: JourneyBarTab[] = [
+  { id: "visao-geral", label: "Visão Geral", icon: LayoutDashboard, phases: [] },
+  { id: "levantamento", label: "Levantamento", icon: ClipboardList, phases: [] },
+  { id: "diagnostico", label: "Diagnóstico", icon: AlertTriangle, phases: [] },
+  { id: "melhorias", label: "Ações", icon: Zap, phases: [] },
+  { id: "acompanhamento", label: "Acompanhamento", icon: BarChart2, phases: [] },
+];
+
+const PROFESSIONAL_TAB_CONTENT: Record<
+  ProfessionalWorkspaceTabId,
+  { title: string; description: string; objective: string; hint: string }
+> = {
+  "visao-geral": {
+    title: "Visão Geral",
+    description: "Contexto, responsáveis, documentação e situação atual do processo.",
+    objective:
+      "Consolidar as informações essenciais do processo antes de avançar para o levantamento.",
+    hint: "Plano Profissional · base de entendimento do processo",
+  },
+  levantamento: {
+    title: "Levantamento",
+    description: "Informações coletadas, roteiro de perguntas e registros de análise.",
+    objective:
+      "Organizar o levantamento básico para entender como o processo acontece na prática.",
+    hint: "Plano Profissional · entrevistas, observações e registros",
+  },
+  diagnostico: {
+    title: "Diagnóstico Inicial",
+    description: "Problemas, pontos de atenção e oportunidades práticas de melhoria.",
+    objective:
+      "Registrar sinais percebidos no processo e transformar observações em oportunidades iniciais.",
+    hint: "Plano Profissional · problemas e oportunidades",
+  },
+  melhorias: {
+    title: "Ações",
+    description: "Plano de ação simples para tratar problemas e organizar melhorias.",
+    objective:
+      "Definir ações práticas, responsáveis, prazos e evidências de conclusão.",
+    hint: "Plano Profissional · execução simples e acompanhável",
+  },
+  acompanhamento: {
+    title: "Acompanhamento",
+    description: "Resumo de status e visão objetiva do andamento das ações.",
+    objective:
+      "Acompanhar problemas, oportunidades e ações para manter visibilidade da evolução.",
+    hint: "Plano Profissional · evolução e pontos de atenção",
+  },
+};
+
+function isProfessionalWorkspaceTabId(value: string | null): value is ProfessionalWorkspaceTabId {
+  return PROFESSIONAL_WORKSPACE_TABS.some((tab) => tab.id === value);
+}
 
 type ProfessionalDraft = Required<
   Pick<
@@ -431,7 +499,12 @@ export function ProcessManagementProfessionalClient({
   attachments,
 }: ProcessManagementProfessionalClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const timeZone = useTimeZone();
+  const [activeTab, setActiveTab] = useState<ProfessionalWorkspaceTabId>(() => {
+    const rawTab = searchParams.get("aba");
+    return isProfessionalWorkspaceTabId(rawTab) ? rawTab : "visao-geral";
+  });
   const [status, setStatus] = useState<OfficeProcessStatus>(officeProcess.status);
   const [description, setDescription] = useState(officeProcess.description ?? "");
   const [notes, setNotes] = useState(officeProcess.notes ?? "");
@@ -537,6 +610,13 @@ export function ProcessManagementProfessionalClient({
   );
 
   useEffect(() => {
+    const rawTab = searchParams.get("aba");
+    if (isProfessionalWorkspaceTabId(rawTab)) {
+      setActiveTab(rawTab);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     setStatus(officeProcess.status);
     setDescription(officeProcess.description ?? "");
     setNotes(officeProcess.notes ?? "");
@@ -556,6 +636,14 @@ export function ProcessManagementProfessionalClient({
 
   function updateDraft<K extends keyof ProfessionalDraft>(key: K, value: ProfessionalDraft[K]) {
     setDraft((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleTabChange(value: string) {
+    if (!isProfessionalWorkspaceTabId(value)) return;
+    setActiveTab(value);
+    const params = new URLSearchParams(window.location.search);
+    params.set("aba", value);
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
   }
 
   async function handleSaveProcess(event: FormEvent) {
@@ -688,7 +776,7 @@ export function ProcessManagementProfessionalClient({
       if (!response.ok || data?.error) {
         throw new Error(data?.error || "Não foi possível gerar a sugestão com IA.");
       }
-      return String(data.result ?? "");
+      return String(data.text ?? "");
     } catch (error) {
       setAiError(error instanceof Error ? error.message : "Erro ao gerar sugestão com IA.");
       return null;
@@ -858,30 +946,143 @@ export function ProcessManagementProfessionalClient({
     </Button>
   );
 
+  const statusLabel =
+    PROCESS_SITUATION_OPTIONS.find((option) => option.value === status)?.label ??
+    OFFICE_PROCESS_STATUS_META[status].label;
+  const statusVariant = OFFICE_PROCESS_STATUS_META[status].variant;
+  const totalActions = draft.actions.length;
+  const completedActions = actionStats.completed;
+  const actionProgressPercent = totalActions
+    ? Math.round((completedActions / totalActions) * 100)
+    : 0;
+  const openProblems = draft.problems.filter((problem) => problem.status !== "resolved").length;
+  const currentTabContent = PROFESSIONAL_TAB_CONTENT[activeTab];
+  const professionalInsightHints = [
+    actionStats.overdue > 0
+      ? `${actionStats.overdue} ação(ões) atrasada(s) precisam de atenção.`
+      : null,
+    openProblems > 0 ? `${openProblems} problema(s) ainda não foram resolvidos.` : null,
+    draft.opportunities.length > 0 && draft.actions.length === 0
+      ? "Transforme oportunidades registradas em ações simples para avançar."
+      : null,
+    draft.records.length === 0
+      ? "Registre ao menos uma reunião, entrevista ou observação no levantamento."
+      : null,
+  ].filter(Boolean) as string[];
+
+  const workspaceSidebar = (
+    <ProcessWorkspaceSidebar
+      statusLabel={statusLabel}
+      statusVariant={statusVariant}
+      recentEvents={[]}
+      onViewFullHistory={() => handleTabChange("acompanhamento")}
+      checklistSummary={`${completedActions}/${totalActions} ações concluídas`}
+      attachmentsCount={attachments.length}
+      materialsCount={editedFlowchartFiles.length}
+      insightHints={professionalInsightHints}
+    />
+  );
+
+  const renderSaveFooter = () => (
+    <div className="flex flex-col gap-3 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-end">
+      {saveError ? (
+        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{saveError}</div>
+      ) : null}
+      {aiError ? (
+        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{aiError}</div>
+      ) : null}
+      <Button type="submit" disabled={saving}>
+        {saving ? "Salvando..." : "Salvar alterações"}
+      </Button>
+    </div>
+  );
+
   return (
     <ProcessWorkspaceShell>
       <div className="space-y-6">
-        <Card className="border-border/80 shadow-[var(--shadow-card)]">
-          <CardHeader>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-2">
-                <CardTitle className="text-2xl">Gestão Profissional do Processo</CardTitle>
-                <CardDescription className="max-w-3xl leading-relaxed">
-                  Analise o processo, organize informações de levantamento e acompanhe ações de
-                  melhoria de forma prática.
-                </CardDescription>
+        <Card className="overflow-hidden border-border/80 border-l-[4px] border-l-[var(--identity-primary)] shadow-[var(--shadow-card)]">
+          <CardContent className="grid gap-6 p-5 lg:grid-cols-10 lg:p-6">
+            <div className="space-y-4 lg:col-span-7">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Gestão Profissional do Processo
+                  </p>
+                  <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                    {officeProcess.name}
+                  </h1>
+                  <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                    Analise o processo, organize informações de levantamento e acompanhe ações de
+                    melhoria de forma prática.
+                  </p>
+                </div>
+                <Badge variant={statusVariant}>{statusLabel}</Badge>
               </div>
-              <Badge variant={OFFICE_PROCESS_STATUS_META[status].variant}>
-                {PROCESS_SITUATION_OPTIONS.find((option) => option.value === status)?.label ??
-                  OFFICE_PROCESS_STATUS_META[status].label}
-              </Badge>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <StatCard label="Problemas abertos" value={openProblems} />
+                <StatCard label="Ações em andamento" value={actionStats.inProgress} />
+                <StatCard label="Ações atrasadas" value={actionStats.overdue} />
+                <StatCard
+                  label="Última atualização"
+                  value={
+                    officeProcess.updated_at
+                      ? formatDateTimePtBr(officeProcess.updated_at, timeZone)
+                      : "-"
+                  }
+                />
+              </div>
             </div>
-          </CardHeader>
+            <div className="space-y-4 rounded-xl border border-border/70 bg-muted/25 p-4 lg:col-span-3">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Avanço das ações
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-foreground">
+                  {actionProgressPercent}%
+                </p>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-border/70">
+                  <div
+                    className="h-full rounded-full bg-[var(--identity-primary)] transition-all"
+                    style={{ width: `${actionProgressPercent}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {completedActions}/{totalActions} ações concluídas
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-lg border border-border/60 bg-card p-3">
+                  <p className="text-xs text-muted-foreground">Oportunidades</p>
+                  <p className="text-lg font-semibold">{draft.opportunities.length}</p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-card p-3">
+                  <p className="text-xs text-muted-foreground">Documentos</p>
+                  <p className="text-lg font-semibold">{attachments.length}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
         </Card>
 
-        <Card className="border-border/80">
-          <CardContent className="p-0">
-            <form onSubmit={handleSaveProcess} className="space-y-0 p-6">
+        <form onSubmit={handleSaveProcess} className="space-y-6">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+            <ProcessWorkspaceJourneyBar
+              tabs={PROFESSIONAL_WORKSPACE_TABS}
+              activeTab={activeTab}
+              secondaryHighlightTabId={null}
+              bpmPhaseRows={[]}
+            />
+
+            <TabsContent value="visao-geral" className="mt-0">
+              <ProcessWorkspaceStageLayout
+                moduleTitle={currentTabContent.title}
+                moduleDescription={currentTabContent.description}
+                stageObjective={currentTabContent.objective}
+                contextHint={currentTabContent.hint}
+                sidebar={workspaceSidebar}
+                workPanelClassName="space-y-8"
+              >
+                <div className="space-y-0">
               <ProcessWorkspaceFormSection
                 isFirst
                 title="1. Visão geral do processo"
@@ -1030,6 +1231,21 @@ export function ProcessManagementProfessionalClient({
                   </div>
                 </div>
               </ProcessWorkspaceFormSection>
+              {renderSaveFooter()}
+                </div>
+              </ProcessWorkspaceStageLayout>
+            </TabsContent>
+
+            <TabsContent value="levantamento" className="mt-0">
+              <ProcessWorkspaceStageLayout
+                moduleTitle={currentTabContent.title}
+                moduleDescription={currentTabContent.description}
+                stageObjective={currentTabContent.objective}
+                contextHint={currentTabContent.hint}
+                sidebar={workspaceSidebar}
+                workPanelClassName="space-y-8"
+              >
+                <div className="space-y-0">
 
               <ProcessWorkspaceFormSection
                 title="9. Levantamento do processo"
@@ -1099,6 +1315,21 @@ export function ProcessManagementProfessionalClient({
                   <Plus className="mr-1.5 h-4 w-4" />Adicionar registro
                 </Button>
               </ProcessWorkspaceFormSection>
+              {renderSaveFooter()}
+                </div>
+              </ProcessWorkspaceStageLayout>
+            </TabsContent>
+
+            <TabsContent value="diagnostico" className="mt-0">
+              <ProcessWorkspaceStageLayout
+                moduleTitle={currentTabContent.title}
+                moduleDescription={currentTabContent.description}
+                stageObjective={currentTabContent.objective}
+                contextHint={currentTabContent.hint}
+                sidebar={workspaceSidebar}
+                workPanelClassName="space-y-8"
+              >
+                <div className="space-y-0">
 
               <ProcessWorkspaceFormSection
                 title="12. Problemas identificados"
@@ -1182,6 +1413,21 @@ export function ProcessManagementProfessionalClient({
                   <Plus className="mr-1.5 h-4 w-4" />Adicionar oportunidade
                 </Button>
               </ProcessWorkspaceFormSection>
+              {renderSaveFooter()}
+                </div>
+              </ProcessWorkspaceStageLayout>
+            </TabsContent>
+
+            <TabsContent value="melhorias" className="mt-0">
+              <ProcessWorkspaceStageLayout
+                moduleTitle={currentTabContent.title}
+                moduleDescription={currentTabContent.description}
+                stageObjective={currentTabContent.objective}
+                contextHint={currentTabContent.hint}
+                sidebar={workspaceSidebar}
+                workPanelClassName="space-y-8"
+              >
+                <div className="space-y-0">
 
               <ProcessWorkspaceFormSection
                 title="14. Plano de ação simples"
@@ -1214,6 +1460,21 @@ export function ProcessManagementProfessionalClient({
                   <Plus className="mr-1.5 h-4 w-4" />Adicionar ação
                 </Button>
               </ProcessWorkspaceFormSection>
+              {renderSaveFooter()}
+                </div>
+              </ProcessWorkspaceStageLayout>
+            </TabsContent>
+
+            <TabsContent value="acompanhamento" className="mt-0">
+              <ProcessWorkspaceStageLayout
+                moduleTitle={currentTabContent.title}
+                moduleDescription={currentTabContent.description}
+                stageObjective={currentTabContent.objective}
+                contextHint={currentTabContent.hint}
+                sidebar={workspaceSidebar}
+                workPanelClassName="space-y-8"
+              >
+                <div className="space-y-0">
 
               <ProcessWorkspaceFormSection
                 title="15. Acompanhamento de status"
@@ -1233,19 +1494,12 @@ export function ProcessManagementProfessionalClient({
                 </div>
                 <TextField id="professional-status-summary" label="Resumo simples do andamento" value={draft.status_summary} onChange={(value) => updateDraft("status_summary", value)} rows={4} />
               </ProcessWorkspaceFormSection>
-
-              <div className="flex flex-col gap-3 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-end">
-                {saveError ? (
-                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{saveError}</div>
-                ) : null}
-                {aiError ? (
-                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{aiError}</div>
-                ) : null}
-                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar alterações"}</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+              {renderSaveFooter()}
+                </div>
+              </ProcessWorkspaceStageLayout>
+            </TabsContent>
+          </Tabs>
+        </form>
 
         <Card className="border-border/80">
           <CardHeader>
