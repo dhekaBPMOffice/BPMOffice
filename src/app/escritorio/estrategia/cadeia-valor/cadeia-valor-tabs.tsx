@@ -38,7 +38,7 @@ function CadeiaValorTabsInner({
         <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="configuracao" className="gap-2">
             <Settings2 className="h-4 w-4" />
-            Configuração da Cadeia
+            Cadeia de Valor
           </TabsTrigger>
           <TabsTrigger value="gestao" className="gap-2">
             <ClipboardList className="h-4 w-4" />
