@@ -16,13 +16,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageLayout } from "@/components/layout/page-layout";
-import { ShieldCheck } from "lucide-react";
 import { CriarAdminForm } from "./criar-admin-form";
 import { PromoverAdminForm } from "./promover-admin-form";
-import { RebaixarAdminButton } from "./rebaixar-admin-button";
+import { AdminMasterAcoes } from "./admin-master-acoes";
 
 export default async function AdministradoresPage() {
-  await requireRole(["admin_master"]);
+  const currentProfile = await requireRole(["admin_master"]);
   const supabase = await createClient();
 
   const { data: admins, error } = await supabase
@@ -67,7 +66,7 @@ export default async function AdministradoresPage() {
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>E-mail</TableHead>
-                    {podeRebaixar && <TableHead className="w-[120px]">Ações</TableHead>}
+                    <TableHead className="w-[140px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -75,11 +74,14 @@ export default async function AdministradoresPage() {
                     <TableRow key={admin.id}>
                       <TableCell>{admin.full_name ?? "—"}</TableCell>
                       <TableCell>{admin.email}</TableCell>
-                      {podeRebaixar && (
-                        <TableCell>
-                          <RebaixarAdminButton profileId={admin.id} fullName={admin.full_name ?? admin.email} />
-                        </TableCell>
-                      )}
+                      <TableCell>
+                        <AdminMasterAcoes
+                          profileId={admin.id}
+                          fullName={admin.full_name ?? admin.email}
+                          isSelf={admin.id === currentProfile.id}
+                          podeRebaixar={podeRebaixar}
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

@@ -164,3 +164,53 @@ export async function removerAdminMaster(profileId: string): Promise<{
   revalidatePath("/admin");
   return { success: true };
 }
+
+export async function resetAdminMasterPassword(
+  profileId: string,
+  newPassword: string
+): Promise<{ success?: boolean; error?: string }> {
+  const currentProfile = await requireRole(["admin_master"]);
+
+  if (!profileId?.trim()) {
+    return { error: "ID do perfil inválido." };
+  }
+
+  const pwdResult = validatePassword(newPassword);
+  if (!pwdResult.valid) {
+    return { error: pwdResult.error };
+  }
+
+  const supabase = await createServiceClient();
+
+  const { data: targetProfile, error: fetchError } = await supabase
+    .from("profiles")
+    .select("auth_user_id")
+    .eq("id", profileId)
+    .eq("role", "admin_master")
+    .single();
+
+  if (fetchError || !targetProfile) {
+    return { error: "Administrador master não encontrado." };
+  }
+
+  const { error: authError } = await supabase.auth.admin.updateUserById(
+    targetProfile.auth_user_id,
+    { password: newPassword }
+  );
+
+  if (authError) {
+    return { error: authError.message };
+  }
+
+  const isSelf = currentProfile.id === profileId;
+  if (!isSelf) {
+    await supabase
+      .from("profiles")
+      .update({ must_change_password: true, password_change_approved: false })
+      .eq("id", profileId)
+      .eq("role", "admin_master");
+  }
+
+  revalidatePath("/admin/administradores");
+  return { success: true };
+}
