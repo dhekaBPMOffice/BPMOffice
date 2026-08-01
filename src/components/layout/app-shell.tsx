@@ -40,7 +40,7 @@ export function AppShell({
           <div className="flex flex-1 flex-col overflow-hidden min-w-0">
             <Header profile={profile} platformLogoUrl={platformLogoUrl} />
             <main
-              className="flex-1 overflow-y-auto bg-background bg-dheka-pattern"
+              className="flex-1 min-h-0 overflow-y-auto bg-background bg-dheka-pattern"
               style={{ padding: "var(--spacing-page)" }}
             >
               {children}

@@ -95,6 +95,8 @@ type SortMode =
   | "atualizacao_asc"
   | "macro_asc"
   | "macro_desc"
+  | "processo_asc"
+  | "processo_desc"
   | "prioridade";
 
 interface ProcessFormData {
@@ -175,6 +177,8 @@ const SORT_OPTIONS: Array<{ value: SortMode; label: string }> = [
   { value: "atualizacao_asc", label: "Atualização mais antiga" },
   { value: "macro_asc", label: "Macroprocesso A-Z" },
   { value: "macro_desc", label: "Macroprocesso Z-A" },
+  { value: "processo_asc", label: "Processos A->Z" },
+  { value: "processo_desc", label: "Processos Z->A" },
   { value: "prioridade", label: "Prioridade (Alta > Baixa)" },
 ];
 
@@ -742,6 +746,12 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
       if (sortMode === "macro_desc") {
         return b.macroprocesso.localeCompare(a.macroprocesso, "pt-BR");
       }
+      if (sortMode === "processo_asc") {
+        return processHighlightTitle(a).localeCompare(processHighlightTitle(b), "pt-BR");
+      }
+      if (sortMode === "processo_desc") {
+        return processHighlightTitle(b).localeCompare(processHighlightTitle(a), "pt-BR");
+      }
       if (sortMode === "prioridade") {
         const weightA = getPriorityWeight(a.prioridade);
         const weightB = getPriorityWeight(b.prioridade);
@@ -1301,12 +1311,49 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
   const showingFrom = filteredSortedProcesses.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const showingTo = Math.min(currentPage * PAGE_SIZE, filteredSortedProcesses.length);
 
+  const pageShell = {
+    title: "Cadeia de Valor",
+    description:
+      "Visual operacional para alto volume de processos com navegação rápida e visão executiva.",
+    iconName: "Network" as const,
+    backHref: "/escritorio/estrategia",
+  };
+
+  if (!hydrated) {
+    return (
+      <PageLayout {...pageShell}>
+        <div className="space-y-6" aria-busy="true" aria-label="Carregando cadeia de valor">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, index) => (
+              <Card key={index}>
+                <CardContent className="pt-5">
+                  <div className="h-3 w-28 rounded bg-muted animate-pulse" />
+                  <div className="mt-3 h-7 w-14 rounded bg-muted animate-pulse" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Card>
+            <CardContent className="py-6">
+              <div className="h-20 rounded-md bg-muted/70 animate-pulse" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="py-10">
+              <div className="h-40 rounded-md bg-muted/50 animate-pulse" />
+            </CardContent>
+          </Card>
+        </div>
+      </PageLayout>
+    );
+  }
+
   return (
     <PageLayout
-      title="Cadeia de Valor"
-      description="Visual operacional para alto volume de processos com navegação rápida e visão executiva."
-      iconName="Network"
-      backHref="/escritorio/estrategia"
+      title={pageShell.title}
+      description={pageShell.description}
+      iconName={pageShell.iconName}
+      backHref={pageShell.backHref}
     >
       <div className="space-y-6">
       {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
@@ -1343,7 +1390,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
         </Card>
       </div>
 
-      <Card className="sticky top-0 z-10 border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <Card className="sticky top-0 z-30 border-border/70 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -1395,6 +1442,24 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
             </div>
 
             <div>
+              <Label className="mb-1 block text-xs text-muted-foreground">Macroprocesso</Label>
+              <Select
+                value={filterMacroprocesso}
+                onChange={(event) => {
+                  setFilterMacroprocesso(event.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="all">Todos</option>
+                {macroprocessOptions.map((macro) => (
+                  <option key={macro} value={macro}>
+                    {macro}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div>
               <Label className="mb-1 block text-xs text-muted-foreground">Status</Label>
               <Select
                 value={filterStatus}
@@ -1425,24 +1490,6 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                 {PRIORITIES.map((priority) => (
                   <option key={priority} value={priority}>
                     {priority}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div>
-              <Label className="mb-1 block text-xs text-muted-foreground">Macroprocesso</Label>
-              <Select
-                value={filterMacroprocesso}
-                onChange={(event) => {
-                  setFilterMacroprocesso(event.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="all">Todos</option>
-                {macroprocessOptions.map((macro) => (
-                  <option key={macro} value={macro}>
-                    {macro}
                   </option>
                 ))}
               </Select>
@@ -1484,6 +1531,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
         </CardContent>
       </Card>
 
+      <div className="max-h-[calc(100dvh-20rem)] overflow-y-auto overscroll-y-contain pr-0.5">
       {viewMode === "lista" ? (
         <Card>
           <CardHeader>
@@ -1536,9 +1584,9 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                       aria-label="Selecionar todos os processos desta página"
                     />
                   </TableHead>
-                  <TableHead>Processo</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Macroprocesso</TableHead>
+                  <TableHead>Processo</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Prioridade</TableHead>
                   <TableHead>BPM</TableHead>
@@ -1561,6 +1609,8 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                           aria-label={`Selecionar processo ${processHighlightTitle(process)}`}
                         />
                       </TableCell>
+                      <TableCell>{process.tipo}</TableCell>
+                      <TableCell>{normalizeLevel(process.macroprocesso, "Sem Macroprocesso")}</TableCell>
                       <TableCell>
                         <div className="space-y-1">
                           <p className="font-medium">{processHighlightTitle(process)}</p>
@@ -1571,8 +1621,6 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                           </p>
                         </div>
                       </TableCell>
-                      <TableCell>{process.tipo}</TableCell>
-                      <TableCell>{normalizeLevel(process.macroprocesso, "Sem Macroprocesso")}</TableCell>
                       <TableCell>
                         <Badge variant={getGeneralStatusVariant(process.statusGeral)}>{process.statusGeral}</Badge>
                       </TableCell>
@@ -1738,6 +1786,8 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
           </CardContent>
         </Card>
       )}
+
+      </div>
 
       <Dialog open={manageDialogOpen} onOpenChange={handleManageDialogOpenChange}>
         <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
