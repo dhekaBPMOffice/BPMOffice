@@ -1,0 +1,24 @@
+---
+description: Commit/push deve publicar na Vercel (branch master)
+alwaysApply: true
+---
+
+# Commit, push e deploy na Vercel
+
+A **produção** em `bpm-office-5bhk.vercel.app` é implantada a partir da branch **`master`** (integração Git → Vercel).
+
+Quando o usuário pedir **commit**, **commit and push**, **commit-and-push** ou ação equivalente na aba de diff:
+
+1. Fazer stage apenas dos arquivos relacionados à tarefa (excluir `.next`, artefatos e mudanças não pedidas).
+2. Criar o commit com mensagem concisa em português.
+3. Fazer push da branch atual para `origin` (preserva histórico da branch de trabalho).
+4. **Publicar em produção:** atualizar `master` e enviar ao remoto:
+   - `git fetch origin`
+   - `git checkout master` e `git pull origin master`
+   - `git merge <branch-de-trabalho>` (fast-forward ou merge commit; resolver conflitos se houver)
+   - `git push origin master`
+   - voltar para a branch em que o usuário estava (`git checkout <branch-anterior>`), se diferente de `master`.
+5. Se o usuário **já estiver em `master`**, basta commit + `git push origin master` (passos 3–4 simplificados para um único push em `master`).
+6. Informar ao usuário que o push em `master` deve disparar o deploy na Vercel e que a URL de produção reflete as mudanças após o build (geralmente 1–3 minutos).
+
+Não pular o push em `master` só porque a branch de feature já foi enviada — isso não atualiza a Vercel de produção.
