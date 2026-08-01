@@ -31,6 +31,60 @@ export function validateProcessFileSize(file: File): string | null {
   return null;
 }
 
+type PreparePayload = {
+  error?: string;
+  path?: string;
+  token?: string;
+  publicUrl?: string;
+  contentType?: string;
+  filename?: string;
+};
+
+async function fetchProcessFileUploadSession(
+  prepareUrl: string,
+  prepareBody: Record<string, unknown>
+): Promise<ProcessFileSignedUploadSessionPayload | { error: string }> {
+  let payload: PreparePayload = {};
+
+  try {
+    const response = await fetch(prepareUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(prepareBody),
+    });
+
+    try {
+      payload = (await response.json()) as PreparePayload;
+    } catch {
+      return {
+        error: response.ok
+          ? "Resposta inválida do servidor."
+          : "Falha ao preparar o upload. Verifique a ligação.",
+      };
+    }
+
+    if (!response.ok) {
+      return { error: payload.error ?? "Falha ao preparar o upload." };
+    }
+
+    if (!payload.path || !payload.token || !payload.publicUrl) {
+      return { error: "Sessão de upload incompleta." };
+    }
+
+    return {
+      path: payload.path,
+      token: payload.token,
+      publicUrl: payload.publicUrl,
+      contentType: payload.contentType ?? "application/octet-stream",
+      filename: payload.filename ?? "arquivo",
+    };
+  } catch {
+    return {
+      error: "Falha de rede ao preparar o upload. Verifique a ligação e tente novamente.",
+    };
+  }
+}
+
 /**
  * Envia o ficheiro diretamente ao Supabase Storage (evita limite ~4,5 MB de corpo na Vercel).
  */
@@ -66,6 +120,39 @@ export async function uploadProcessFileToSignedSession(input: {
   }
 }
 
+export async function uploadBaseProcessFileDirect(input: {
+  baseProcessId: string;
+  kind: ProcessFileKind;
+  file: File;
+}): Promise<ProcessFileUploadClientResult> {
+  const sizeError = validateProcessFileSize(input.file);
+  if (sizeError) return { error: sizeError };
+
+  const session = await fetchProcessFileUploadSession(
+    "/api/admin/processos/upload-file/prepare",
+    {
+      baseProcessId: input.baseProcessId,
+      filename: input.file.name,
+      kind: input.kind,
+      fileSizeBytes: input.file.size,
+      contentType: input.file.type || undefined,
+    }
+  );
+
+  if ("error" in session) {
+    return { error: session.error };
+  }
+
+  return uploadProcessFileToSignedSession({
+    file: input.file,
+    session: {
+      ...session,
+      contentType: session.contentType || input.file.type || "application/octet-stream",
+      filename: session.filename || input.file.name,
+    },
+  });
+}
+
 export async function uploadOfficeProcessFileDirect(input: {
   officeProcessId: string;
   kind: ProcessFileKind;
@@ -74,59 +161,27 @@ export async function uploadOfficeProcessFileDirect(input: {
   const sizeError = validateProcessFileSize(input.file);
   if (sizeError) return { error: sizeError };
 
-  let payload: {
-    error?: string;
-    path?: string;
-    token?: string;
-    publicUrl?: string;
-    contentType?: string;
-    filename?: string;
-  } = {};
-
-  try {
-    const response = await fetch("/api/escritorio/processos/upload-file/prepare", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        officeProcessId: input.officeProcessId,
-        filename: input.file.name,
-        kind: input.kind,
-        fileSizeBytes: input.file.size,
-        contentType: input.file.type || undefined,
-      }),
-    });
-
-    try {
-      payload = (await response.json()) as typeof payload;
-    } catch {
-      return {
-        error: response.ok
-          ? "Resposta inválida do servidor."
-          : "Falha ao preparar o upload. Verifique a ligação.",
-      };
+  const session = await fetchProcessFileUploadSession(
+    "/api/escritorio/processos/upload-file/prepare",
+    {
+      officeProcessId: input.officeProcessId,
+      filename: input.file.name,
+      kind: input.kind,
+      fileSizeBytes: input.file.size,
+      contentType: input.file.type || undefined,
     }
+  );
 
-    if (!response.ok) {
-      return { error: payload.error ?? "Falha ao preparar o upload." };
-    }
-
-    if (!payload.path || !payload.token || !payload.publicUrl) {
-      return { error: "Sessão de upload incompleta." };
-    }
-  } catch {
-    return {
-      error: "Falha de rede ao preparar o upload. Verifique a ligação e tente novamente.",
-    };
+  if ("error" in session) {
+    return { error: session.error };
   }
 
   return uploadProcessFileToSignedSession({
     file: input.file,
     session: {
-      path: payload.path,
-      token: payload.token,
-      publicUrl: payload.publicUrl,
-      contentType: payload.contentType ?? input.file.type ?? "application/octet-stream",
-      filename: payload.filename ?? input.file.name,
+      ...session,
+      contentType: session.contentType || input.file.type || "application/octet-stream",
+      filename: session.filename || input.file.name,
     },
   });
 }
