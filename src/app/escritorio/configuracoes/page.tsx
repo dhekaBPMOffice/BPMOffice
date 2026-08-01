@@ -147,7 +147,7 @@ export default function ConfiguracoesPage() {
                     type="password"
                     value={aiApiKey}
                     onChange={(e) => setAiApiKey(e.target.value)}
-                    placeholder="sk-..."
+                    placeholder="Chave do provedor configurado no admin (opcional)"
                     autoComplete="off"
                   />
                   <p className="text-xs text-muted-foreground">

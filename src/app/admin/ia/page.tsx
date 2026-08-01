@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageLayout } from "@/components/layout/page-layout";
 import { Sparkles } from "lucide-react";
 import { DEFAULT_PROMPTS } from "@/lib/ai/prompts";
-import { saveAiConfig } from "./actions";
+import { saveAiConfig, testAiConnection } from "./actions";
 
 const BPM_PHASES = [
   { key: "levantamento", label: "Levantamento (roteiro)" },
@@ -58,6 +58,10 @@ export default function IaPage() {
   const [prompts, setPrompts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testFeedback, setTestFeedback] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,6 +122,30 @@ export default function IaPage() {
     }
 
     setSaving(false);
+  }
+
+  async function handleTestConnection() {
+    setTestFeedback(null);
+    setTesting(true);
+
+    const result = await testAiConnection({
+      default_provider: defaultProvider,
+      default_model: defaultModel,
+      default_api_key: defaultApiKey || undefined,
+    });
+
+    setTesting(false);
+
+    if (result.error) {
+      setTestFeedback({ type: "error", message: result.error });
+      return;
+    }
+
+    const preview = "preview" in result && result.preview ? ` Resposta: «${result.preview}»` : "";
+    setTestFeedback({
+      type: "success",
+      message: `Conexão com a IA funcionando.${preview}`,
+    });
   }
 
   if (loading) {
@@ -186,6 +214,28 @@ export default function IaPage() {
               />
               <p className="text-xs text-muted-foreground">
                 Mantenha em branco para não alterar a chave atual.
+                {defaultProvider === "google" && (
+                  <>
+                    {" "}
+                    Para Google Gemini, use chave do{" "}
+                    <a
+                      href="https://aistudio.google.com/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2"
+                    >
+                      Google AI Studio
+                    </a>{" "}
+                    ou do Cloud Console com a Gemini API ativa (formato{" "}
+                    <code className="text-xs">AIza…</code>).
+                  </>
+                )}
+                {defaultProvider === "openai" && (
+                  <> Para OpenAI, use chave no formato <code className="text-xs">sk-…</code>.</>
+                )}
+                {defaultProvider === "anthropic" && (
+                  <> Para Anthropic, use a chave da console Anthropic.</>
+                )}
               </p>
             </div>
           </CardContent>
@@ -235,9 +285,31 @@ export default function IaPage() {
           </CardContent>
         </Card>
 
-        <Button type="submit" disabled={saving}>
-          {saving ? "Salvando..." : "Salvar configurações"}
-        </Button>
+        {testFeedback && (
+          <div
+            className={
+              testFeedback.type === "success"
+                ? "rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-200"
+                : "rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+            }
+          >
+            {testFeedback.message}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit" disabled={saving || testing}>
+            {saving ? "Salvando..." : "Salvar configurações"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={saving || testing}
+            onClick={() => void handleTestConnection()}
+          >
+            {testing ? "Testando..." : "Testar conexão"}
+          </Button>
+        </div>
       </form>
     </PageLayout>
   );

@@ -3,6 +3,8 @@
  * Each provider implements the AIProvider interface.
  */
 
+import { formatProviderError } from "./provider-errors";
+
 export interface AIProvider {
   generate(prompt: string, context?: string): Promise<{ text: string; tokensUsed?: number }>;
 }
@@ -41,7 +43,7 @@ export class OpenAIProvider implements AIProvider {
 
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`OpenAI API error: ${res.status} - ${err}`);
+      throw new Error(formatProviderError("openai", res.status, err));
     }
 
     const data = (await res.json()) as {
@@ -84,7 +86,7 @@ export class OpenAIProvider implements AIProvider {
 
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`OpenAI API error: ${res.status} - ${err}`);
+      throw new Error(formatProviderError("openai", res.status, err));
     }
 
     const data = (await res.json()) as {
@@ -124,7 +126,7 @@ export class AnthropicProvider implements AIProvider {
 
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`Anthropic API error: ${res.status} - ${err}`);
+      throw new Error(formatProviderError("anthropic", res.status, err));
     }
 
     const data = (await res.json()) as {
@@ -188,7 +190,7 @@ export class GoogleProvider implements AIProvider {
 
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`Google Gemini API error: ${res.status} - ${err}`);
+      throw new Error(formatProviderError("google", res.status, err));
     }
 
     const data = (await res.json()) as GoogleGenerateContentResponse;

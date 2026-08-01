@@ -2,6 +2,60 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { requireRole } from "@/lib/auth";
+import { createProvider } from "@/lib/ai/providers";
+
+export async function testAiConnection(data: {
+  default_provider: string;
+  default_model: string;
+  default_api_key?: string;
+}) {
+  await requireRole(["admin_master"]);
+
+  const provider = data.default_provider as "openai" | "anthropic" | "google";
+  if (!["openai", "anthropic", "google"].includes(provider)) {
+    return { error: "Provedor inválido." };
+  }
+
+  const model = data.default_model?.trim();
+  if (!model) {
+    return { error: "Informe o modelo padrão." };
+  }
+
+  let apiKey = data.default_api_key?.trim() ?? "";
+
+  if (!apiKey) {
+    const supabase = await createServiceClient();
+    const { data: platformConfig } = await supabase
+      .from("ai_configs")
+      .select("default_api_key_encrypted")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    apiKey = (platformConfig?.default_api_key_encrypted as string | null)?.trim() ?? "";
+  }
+
+  if (!apiKey) {
+    return {
+      error:
+        "Nenhuma chave de API informada. Digite uma chave ou salve uma chave padrão antes de testar.",
+    };
+  }
+
+  try {
+    const ai = createProvider(provider, apiKey, model);
+    const { text } = await ai.generate("Responda apenas com a palavra OK, sem pontuação.");
+    if (!text?.trim()) {
+      return { error: "A API respondeu, mas sem texto. Verifique o modelo configurado." };
+    }
+    return { success: true as const, preview: text.trim().slice(0, 80) };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Falha ao testar conexão com a IA.";
+    return { error: message };
+  }
+}
 
 export async function saveAiConfig(data: {
   default_provider: string;
