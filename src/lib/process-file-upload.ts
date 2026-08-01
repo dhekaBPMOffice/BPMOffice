@@ -1,7 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  MAX_FILE_SIZE_BYTES,
+  PROCESS_FILES_BUCKET,
+  type ProcessFileKind,
+} from "@/lib/process-file-upload-constants";
 
-export const PROCESS_FILES_BUCKET = "process-files";
-export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+export {
+  MAX_FILE_SIZE_BYTES,
+  PROCESS_FILES_BUCKET,
+  type ProcessFileKind,
+} from "@/lib/process-file-upload-constants";
 /** Evita `fetch` pendurada ao obter ficheiro remoto (ex.: importação de processos do catálogo). */
 const DUPLICATE_FILE_FETCH_TIMEOUT_MS = 60_000;
 
@@ -49,9 +57,13 @@ function buildProcessFilePath(scope: ProcessFileUploadScope, filename: string) {
   return `${buildProcessScopePath(scope)}/${Date.now()}-${sanitizeFilename(filename)}`;
 }
 
-function resolveMimeType(filename: string, fallback?: string): string {
+export function resolveProcessFileMimeType(filename: string, fallback?: string): string {
   const ext = getExtension(filename);
   return COMMON_MIME_TYPES[ext] ?? (fallback || "application/octet-stream");
+}
+
+function resolveMimeType(filename: string, fallback?: string): string {
+  return resolveProcessFileMimeType(filename, fallback);
 }
 
 function getProcessFilePublicUrl(supabase: SupabaseClient, filePath: string) {
@@ -117,11 +129,26 @@ export type ProcessFileUploadScope =
   | { type: "base_process"; baseProcessId: string }
   | { type: "office_attachment"; officeProcessId: string };
 
-export type ProcessFileKind = "template" | "flowchart" | "attachment";
-
 export type ProcessFileUploadResult =
   | { url: string; filename: string }
   | { error: string };
+
+export type ProcessFileSignedUploadSession =
+  | {
+      path: string;
+      token: string;
+      publicUrl: string;
+      contentType: string;
+      filename: string;
+    }
+  | { error: string };
+
+export function validateProcessFilenameForKind(
+  filename: string,
+  kind: ProcessFileKind
+): { ok: true } | { error: string } {
+  return validateFilenameForKind(filename, kind);
+}
 
 function validateFilenameForKind(
   _filename: string,
@@ -178,6 +205,56 @@ export async function uploadProcessFile(
   }
 
   return { url: getProcessFilePublicUrl(supabase, filePath), filename: file.name };
+}
+
+/**
+ * Cria sessão de upload assinada para envio direto do browser ao Storage (contorna limite ~4,5 MB da Vercel).
+ */
+export async function prepareProcessFileSignedUpload(
+  supabase: SupabaseClient,
+  input: {
+    scope: ProcessFileUploadScope;
+    filename: string;
+    kind: ProcessFileKind;
+    fileSizeBytes: number;
+    contentType?: string;
+  }
+): Promise<ProcessFileSignedUploadSession> {
+  const filename = input.filename.trim() || "arquivo";
+  const validation = validateFilenameForKind(filename, input.kind);
+  if (!("ok" in validation)) {
+    return validation;
+  }
+
+  if (input.fileSizeBytes > MAX_FILE_SIZE_BYTES) {
+    return { error: `Arquivo muito grande. Máximo: ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB` };
+  }
+
+  if (input.fileSizeBytes <= 0) {
+    return { error: "Arquivo inválido ou vazio." };
+  }
+
+  const ensured = await ensureProcessFilesBucket(supabase);
+  if (ensured?.error) return { error: ensured.error };
+
+  const path = buildProcessFilePath(input.scope, filename);
+  const contentType = resolveMimeType(filename, input.contentType);
+
+  const { data, error } = await supabase.storage
+    .from(PROCESS_FILES_BUCKET)
+    .createSignedUploadUrl(path);
+
+  if (error || !data?.token) {
+    return { error: error?.message ?? "Não foi possível preparar o upload." };
+  }
+
+  return {
+    path,
+    token: data.token,
+    publicUrl: getProcessFilePublicUrl(supabase, path),
+    contentType,
+    filename,
+  };
 }
 
 export async function duplicateProcessFileFromUrl(

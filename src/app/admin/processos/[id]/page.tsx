@@ -6,7 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { buildChecklistInput } from "@/lib/processes";
 import type { BaseProcess, ProcessFlowchartFile, ProcessTemplateFile } from "@/types/database";
-import { deleteBaseProcess, updateBaseProcess, uploadBaseProcessFile } from "../actions";
+import { deleteBaseProcess, updateBaseProcess } from "../actions";
+import { uploadBaseProcessFileDirect } from "../base-process-file-upload-client";
 import {
   draftLevelsForForm,
   type OfficeProcessLevelRow,
@@ -312,83 +313,82 @@ export default function AdminProcessoDetailPage() {
     setError(null);
     setSaveSuccess(false);
 
-    const normalizedTemplates = templateFiles.map((tf) => ({
-      url: tf.url,
-      label: tf.label?.trim() || fileNameFromUrl(tf.url),
-    }));
+    try {
+      const normalizedTemplates = templateFiles.map((tf) => ({
+        url: tf.url,
+        label: tf.label?.trim() || fileNameFromUrl(tf.url),
+      }));
 
-    const finalTemplates = [...normalizedTemplates];
+      const finalTemplates = [...normalizedTemplates];
 
-    const templateUploads = newTemplateFiles.filter((f) => f?.size);
-    const flowchartUploads = newFlowchartFiles.filter((f) => f?.size);
-    const totalUploads = templateUploads.length + flowchartUploads.length;
-    let uploadDone = 0;
+      const templateUploads = newTemplateFiles.filter((f) => f?.size);
+      const flowchartUploads = newFlowchartFiles.filter((f) => f?.size);
+      const totalUploads = templateUploads.length + flowchartUploads.length;
+      let uploadDone = 0;
 
-    for (let i = 0; i < newTemplateFiles.length; i++) {
-      const file = newTemplateFiles[i];
-      if (!file?.size) continue;
-      uploadDone += 1;
-      setSaveProgressLabel(`Enviando ${uploadDone} de ${totalUploads}…`);
-      const formData = new FormData();
-      formData.set("file", file);
-      formData.set("baseProcessId", processId);
-      formData.set("kind", "template");
-      const upload = await uploadBaseProcessFile(formData);
-      if ("error" in upload) {
-        setError(upload.error ?? "Erro no upload.");
-        setSaving(false);
-        setSaveProgressLabel(null);
-        return;
+      for (let i = 0; i < newTemplateFiles.length; i++) {
+        const file = newTemplateFiles[i];
+        if (!file?.size) continue;
+        uploadDone += 1;
+        setSaveProgressLabel(`Enviando ${uploadDone} de ${totalUploads}…`);
+        const upload = await uploadBaseProcessFileDirect({
+          baseProcessId: processId,
+          kind: "template",
+          file,
+        });
+        if ("error" in upload) {
+          setError(upload.error ?? "Erro no upload.");
+          return;
+        }
+        finalTemplates.push({
+          url: upload.url,
+          label: newTemplateLabels[i]?.trim() || file.name,
+        });
       }
-      finalTemplates.push({
-        url: upload.url,
-        label: newTemplateLabels[i]?.trim() || file.name,
+
+      const finalFlowcharts = [...flowchartFiles];
+      for (const file of newFlowchartFiles) {
+        if (!file?.size) continue;
+        uploadDone += 1;
+        setSaveProgressLabel(`Enviando ${uploadDone} de ${totalUploads}…`);
+        const upload = await uploadBaseProcessFileDirect({
+          baseProcessId: processId,
+          kind: "flowchart",
+          file,
+        });
+        if ("error" in upload) {
+          setError(upload.error ?? "Erro no upload.");
+          return;
+        }
+        finalFlowcharts.push({ url: upload.url });
+      }
+
+      setSaveProgressLabel("Gravando…");
+      const result = await updateBaseProcess(processId, {
+        category: tipo,
+        vcMacroprocesso: vcMacro,
+        vcLevels: vcLevelsDraft,
+        description,
+        templateFiles: finalTemplates,
+        flowchartFiles: finalFlowcharts,
+        managementChecklist: checklist.split("\n"),
+        sortOrder: Number(sortOrder) || 0,
+        isActive,
       });
-    }
 
-    const finalFlowcharts = [...flowchartFiles];
-    for (const file of newFlowchartFiles) {
-      if (!file?.size) continue;
-      uploadDone += 1;
-      setSaveProgressLabel(`Enviando ${uploadDone} de ${totalUploads}…`);
-      const formData = new FormData();
-      formData.set("file", file);
-      formData.set("baseProcessId", processId);
-      formData.set("kind", "flowchart");
-      const upload = await uploadBaseProcessFile(formData);
-      if ("error" in upload) {
-        setError(upload.error ?? "Erro no upload.");
-        setSaving(false);
-        setSaveProgressLabel(null);
+      if ("error" in result && result.error) {
+        setError(result.error);
         return;
       }
-      finalFlowcharts.push({ url: upload.url });
-    }
 
-    setSaveProgressLabel("Gravando…");
-    const result = await updateBaseProcess(processId, {
-      category: tipo,
-      vcMacroprocesso: vcMacro,
-      vcLevels: vcLevelsDraft,
-      description,
-      templateFiles: finalTemplates,
-      flowchartFiles: finalFlowcharts,
-      managementChecklist: checklist.split("\n"),
-      sortOrder: Number(sortOrder) || 0,
-      isActive,
-    });
-
-    if ("error" in result && result.error) {
-      setError(result.error);
-      setSaving(false);
+      await load();
+      setSaveSuccess(true);
+    } catch {
+      setError("Erro inesperado ao guardar. Tente novamente.");
+    } finally {
       setSaveProgressLabel(null);
-      return;
+      setSaving(false);
     }
-
-    await load();
-    setSaveProgressLabel(null);
-    setSaving(false);
-    setSaveSuccess(true);
   }
 
   function removeTemplateFile(index: number) {

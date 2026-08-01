@@ -11,8 +11,8 @@ import {
   deleteBaseProcesses,
   setBaseProcessActive,
   updateBaseProcess,
-  uploadBaseProcessFile,
 } from "./actions";
+import { uploadBaseProcessFileDirect } from "./base-process-file-upload-client";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -215,71 +215,87 @@ export default function AdminProcessosPage() {
     setError(null);
     setCreating(true);
 
-    const result = await createBaseProcess({
-      category: tipo,
-      vcMacroprocesso: vcMacro,
-      vcLevels: vcLevelsDraft,
-      description,
-      templateFiles: [],
-      flowchartFiles: [],
-      managementChecklist: checklist.split("\n"),
-      isActive: true,
-    });
+    try {
+      const result = await createBaseProcess({
+        category: tipo,
+        vcMacroprocesso: vcMacro,
+        vcLevels: vcLevelsDraft,
+        description,
+        templateFiles: [],
+        flowchartFiles: [],
+        managementChecklist: checklist.split("\n"),
+        isActive: true,
+      });
 
-    if ("error" in result && result.error) {
-      setError(result.error);
+      if ("error" in result && result.error) {
+        setError(result.error);
+        return;
+      }
+
+      const newId = "id" in result ? result.id : null;
+      const finalTemplates: { url: string; label?: string }[] = [];
+      const finalFlowcharts: { url: string }[] = [];
+
+      if (newId) {
+        for (const { file, label } of templateFilesToAdd) {
+          if (!file?.size) continue;
+          const up = await uploadBaseProcessFileDirect({
+            baseProcessId: newId,
+            kind: "template",
+            file,
+          });
+          if ("error" in up) {
+            setError(up.error ?? "Erro no upload de template.");
+            return;
+          }
+          finalTemplates.push({ url: up.url, label: label.trim() || file.name });
+        }
+        for (const file of flowchartFilesToAdd) {
+          if (!file?.size) continue;
+          const up = await uploadBaseProcessFileDirect({
+            baseProcessId: newId,
+            kind: "flowchart",
+            file,
+          });
+          if ("error" in up) {
+            setError(up.error ?? "Erro no upload de fluxograma.");
+            return;
+          }
+          finalFlowcharts.push({ url: up.url });
+        }
+        if (finalTemplates.length > 0 || finalFlowcharts.length > 0) {
+          const updateResult = await updateBaseProcess(newId, {
+            category: tipo,
+            vcMacroprocesso: vcMacro,
+            vcLevels: vcLevelsDraft,
+            description,
+            templateFiles: finalTemplates,
+            flowchartFiles: finalFlowcharts,
+            managementChecklist: checklist.split("\n"),
+            sortOrder: 0,
+            isActive: true,
+          });
+          if ("error" in updateResult && updateResult.error) {
+            setError(updateResult.error);
+            return;
+          }
+        }
+      }
+
+      setTipo("");
+      setVcMacro("");
+      setVcLevelsDraft([""]);
+      setDescription("");
+      setTemplateFilesToAdd([]);
+      setFlowchartFilesToAdd([]);
+      setChecklist("");
+      setShowNew(false);
+      load();
+    } catch {
+      setError("Erro inesperado ao criar o processo. Tente novamente.");
+    } finally {
       setCreating(false);
-      return;
     }
-
-    const newId = "id" in result ? result.id : null;
-    const finalTemplates: { url: string; label?: string }[] = [];
-    const finalFlowcharts: { url: string }[] = [];
-
-    if (newId) {
-      for (const { file, label } of templateFilesToAdd) {
-        if (!file?.size) continue;
-        const formData = new FormData();
-        formData.set("file", file);
-        formData.set("baseProcessId", newId);
-        formData.set("kind", "template");
-        const up = await uploadBaseProcessFile(formData);
-        if ("url" in up && up.url) finalTemplates.push({ url: up.url, label: label.trim() || file.name });
-      }
-      for (const file of flowchartFilesToAdd) {
-        if (!file?.size) continue;
-        const formData = new FormData();
-        formData.set("file", file);
-        formData.set("baseProcessId", newId);
-        formData.set("kind", "flowchart");
-        const up = await uploadBaseProcessFile(formData);
-        if ("url" in up && up.url) finalFlowcharts.push({ url: up.url });
-      }
-      if (finalTemplates.length > 0 || finalFlowcharts.length > 0) {
-        await updateBaseProcess(newId, {
-          category: tipo,
-          vcMacroprocesso: vcMacro,
-          vcLevels: vcLevelsDraft,
-          description,
-          templateFiles: finalTemplates,
-          flowchartFiles: finalFlowcharts,
-          managementChecklist: checklist.split("\n"),
-          sortOrder: 0,
-          isActive: true,
-        });
-      }
-    }
-
-    setTipo("");
-    setVcMacro("");
-    setVcLevelsDraft([""]);
-    setDescription("");
-    setTemplateFilesToAdd([]);
-    setFlowchartFilesToAdd([]);
-    setChecklist("");
-    setShowNew(false);
-    setCreating(false);
-    load();
   }
 
   async function handleToggleActive(process: BaseProcess) {

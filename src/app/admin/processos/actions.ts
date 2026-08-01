@@ -1,10 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireRole } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { normalizeChecklist, slugifyProcessName } from "@/lib/processes";
 import type { ProcessFlowchartFile, ProcessTemplateFile } from "@/types/database";
-import { uploadProcessFile } from "@/lib/process-file-upload";
+import {
+  prepareProcessFileSignedUpload,
+  type ProcessFileKind,
+  uploadProcessFile,
+} from "@/lib/process-file-upload";
 import { compactLevelsForPersist } from "@/lib/office-process-levels";
 
 type SaveBaseProcessInput = {
@@ -183,6 +188,41 @@ export async function deleteBaseProcesses(ids: string[]) {
 
   revalidatePath("/admin/processos");
   return { success: true };
+}
+
+export async function prepareBaseProcessFileUpload(input: {
+  baseProcessId: string;
+  filename: string;
+  kind: ProcessFileKind;
+  fileSizeBytes: number;
+  contentType?: string;
+}) {
+  await requireRole(["admin_master"]);
+
+  const baseProcessId = input.baseProcessId?.trim();
+  const filename = input.filename?.trim();
+  if (!baseProcessId || !filename) {
+    return { error: "ID do processo e nome do arquivo são obrigatórios." };
+  }
+
+  const supabase = await createServiceClient();
+  const { data: baseProcess, error: processError } = await supabase
+    .from("base_processes")
+    .select("id")
+    .eq("id", baseProcessId)
+    .maybeSingle();
+
+  if (processError || !baseProcess) {
+    return { error: "Processo do catálogo não encontrado." };
+  }
+
+  return prepareProcessFileSignedUpload(supabase, {
+    scope: { type: "base_process", baseProcessId },
+    filename,
+    kind: input.kind,
+    fileSizeBytes: input.fileSizeBytes,
+    contentType: input.contentType,
+  });
 }
 
 export async function uploadBaseProcessFile(formData: FormData) {
