@@ -61,7 +61,22 @@ export const DEFAULT_PROMPTS: Record<string, string> = {
     "Com base nos objetivos estratégicos apresentados, crie um plano tático com ações concretas. Retorne no formato:\nObjetivo: [título do objetivo]\n- Ação: [descrição da ação] | Responsável: [sugestão] | Prazo: [YYYY-MM-DD]\n- Ação: [descrição da ação] | Responsável: [sugestão] | Prazo: [YYYY-MM-DD]\nRepita para cada objetivo. As ações devem ser práticas e executáveis dentro de um trimestre.",
 
   cadeia_valor:
-    "Gere uma sugestão de cadeia de valor para a organização. Identifique atividades primárias e de apoio, e como elas se conectam para entregar valor ao cliente.",
+    `Com base nos Dados da Empresa e nas respostas do questionário da Cadeia de Valor, sugira macroprocessos classificados como Primário, Apoio ou Gerencial.
+
+REGRAS:
+- Respeite estritamente o escopo informado. Não inclua processos de toda a organização quando o escopo for uma unidade, marca, região, produto, serviço ou área.
+- Represente o cenário selecionado (operação atual, futura ou com oportunidades de evolução), sem idealizar a estrutura quando o usuário escolher a operação atual.
+- Estruture os processos Primários pela jornada ponta a ponta de criação e entrega do valor, e não pelo organograma.
+- Use as respostas específicas do questionário para delimitar produtos, públicos, início, conclusão, variações e dependências externas.
+- Considere os Dados da Empresa como contexto institucional; em caso de conflito, as respostas específicas sobre o escopo prevalecem.
+- Preserve processos, nomenclaturas ou estruturas que o usuário declarar como obrigatórios.
+
+Retorne APENAS um JSON válido (array), sem markdown, no formato:
+[
+  {"tipo": "Primário|Apoio|Gerencial", "macroprocesso": "nome", "niveis": ["nível 1", "nível 2"]}
+]
+
+Inclua entre 4 e 12 macroprocessos. Os níveis devem ser nomes curtos de subprocessos ou etapas agregadas, sem detalhar tarefas ou procedimentos.`,
 
   process_essential_rewrite:
     `Você é um assistente de documentação de processos. Sua tarefa é melhorar a redação dos campos textuais já preenchidos pelo usuário, tornando os textos mais claros, profissionais e organizados.

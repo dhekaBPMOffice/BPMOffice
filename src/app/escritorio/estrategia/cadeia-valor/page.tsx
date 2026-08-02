@@ -14,6 +14,7 @@ import {
 } from "@/lib/office-process-levels";
 import { CadeiaValorTabs } from "./cadeia-valor-tabs";
 import type { GestaoProcessItem } from "./gestao-processos-tab";
+import { getOfficeCompanyProfile } from "@/app/escritorio/estrategia/dados-empresa/actions";
 import type { OfficeProcessBpmPhase, OfficeProcessStatus } from "@/types/database";
 
 export default async function CadeiaValorPage() {
@@ -121,11 +122,14 @@ export default async function CadeiaValorPage() {
   const hasGestaoProcesses = gestaoItems.length > 0;
   const initialTab = hasGestaoProcesses ? "gestao" : "configuracao";
 
+  const { profile: companyProfile } = await getOfficeCompanyProfile();
+
   return (
     <CadeiaValorTabs
       initialTab={initialTab}
       cadeiaProcesses={cadeiaProcesses}
       processListKey={processListKey}
+      companyProfile={companyProfile}
       gestaoProps={{
         items: gestaoItems,
         stats: { total: totalAll, inProgress, completed },

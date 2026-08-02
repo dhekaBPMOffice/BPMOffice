@@ -87,6 +87,14 @@ import {
   formatNivelLabelFromLevels,
   type OfficeProcessLevelRow,
 } from "@/lib/office-process-levels";
+import type { OfficeCompanyProfile } from "@/types/database";
+import {
+  deriveAiQuestionPrefill,
+  formatCompanyProfileForAI,
+  isCompanyProfileComplete,
+  parseValueChainAiResponse,
+  type ParsedValueChainSuggestion,
+} from "@/lib/estrategia/company-profile";
 
 type ViewMode = "lista" | "hierarquia";
 type CreationMode = "anexar" | "manual" | "ia";
@@ -182,26 +190,174 @@ const SORT_OPTIONS: Array<{ value: SortMode; label: string }> = [
   { value: "prioridade", label: "Prioridade (Alta > Baixa)" },
 ];
 
-const AI_QUESTIONS = [
-  { id: "segmento", label: "Qual o segmento principal da empresa?" },
-  { id: "propostaValor", label: "Qual a proposta de valor principal ao cliente?" },
-  { id: "publicoAlvo", label: "Quem são os principais públicos/clientes?" },
-  { id: "canais", label: "Quais canais de entrega/comercialização são usados?" },
-  { id: "operacao", label: "Como a operação é executada no dia a dia?" },
-  { id: "suporte", label: "Quais áreas de apoio são essenciais?" },
-  { id: "governanca", label: "Como ocorre governança, gestão e tomada de decisão?" },
-] as const;
+type AIQuestionId =
+  | "escopo"
+  | "detalhesEscopo"
+  | "cenario"
+  | "produtosEscopo"
+  | "publicosEscopo"
+  | "valorEntregue"
+  | "inicioConclusao"
+  | "etapasValor"
+  | "processosGestao"
+  | "processosApoio"
+  | "variacoes"
+  | "parceiros"
+  | "estruturasPreservadas"
+  | "outrasInformacoes";
 
-type AIQuestionId = (typeof AI_QUESTIONS)[number]["id"];
+type AIQuestion = {
+  id: AIQuestionId;
+  label: string;
+  helper?: string;
+  required: boolean;
+  type?: "textarea" | "select";
+  options?: readonly string[];
+  section: "essential" | "complementary";
+  showWhen?: (answers: Record<AIQuestionId, string>) => boolean;
+};
+
+const AI_QUESTIONS: readonly AIQuestion[] = [
+  {
+    id: "escopo",
+    label: "1. Qual é o escopo desta Cadeia de Valor?",
+    required: false,
+    type: "select",
+    options: [
+      "Toda a empresa",
+      "Unidade de negócio",
+      "Marca",
+      "Região ou unidade operacional",
+      "Produto ou serviço",
+      "Área organizacional",
+      "Outro",
+    ],
+    section: "essential",
+  },
+  {
+    id: "detalhesEscopo",
+    label: "Descreva o que está incluído e o que não está incluído neste escopo.",
+    helper: "Delimite claramente a parte da organização que a Cadeia de Valor deve representar.",
+    required: false,
+    section: "essential",
+    showWhen: (answers) => Boolean(answers.escopo) && answers.escopo !== "Toda a empresa",
+  },
+  {
+    id: "cenario",
+    label: "2. A Cadeia de Valor deve representar qual cenário?",
+    required: false,
+    type: "select",
+    options: [
+      "Operação atual",
+      "Operação futura desejada",
+      "Operação atual com oportunidades de evolução",
+      "Ainda não definido",
+    ],
+    section: "essential",
+  },
+  {
+    id: "produtosEscopo",
+    label: "3. Quais produtos, serviços, soluções ou entregas fazem parte deste escopo?",
+    helper:
+      "Os itens cadastrados em Dados da Empresa foram incluídos como ponto de partida. Ajuste a lista para este escopo.",
+    required: false,
+    section: "essential",
+  },
+  {
+    id: "publicosEscopo",
+    label: "4. Quais clientes, usuários ou públicos devem ser considerados neste escopo?",
+    helper:
+      "Os públicos cadastrados em Dados da Empresa foram incluídos como ponto de partida. Remova ou acrescente itens conforme necessário.",
+    required: false,
+    section: "essential",
+  },
+  {
+    id: "valorEntregue",
+    label: "5. Qual é o principal valor ou resultado entregue a esses clientes, usuários ou públicos?",
+    helper:
+      "Considere o benefício ou resultado que o público espera receber, e não apenas o produto ou serviço entregue.",
+    required: false,
+    section: "essential",
+  },
+  {
+    id: "inicioConclusao",
+    label: "6. O que inicia a entrega de valor e o que caracteriza sua conclusão?",
+    helper:
+      "Informe o evento que inicia o fluxo, como uma necessidade, solicitação, oportunidade ou demanda, e o resultado que representa sua conclusão.",
+    required: false,
+    section: "essential",
+  },
+  {
+    id: "etapasValor",
+    label: "7. Quais são as principais etapas para criar e entregar esse valor?",
+    helper:
+      "Descreva, em uma visão ampla, o que acontece desde o surgimento da demanda até a entrega e o relacionamento posterior. Não detalhe tarefas ou procedimentos.",
+    required: false,
+    section: "essential",
+  },
+  {
+    id: "processosGestao",
+    label: "8. Quais processos direcionam, planejam, acompanham e controlam este escopo?",
+    helper:
+      "Considere estratégia, planejamento, desempenho, governança, riscos, conformidade e tomada de decisão.",
+    required: false,
+    section: "essential",
+  },
+  {
+    id: "processosApoio",
+    label: "9. Quais processos de apoio são necessários para que a entrega de valor aconteça?",
+    helper:
+      "Considere pessoas, finanças, tecnologia, suprimentos, infraestrutura, jurídico, comunicação e outros apoios necessários.",
+    required: false,
+    section: "essential",
+  },
+  {
+    id: "variacoes",
+    label: "10. Existem variações importantes na forma de entregar o valor?",
+    helper:
+      "Considere diferenças entre produtos, serviços, públicos, canais, regiões, marcas, unidades ou modelos de atendimento.",
+    required: false,
+    section: "complementary",
+  },
+  {
+    id: "parceiros",
+    label: "11. Existem parceiros, fornecedores ou terceiros que participam diretamente da entrega de valor?",
+    helper:
+      "Considere terceirizações, distribuidores, franqueados, operadores logísticos e prestadores.",
+    required: false,
+    section: "complementary",
+  },
+  {
+    id: "estruturasPreservadas",
+    label: "12. Há processos, nomenclaturas ou estruturas que devem obrigatoriamente ser preservados?",
+    helper:
+      "Informe terminologias institucionais, arquiteturas globais ou estruturas corporativas existentes.",
+    required: false,
+    section: "complementary",
+  },
+  {
+    id: "outrasInformacoes",
+    label: "13. Há alguma outra informação que deve ser considerada na geração da Cadeia de Valor?",
+    required: false,
+    section: "complementary",
+  },
+];
 
 const AI_QUESTION_DEFAULTS: Record<AIQuestionId, string> = {
-  segmento: "",
-  propostaValor: "",
-  publicoAlvo: "",
-  canais: "",
-  operacao: "",
-  suporte: "",
-  governanca: "",
+  escopo: "",
+  detalhesEscopo: "",
+  cenario: "",
+  produtosEscopo: "",
+  publicosEscopo: "",
+  valorEntregue: "",
+  inicioConclusao: "",
+  etapasValor: "",
+  processosGestao: "",
+  processosApoio: "",
+  variacoes: "",
+  parceiros: "",
+  estruturasPreservadas: "",
+  outrasInformacoes: "",
 };
 
 const DEFAULT_UI_STATE: UIState = {
@@ -430,10 +586,10 @@ async function extractProcessesFromAttachment(file: File): Promise<ProcessFormDa
 }
 
 function buildAISuggestions(answers: Record<AIQuestionId, string>): ProcessFormData[] {
-  const segmento = answers.segmento.toLowerCase();
-  const operacaoBase = segmento.includes("servi")
+  const contextoOperacional = `${answers.produtosEscopo} ${answers.etapasValor}`.toLowerCase();
+  const operacaoBase = contextoOperacional.includes("servi")
     ? "Atendimento e entrega do serviço"
-    : segmento.includes("indústr") || segmento.includes("fábrica")
+    : contextoOperacional.includes("indústr") || contextoOperacional.includes("fábrica")
       ? "Planejamento e execução da produção"
       : "Execução da operação principal";
 
@@ -462,6 +618,32 @@ function buildAISuggestions(answers: Record<AIQuestionId, string>): ProcessFormD
 
   return rows.map((row) => ({
     ...row,
+    description: "",
+    gestorProcesso: "Definir gestor",
+    ultimaAtualizacao: new Date().toISOString().slice(0, 16),
+    responsavelAtualizacao: "IA (revisão pendente)",
+    prioridade: "Média",
+    statusGeral: "Não iniciado",
+    etapas: createDefaultStages("Não iniciado"),
+  }));
+}
+
+function normalizeSuggestionTipo(raw: string): ProcessType {
+  const t = raw.trim();
+  if (t === "Apoio" || t === "Gerencial" || t === "Primário") return t;
+  const lower = t.toLowerCase();
+  if (lower.includes("apoio") || lower.includes("suporte")) return "Apoio";
+  if (lower.includes("gerencial") || lower.includes("gestão") || lower.includes("gestao")) {
+    return "Gerencial";
+  }
+  return "Primário";
+}
+
+function suggestionsFromParsedRows(rows: ParsedValueChainSuggestion[]): ProcessFormData[] {
+  return rows.map((row) => ({
+    tipo: normalizeSuggestionTipo(row.tipo),
+    macroprocesso: row.macroprocesso,
+    niveis: row.niveis.length ? row.niveis : [row.macroprocesso],
     description: "",
     gestorProcesso: "Definir gestor",
     ultimaAtualizacao: new Date().toISOString().slice(0, 16),
@@ -595,7 +777,17 @@ function deleteServerIgnoredError(res: { success?: boolean; error?: string }): b
   return res.error === "Processo não encontrado.";
 }
 
-export function CadeiaValorClient({ initialProcesses }: { initialProcesses: ProcessItem[] }) {
+function initialAiAnswers(profile: OfficeCompanyProfile | null): Record<AIQuestionId, string> {
+  return { ...AI_QUESTION_DEFAULTS, ...deriveAiQuestionPrefill(profile) };
+}
+
+export function CadeiaValorClient({
+  initialProcesses,
+  companyProfile,
+}: {
+  initialProcesses: ProcessItem[];
+  companyProfile: OfficeCompanyProfile | null;
+}) {
   const timeZone = useTimeZone();
   const formatDateTime = (value: string) => {
     const parsed = new Date(value);
@@ -609,7 +801,10 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creationMode, setCreationMode] = useState<CreationMode>("manual");
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
-  const [aiAnswers, setAiAnswers] = useState<Record<AIQuestionId, string>>(AI_QUESTION_DEFAULTS);
+  const [aiAnswers, setAiAnswers] = useState<Record<AIQuestionId, string>>(() =>
+    initialAiAnswers(companyProfile)
+  );
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -1078,24 +1273,62 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     setManageDialogOpen(false);
   }
 
-  function handleGenerateByAI(event: FormEvent<HTMLFormElement>) {
+  async function handleGenerateByAI(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     clearMessages();
 
-    const firstMissing = AI_QUESTIONS.find((question) => !aiAnswers[question.id].trim());
-    if (firstMissing) {
-      setError(`Responda o questionário completo antes de gerar: ${firstMissing.label}`);
-      return;
+    const visibleQuestions = AI_QUESTIONS.filter(
+      (question) => !question.showWhen || question.showWhen(aiAnswers)
+    );
+    setAiGenerating(true);
+
+    const questionnaire = visibleQuestions
+      .filter((question) => aiAnswers[question.id].trim())
+      .map((question) => `${question.label}\n${aiAnswers[question.id].trim()}`)
+      .join("\n\n");
+    const companyBlock = formatCompanyProfileForAI(companyProfile);
+    const inputParts: string[] = [];
+    if (companyBlock) inputParts.push(companyBlock);
+    inputParts.push("=== Questionário complementar ===", questionnaire);
+    const input = inputParts.join("\n\n");
+
+    let suggestions = buildAISuggestions(aiAnswers);
+    let usedFallback = true;
+
+    try {
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase: "cadeia_valor", input }),
+      });
+      const data = (await res.json()) as { text?: string; error?: string };
+
+      if (res.ok && data.text) {
+        const parsed = parseValueChainAiResponse(data.text);
+        if (parsed.length > 0) {
+          suggestions = suggestionsFromParsedRows(parsed);
+          usedFallback = false;
+        }
+      } else if (data.error) {
+        setError(`IA: ${data.error}. Foi aplicada uma sugestão simplificada.`);
+      }
+    } catch {
+      setError("Não foi possível contactar a IA. Foi aplicada uma sugestão simplificada.");
+    } finally {
+      setAiGenerating(false);
     }
 
-    const suggestions = buildAISuggestions(aiAnswers);
     const generated = suggestions.map((item) => ({
       id: crypto.randomUUID(),
       ...item,
       niveis: compactLevelsForPersist(item.niveis.length ? item.niveis : [""]),
     }));
     setProcesses((prev) => [...generated, ...prev]);
-    setSuccess(`${generated.length} processos sugeridos por IA incluídos. Revise e ajuste como quiser.`);
+    setSuccess(
+      usedFallback
+        ? `${generated.length} processos sugeridos (modo simplificado). Revise antes de consolidar.`
+        : `${generated.length} processos sugeridos por IA. Revise e ajuste como quiser.`
+    );
     setManageDialogOpen(false);
   }
 
@@ -1795,8 +2028,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
               {editingId ? "Editar processo na Cadeia de Valor" : "Adicionar Cadeia de Valor"}
             </DialogTitle>
             <DialogDescription>
-              Inclusão de instâncias de processo na cadeia de valor do escritório e parametrização do ciclo BPM.
-              Selecione o modo de entrada.
+              Selecione o modo de entrada para adicionar os processos à Cadeia de Valor.
             </DialogDescription>
           </DialogHeader>
 
@@ -1812,7 +2044,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
             }}
           >
             <TabsList className="w-full md:w-auto">
-              <TabsTrigger value="anexar">Importação por ficheiro</TabsTrigger>
+              <TabsTrigger value="anexar">Importação por Arquivo</TabsTrigger>
               <TabsTrigger value="manual">Registo unitário</TabsTrigger>
               <TabsTrigger value="ia">Geração assistida</TabsTrigger>
             </TabsList>
@@ -1835,7 +2067,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                   </a>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="arquivo-cadeia">Carregar ficheiro</Label>
+                  <Label htmlFor="arquivo-cadeia">Carregar Arquivo</Label>
                   <Input
                     id="arquivo-cadeia"
                     type="file"
@@ -2124,28 +2356,86 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
             <TabsContent value="ia" className="mt-4">
               <form onSubmit={handleGenerateByAI} className="space-y-4">
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Geração assistida de um conjunto de processos a partir do questionário; exige revisão antes de
-                  consolidar as entradas na lista da cadeia de valor.
+                  Geração assistida de um conjunto de processos a partir dos Dados da Empresa e do questionário;
+                  exige revisão antes de consolidar as entradas na lista da cadeia de valor.
                 </p>
-                <div className="grid gap-4">
-                  {AI_QUESTIONS.map((question) => (
+                {!isCompanyProfileComplete(companyProfile) && (
+                  <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+                    <Link
+                      href="/escritorio/estrategia/dados-empresa"
+                      className="font-medium underline underline-offset-2"
+                    >
+                      Complete os Dados da Empresa
+                    </Link>{" "}
+                    para enriquecer o contexto enviado à IA.
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Todas as perguntas são opcionais. Quanto mais contexto for informado, mais precisa será a sugestão.
+                </p>
+                <div className="grid gap-5">
+                  {AI_QUESTIONS.filter(
+                    (question) => !question.showWhen || question.showWhen(aiAnswers)
+                  ).map((question) => (
                     <div key={question.id} className="space-y-2">
-                      <Label required>{question.label}</Label>
-                      <Textarea
-                        value={aiAnswers[question.id]}
-                        onChange={(event) =>
-                          setAiAnswers((current) => ({ ...current, [question.id]: event.target.value }))
-                        }
-                        rows={3}
-                        required
-                      />
+                      <Label htmlFor={`ai-question-${question.id}`}>{question.label}</Label>
+                      {question.helper && (
+                        <p className="text-xs leading-relaxed text-muted-foreground">
+                          {question.helper}
+                        </p>
+                      )}
+                      {question.type === "select" ? (
+                        <Select
+                          id={`ai-question-${question.id}`}
+                          value={aiAnswers[question.id]}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setAiAnswers((current) => ({
+                              ...current,
+                              [question.id]: value,
+                              ...(question.id === "escopo" && value === "Toda a empresa"
+                                ? { detalhesEscopo: "" }
+                                : {}),
+                            }));
+                          }}
+                        >
+                          <option value="">Selecione uma opção</option>
+                          {question.options?.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        <Textarea
+                          id={`ai-question-${question.id}`}
+                          value={aiAnswers[question.id]}
+                          onChange={(event) =>
+                            setAiAnswers((current) => ({
+                              ...current,
+                              [question.id]: event.target.value,
+                            }))
+                          }
+                          rows={3}
+                          placeholder="Opcional"
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
                 <div className="flex gap-2">
-                  <Button type="submit">
-                    <WandSparkles className="h-4 w-4" />
-                    Gerar sugestão por IA
+                  <Button type="submit" disabled={aiGenerating}>
+                    {aiGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Gerando…
+                      </>
+                    ) : (
+                      <>
+                        <WandSparkles className="h-4 w-4" />
+                        Gerar sugestão por IA
+                      </>
+                    )}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setManageDialogOpen(false)}>
                     Fechar

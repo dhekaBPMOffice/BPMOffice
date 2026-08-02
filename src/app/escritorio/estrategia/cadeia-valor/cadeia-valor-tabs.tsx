@@ -6,17 +6,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CadeiaValorClient } from "./cadeia-valor-client";
 import { GestaoProcessosTab, type GestaoProcessosTabProps } from "./gestao-processos-tab";
 import type { ProcessItem } from "@/types/cadeia-valor";
+import type { OfficeCompanyProfile } from "@/types/database";
 import { Settings2, ClipboardList } from "lucide-react";
 
 function CadeiaValorTabsInner({
   initialTab,
   cadeiaProcesses,
   processListKey,
+  companyProfile,
   gestaoProps,
 }: {
   initialTab: "configuracao" | "gestao";
   cadeiaProcesses: ProcessItem[];
   processListKey: string;
+  companyProfile: OfficeCompanyProfile | null;
   gestaoProps: GestaoProcessosTabProps;
 }) {
   const searchParams = useSearchParams();
@@ -48,7 +51,11 @@ function CadeiaValorTabsInner({
       </div>
 
       <TabsContent value="configuracao" className="mt-0">
-        <CadeiaValorClient key={processListKey} initialProcesses={cadeiaProcesses} />
+        <CadeiaValorClient
+          key={processListKey}
+          initialProcesses={cadeiaProcesses}
+          companyProfile={companyProfile}
+        />
       </TabsContent>
 
       <TabsContent value="gestao" className="mt-0">
@@ -62,6 +69,7 @@ export function CadeiaValorTabs(props: {
   initialTab: "configuracao" | "gestao";
   cadeiaProcesses: ProcessItem[];
   processListKey: string;
+  companyProfile: OfficeCompanyProfile | null;
   gestaoProps: GestaoProcessosTabProps;
 }) {
   return (

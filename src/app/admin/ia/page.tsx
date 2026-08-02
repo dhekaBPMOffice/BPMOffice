@@ -28,6 +28,7 @@ const BPM_PHASES = [
   { key: "implantacao", label: "Implantação" },
   { key: "encerramento", label: "Encerramento" },
   { key: "plano_tatico", label: "Plano Tático" },
+  { key: "cadeia_valor", label: "Cadeia de Valor" },
 ] as const;
 
 const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
@@ -46,6 +47,10 @@ function getInitialPrompts(savedPrompts: Record<string, string> = {}) {
 
   if (!prompts.levantamento?.trim()) {
     prompts.levantamento = DEFAULT_PROMPTS.levantamento;
+  }
+
+  if (!prompts.cadeia_valor?.trim()) {
+    prompts.cadeia_valor = DEFAULT_PROMPTS.cadeia_valor;
   }
 
   return prompts;
@@ -243,16 +248,16 @@ export default function IaPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Prompts por fase BPM</CardTitle>
+            <CardTitle>Prompts de geração por funcionalidade</CardTitle>
             <CardDescription>
-              Personalize os prompts utilizados em cada fase do ciclo BPM. O prompt de
-              Levantamento é usado para gerar roteiros de entrevista no Plano Profissional e
-              deve retornar JSON no formato indicado abaixo.
+              Personalize os prompts utilizados nas fases do ciclo BPM e na geração da Cadeia
+              de Valor. O prompt de Levantamento é usado para gerar roteiros de entrevista no
+              Plano Profissional e deve retornar JSON no formato indicado abaixo.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="levantamento">
-              <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7">
+              <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
                 {BPM_PHASES.map(({ key, label }) => (
                   <TabsTrigger key={key} value={key}>
                     {label}
@@ -264,6 +269,8 @@ export default function IaPage() {
                   <Label htmlFor={`prompt_${key}`}>
                     {key === "levantamento"
                       ? "Prompt para geração do roteiro de entrevistas"
+                      : key === "cadeia_valor"
+                        ? "Prompt para geração da Cadeia de Valor"
                       : `Prompt para ${label}`}
                   </Label>
                   <Textarea
@@ -276,6 +283,8 @@ export default function IaPage() {
                     placeholder={
                       key === "levantamento"
                         ? "Prompt para gerar roteiro (JSON com name, description e blocks)..."
+                        : key === "cadeia_valor"
+                          ? "Prompt utilizado para gerar macroprocessos e níveis da Cadeia de Valor..."
                         : `Digite o prompt padrão para a fase de ${label.toLowerCase()}...`
                     }
                   />
