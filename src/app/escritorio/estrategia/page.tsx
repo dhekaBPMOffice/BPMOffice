@@ -39,7 +39,7 @@ type Section = {
 const sections: Section[] = [
   {
     title: "Estratégia da Empresa",
-    description: "Objetivos estratégicos, cadeia de valor, processos e alinhamento do escritório.",
+    description: "Objetivos estratégicos, cadeia de valor, portfólio de processos e alinhamento estratégico.",
     icon: Building2,
     variant: "teal",
     links: [
@@ -51,7 +51,7 @@ const sections: Section[] = [
   },
   {
     title: "Escritório de Processos",
-    description: "Análise SWOT (F.O.F.A), objetivos, processos do escritório e portfólio de serviços.",
+    description: "Análise SWOT (F.O.F.A), objetivos, processos e portfólio de serviços do Escritório.",
     icon: FolderKanban,
     variant: "purple",
     links: [
