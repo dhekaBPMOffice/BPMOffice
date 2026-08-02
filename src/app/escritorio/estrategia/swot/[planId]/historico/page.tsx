@@ -84,7 +84,7 @@ export default function HistoricoPage() {
 
   if (loading) {
     return (
-      <PageLayout title="Histórico de Versões" iconName="History" backHref={`/escritorio/estrategia/swot/${planId}`}>
+      <PageLayout title="Histórico de Versões" iconName="History" backHref={`/escritorio/estrategia/swot?planId=${planId}`}>
         <div className="flex items-center justify-center min-h-[50vh]">
           <div className="text-center space-y-2">
             <div className="h-8 w-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
@@ -102,7 +102,7 @@ export default function HistoricoPage() {
       title="Histórico de Versões"
       description={`${plan?.name ?? "Plano Estratégico"} · ${plan?.year ?? ""}`}
       iconName="History"
-      backHref={`/escritorio/estrategia/swot/${planId}`}
+      backHref={`/escritorio/estrategia/swot?planId=${planId}`}
       className="max-w-3xl mx-auto"
     >
       {/* Snapshots list */}
@@ -110,7 +110,7 @@ export default function HistoricoPage() {
         <div className="text-center py-16 text-muted-foreground">
           <History className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p>Nenhuma versão salva ainda.</p>
-          <p className="text-sm mt-1">Salve uma versão na etapa de Revisão do plano.</p>
+          <p className="text-sm mt-1">Edite a matriz na página principal e use Concluir edição para registrar uma versão.</p>
         </div>
       ) : (
         <div className="space-y-3">

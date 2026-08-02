@@ -17,7 +17,7 @@ export default function NovoPlanoPage() {
         new Date().getFullYear()
       );
       if (result.data) {
-        router.replace(`/escritorio/estrategia/swot/${result.data.id}`);
+        router.replace(`/escritorio/estrategia/swot?planId=${result.data.id}&edit=1`);
       } else {
         router.replace("/escritorio/estrategia/swot");
       }

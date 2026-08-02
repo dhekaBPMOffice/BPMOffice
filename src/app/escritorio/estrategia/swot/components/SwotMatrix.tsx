@@ -77,19 +77,32 @@ function SwotItemCard({
   item,
   icon: Icon,
   iconClass,
+  readOnly,
   onEdit,
   onDelete,
 }: {
   item: SwotItem;
   icon: typeof TrendingUp;
   iconClass: string;
+  readOnly?: boolean;
   onEdit: (item: SwotItem) => void;
   onDelete: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: item.id,
     data: { type: item.type },
+    disabled: readOnly,
   });
+
+  if (readOnly) {
+    return (
+      <li className="flex items-center gap-2 rounded-lg bg-white/90 border shadow-sm p-3 text-sm">
+        <Icon className={`h-4 w-4 shrink-0 ${iconClass} opacity-80`} />
+        <span className="flex-1 min-w-0">{item.content}</span>
+      </li>
+    );
+  }
+
   return (
     <li
       ref={setNodeRef}
@@ -135,6 +148,7 @@ type QuadrantConfig = (typeof SWOT_CONFIG)[number];
 function QuadrantCard({
   config,
   items,
+  readOnly,
   addingType,
   newContent,
   setNewContent,
@@ -146,6 +160,7 @@ function QuadrantCard({
 }: {
   config: QuadrantConfig;
   items: SwotItem[];
+  readOnly?: boolean;
   addingType: SwotType | null;
   newContent: string;
   setNewContent: (v: string) => void;
@@ -180,6 +195,7 @@ function QuadrantCard({
                 item={item}
                 icon={Icon}
                 iconClass={iconClass}
+                readOnly={readOnly}
                 onEdit={onEdit}
                 onDelete={onDelete}
               />
@@ -190,7 +206,7 @@ function QuadrantCard({
               </li>
             )}
           </ul>
-          {addingType === key ? (
+          {!readOnly && (addingType === key ? (
             <div className="flex gap-2">
               <Input
                 value={newContent}
@@ -212,7 +228,7 @@ function QuadrantCard({
                 <Sparkles className="h-4 w-4" /> Pedir ajuda à IA
               </Button>
             </div>
-          )}
+          ))}
         </CardContent>
       </Card>
     </div>
@@ -225,10 +241,21 @@ export interface SwotMatrixProps {
   mission?: string | null;
   vision?: string | null;
   swotItems: SwotItem[];
+  onMutateItems?: (update: (items: SwotItem[]) => SwotItem[]) => void;
   onReload: () => Promise<void>;
+  readOnly?: boolean;
 }
 
-export function SwotMatrix({ planId, planName, mission, vision, swotItems, onReload }: SwotMatrixProps) {
+export function SwotMatrix({
+  planId,
+  planName,
+  mission,
+  vision,
+  swotItems,
+  onMutateItems,
+  onReload,
+  readOnly = false,
+}: SwotMatrixProps) {
   const [addingType, setAddingType] = useState<SwotType | null>(null);
   const [newContent, setNewContent] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -255,10 +282,14 @@ export function SwotMatrix({ planId, planName, mission, vision, swotItems, onRel
     const result = await createSwotItem(type, newContent.trim(), "escritorio", planId);
     if (result.error) {
       setError(result.error);
-    } else {
+    } else if (result.data) {
       setNewContent("");
       setAddingType(null);
-      await onReload();
+      if (onMutateItems) {
+        onMutateItems((items) => [...items, result.data!]);
+      } else {
+        await onReload();
+      }
     }
   }
 
@@ -266,7 +297,11 @@ export function SwotMatrix({ planId, planName, mission, vision, swotItems, onRel
     if (!confirm("Remover este item?")) return;
     const result = await deleteSwotItem(id);
     if (result.error) setError(result.error);
-    else await onReload();
+    else if (onMutateItems) {
+      onMutateItems((items) => items.filter((i) => i.id !== id));
+    } else {
+      await onReload();
+    }
   }
 
   function openEdit(item: SwotItem) {
@@ -279,10 +314,16 @@ export function SwotMatrix({ planId, planName, mission, vision, swotItems, onRel
     setError(null);
     const result = await updateSwotItem(editItem.id, { content: editContent.trim() });
     if (result.error) setError(result.error);
-    else {
+    else if (result.data) {
       setEditItem(null);
       setEditContent("");
-      await onReload();
+      if (onMutateItems) {
+        onMutateItems((items) =>
+          items.map((i) => (i.id === result.data!.id ? result.data! : i))
+        );
+      } else {
+        await onReload();
+      }
     }
   }
 
@@ -305,16 +346,24 @@ export function SwotMatrix({ planId, planName, mission, vision, swotItems, onRel
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao gerar sugestão.");
       const lines = (data.text ?? "").split("\n").filter((l: string) => l.trim());
+      const created: SwotItem[] = [];
       for (const line of lines) {
         const trimmed = line.trim();
         if (trimmed.startsWith("-")) {
           const content = trimmed.replace(/^-\s*/, "").trim();
-          if (content) await createSwotItem(type, content, "escritorio", planId);
+          if (content) {
+            const itemResult = await createSwotItem(type, content, "escritorio", planId);
+            if (itemResult.data) created.push(itemResult.data);
+          }
         }
       }
       setAiQuadrant(null);
       setAiQuadrantAnswers([]);
-      await onReload();
+      if (onMutateItems && created.length > 0) {
+        onMutateItems((items) => [...items, ...created]);
+      } else if (created.length > 0) {
+        await onReload();
+      }
     } catch (err) {
       setAiQuadrantError(err instanceof Error ? err.message : "Erro ao gerar sugestão.");
     } finally {
@@ -328,6 +377,7 @@ export function SwotMatrix({ planId, planName, mission, vision, swotItems, onRel
   );
 
   async function handleDragEnd(event: DragEndEvent) {
+    if (readOnly) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const targetType = over.id as string;
@@ -337,7 +387,15 @@ export function SwotMatrix({ planId, planName, mission, vision, swotItems, onRel
     setError(null);
     const result = await updateSwotItem(item.id, { type: targetType as SwotType });
     if (result.error) setError(result.error);
-    else await onReload();
+    else if (result.data) {
+      if (onMutateItems) {
+        onMutateItems((items) =>
+          items.map((i) => (i.id === result.data!.id ? result.data! : i))
+        );
+      } else {
+        await onReload();
+      }
+    }
   }
 
   return (
@@ -353,6 +411,7 @@ export function SwotMatrix({ planId, planName, mission, vision, swotItems, onRel
               key={config.key}
               config={config}
               items={getItemsByType(config.key)}
+              readOnly={readOnly}
               addingType={addingType}
               newContent={newContent}
               setNewContent={setNewContent}

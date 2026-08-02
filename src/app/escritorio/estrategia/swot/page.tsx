@@ -33,6 +33,7 @@ import {
   Trash2,
   Calendar,
   ListChecks,
+  CheckCircle2,
 } from "lucide-react";
 import { PageLayout } from "@/components/layout/page-layout";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,7 @@ import {
   getSwotItems,
   createStrategicPlan,
   deleteStrategicPlan,
+  saveSnapshot,
   type StrategicPlan,
   type SwotItem,
 } from "./actions";
@@ -80,6 +82,12 @@ export default function SwotPage() {
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editSaveError, setEditSaveError] = useState<string | null>(null);
+  const [editSuccessMessage, setEditSuccessMessage] = useState<string | null>(null);
+
+  const planIdFromUrl = searchParams.get("planId");
+  const editFromUrl = searchParams.get("edit") === "1";
 
   const loadPlans = useCallback(async () => {
     setLoading(true);
@@ -101,8 +109,9 @@ export default function SwotPage() {
     }
   }, []);
 
-  const loadSwotItems = useCallback(async (planId: string) => {
-    setItemsLoading(true);
+  const loadSwotItems = useCallback(async (planId: string, options?: { showLoading?: boolean }) => {
+    const showLoading = options?.showLoading !== false;
+    if (showLoading) setItemsLoading(true);
     try {
       const res = await getSwotItems(planId);
       if (res?.data) setSwotItems(res.data);
@@ -110,7 +119,7 @@ export default function SwotPage() {
     } catch {
       setSwotItems([]);
     } finally {
-      setItemsLoading(false);
+      if (showLoading) setItemsLoading(false);
     }
   }, []);
 
@@ -118,25 +127,82 @@ export default function SwotPage() {
     loadPlans();
   }, [loadPlans]);
 
-  const planIdFromUrl = searchParams.get("planId");
   useEffect(() => {
     if (loading && plans.length === 0) return;
     const id = planIdFromUrl || plans[0]?.id || null;
     if (id && id !== selectedPlanId) {
       setSelectedPlanId(id);
+      setSwotItems([]);
       loadSwotItems(id);
     }
   }, [loading, plans, planIdFromUrl, selectedPlanId, loadSwotItems]);
 
+  useEffect(() => {
+    if (editFromUrl && planIdFromUrl) {
+      setEditingPlanId(planIdFromUrl);
+    } else if (!editFromUrl) {
+      setEditingPlanId(null);
+    }
+  }, [editFromUrl, planIdFromUrl]);
+
+  function exitEditMode(planId: string | null) {
+    setEditingPlanId(null);
+    if (planId) {
+      router.replace(`/escritorio/estrategia/swot?planId=${planId}`);
+    }
+  }
+
   function handleSelectPlan(planId: string) {
+    setEditingPlanId(null);
+    setEditSaveError(null);
+    setEditSuccessMessage(null);
     setSelectedPlanId(planId);
+    setSwotItems([]);
     router.replace(`/escritorio/estrategia/swot?planId=${planId}`);
     loadSwotItems(planId);
   }
 
+  function handleStartEdit(planId: string) {
+    setEditSaveError(null);
+    setEditSuccessMessage(null);
+    setSelectedPlanId(planId);
+    setEditingPlanId(planId);
+    router.replace(`/escritorio/estrategia/swot?planId=${planId}&edit=1`);
+    loadSwotItems(planId);
+    requestAnimationFrame(() => {
+      document.getElementById("analises")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function handleConcludeEdit() {
+    if (!selectedPlanId) return;
+    const planId = selectedPlanId;
+    setEditSaveError(null);
+    setEditSuccessMessage(null);
+    exitEditMode(planId);
+    void saveSnapshot(planId).then((result) => {
+      if (result.error) {
+        setEditSaveError(result.error);
+      } else {
+        setEditSuccessMessage("Versão salva no histórico de versões.");
+      }
+    });
+  }
+
+  async function handleCancelEdit() {
+    if (selectedPlanId) await loadSwotItems(selectedPlanId, { showLoading: false });
+    setEditSaveError(null);
+    exitEditMode(selectedPlanId);
+  }
+
   const currentPlan = plans.find((p) => p.id === selectedPlanId);
+  const isEditing = !!selectedPlanId && editingPlanId === selectedPlanId;
+  const mutateSwotItems = useCallback((update: (items: SwotItem[]) => SwotItem[]) => {
+    setSwotItems(update);
+  }, []);
+
   const reloadDiagram = useCallback(async () => {
-    if (selectedPlanId) await loadSwotItems(selectedPlanId);
+    if (selectedPlanId) await loadSwotItems(selectedPlanId, { showLoading: false });
   }, [selectedPlanId, loadSwotItems]);
 
   async function handleImport() {
@@ -162,7 +228,7 @@ export default function SwotPage() {
       setImportSuccess(true);
       setImportFile(null);
       await loadPlans();
-      router.push(`/escritorio/estrategia/swot?planId=${data.planId}`);
+      router.push(`/escritorio/estrategia/swot?planId=${data.planId}&edit=1`);
     } catch {
       setImportError("Erro de conexão ao importar.");
     } finally {
@@ -191,7 +257,7 @@ export default function SwotPage() {
       }
       if (result?.data) {
         await loadPlans();
-        router.push(`/escritorio/estrategia/swot?planId=${result.data.id}`);
+        router.push(`/escritorio/estrategia/swot?planId=${result.data.id}&edit=1`);
       } else {
         setCreateError("Resposta inesperada do servidor.");
       }
@@ -212,6 +278,7 @@ export default function SwotPage() {
         setDeleteId(null);
         if (wasSelected) {
           setSelectedPlanId(null);
+          setEditingPlanId(null);
           setSwotItems([]);
         }
       }
@@ -416,19 +483,54 @@ export default function SwotPage() {
                 Crie uma análise ou importe uma matriz SWOT (F.O.F.A) acima.
               </p>
             </div>
-          ) : itemsLoading ? (
+          ) : itemsLoading && swotItems.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : selectedPlanId && (currentPlan || swotItems.length >= 0) ? (
-            <SwotMatrix
-              planId={selectedPlanId}
-              planName={currentPlan?.name ?? "Análise SWOT (F.O.F.A)"}
-              mission={currentPlan?.mission}
-              vision={currentPlan?.vision}
-              swotItems={swotItems}
-              onReload={reloadDiagram}
-            />
+            <div className="space-y-4">
+              {editSuccessMessage && !isEditing && (
+                <div className="flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-800">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  {editSuccessMessage}
+                </div>
+              )}
+              {isEditing && (
+                <div className="flex flex-col gap-3 rounded-lg border border-teal-200 bg-teal-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium text-teal-900">Modo edição</p>
+                    <p className="text-sm text-teal-800/80">
+                      Altere a matriz e use Concluir edição para registrar uma nova versão no histórico.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button variant="outline" size="sm" onClick={handleCancelEdit}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="gap-2 bg-teal-600 hover:bg-teal-700"
+                      onClick={handleConcludeEdit}
+                    >
+                      Concluir edição
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {editSaveError && (
+                <p className="text-sm text-destructive text-center">{editSaveError}</p>
+              )}
+              <SwotMatrix
+                planId={selectedPlanId}
+                planName={currentPlan?.name ?? "Análise SWOT (F.O.F.A)"}
+                mission={currentPlan?.mission}
+                vision={currentPlan?.vision}
+                swotItems={swotItems}
+                onMutateItems={mutateSwotItems}
+                onReload={reloadDiagram}
+                readOnly={!isEditing}
+              />
+            </div>
           ) : null}
         </CardContent>
       </Card>
@@ -451,12 +553,14 @@ export default function SwotPage() {
               {plans.map((plan) => {
                 const statusInfo = STATUS_LABELS[plan.status] ?? STATUS_LABELS.draft;
                 const isSelected = plan.id === selectedPlanId;
+                const isEditingThis = plan.id === editingPlanId;
                 return (
                   <li
                     key={plan.id}
                     className={cn(
                       "flex flex-col gap-2 rounded-lg border border-border bg-card p-4 transition-colors sm:flex-row sm:items-center sm:justify-between",
-                      isSelected && "ring-2 ring-primary"
+                      isSelected && "ring-2 ring-primary",
+                      isEditingThis && "border-teal-300 bg-teal-50/30"
                     )}
                   >
                     <div
@@ -491,8 +595,8 @@ export default function SwotPage() {
                         variant="ghost"
                         size="icon"
                         className="h-9 w-9"
-                        onClick={() => router.push(`/escritorio/estrategia/swot/${plan.id}`)}
-                        aria-label="Abrir wizard"
+                        onClick={() => handleStartEdit(plan.id)}
+                        aria-label="Editar análise"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
