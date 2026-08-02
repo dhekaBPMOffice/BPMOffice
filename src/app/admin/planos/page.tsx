@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/layout/page-layout";
-import { CreditCard, LayoutGrid, List, Plus } from "lucide-react";
+import { CreditCard, LayoutGrid, List, Pencil, Plus } from "lucide-react";
 
 interface PlanosPageProps {
   searchParams?: Promise<{ aba?: string; visualizacao?: string }>;
@@ -157,7 +157,9 @@ export default async function PlanosPage({ searchParams: searchParamsPromise }: 
                       </TableCell>
                       <TableCell>
                         <Link href={`/admin/planos/${plan.id}`}>
-                          <Button variant="ghost" size="sm">Editar</Button>
+                          <Button variant="ghost" size="icon" aria-label="Editar plano">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                         </Link>
                       </TableCell>
                     </TableRow>
@@ -195,8 +197,12 @@ export default async function PlanosPage({ searchParams: searchParamsPromise }: 
                       Preço/mês: <span className="text-foreground">{formatPrice(plan.price_monthly)}</span>
                     </p>
                     <div className="pt-2">
-                      <Link href={`/admin/planos/${plan.id}`}>
-                        <Button variant="outline" size="sm">Editar</Button>
+                      <Link
+                        href={`/admin/planos/${plan.id}`}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                        aria-label="Editar plano"
+                      >
+                        <Pencil className="h-4 w-4" />
                       </Link>
                     </div>
                   </CardContent>

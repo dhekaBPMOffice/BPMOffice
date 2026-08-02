@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageLayout } from "@/components/layout/page-layout";
-import { ClipboardList, Plus, Rocket, Trash2 } from "lucide-react";
+import { ClipboardList, Pencil, Plus, Rocket, Trash2 } from "lucide-react";
 
 export default function QuestionarioProcessosPage() {
   const [items, setItems] = useState<ProcessQuestionnaire[]>([]);
@@ -181,9 +181,10 @@ export default function QuestionarioProcessosPage() {
                     <div className="flex flex-wrap gap-2">
                       <Link
                         href={`/admin/questionario-processos/${item.id}`}
-                        className={buttonVariants({ size: "sm" })}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                        aria-label="Editar questionário"
                       >
-                        Abrir builder
+                        <Pencil className="h-4 w-4" />
                       </Link>
                       {!item.is_active && (
                         <Button

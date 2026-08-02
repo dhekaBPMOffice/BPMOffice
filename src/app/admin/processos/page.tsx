@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ClipboardList, LayoutGrid, LayoutList, Plus, Search, Trash2 } from "lucide-react";
+import { ClipboardList, LayoutGrid, LayoutList, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import {
   DEFAULT_PROCESS_TYPE_OPTIONS,
   mergeProcessTypeOptionsForSelect,
@@ -823,9 +823,10 @@ export default function AdminProcessosPage() {
                       <div className="flex flex-nowrap items-center justify-end gap-2">
                         <Link
                           href={`/admin/processos/${process.id}`}
-                          className={buttonVariants({ size: "sm" })}
+                          className={buttonVariants({ variant: "ghost", size: "icon" })}
+                          aria-label="Editar processo"
                         >
-                          Abrir
+                          <Pencil className="h-4 w-4" />
                         </Link>
                         <Button
                           variant="outline"
@@ -882,9 +883,10 @@ export default function AdminProcessosPage() {
                     <div className="flex flex-nowrap items-center gap-2">
                       <Link
                         href={`/admin/processos/${process.id}`}
-                        className={buttonVariants({ size: "sm" })}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                        aria-label="Editar processo"
                       >
-                        Abrir
+                        <Pencil className="h-4 w-4" />
                       </Link>
                       <Button
                         variant="outline"

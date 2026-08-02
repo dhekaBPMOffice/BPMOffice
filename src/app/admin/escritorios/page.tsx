@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/layout/page-layout";
-import { Building2, LayoutGrid, List } from "lucide-react";
+import { Building2, LayoutGrid, List, Pencil } from "lucide-react";
 import { NovoEscritorioButton } from "./novo-escritorio-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -338,8 +338,10 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
                         {formatDate(office.created_at)}
                       </TableCell>
                       <TableCell>
-                        <Link href={`/admin/escritorios/${office.id}`} className="text-sm text-[var(--identity-primary)] hover:underline">
-                          Ver
+                        <Link href={`/admin/escritorios/${office.id}`}>
+                          <Button variant="ghost" size="icon" aria-label="Editar escritório">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                         </Link>
                       </TableCell>
                     </TableRow>
@@ -378,8 +380,12 @@ export default async function EscritoriosPage({ searchParams: searchParamsPromis
                       Criado em: <span className="text-foreground">{formatDate(office.created_at)}</span>
                     </p>
                     <div className="pt-2">
-                      <Link href={`/admin/escritorios/${office.id}`} className="text-sm text-[var(--identity-primary)] hover:underline">
-                        Ver escritório
+                      <Link
+                        href={`/admin/escritorios/${office.id}`}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                        aria-label="Editar escritório"
+                      >
+                        <Pencil className="h-4 w-4" />
                       </Link>
                     </div>
                   </CardContent>

@@ -230,6 +230,7 @@ export default function FormulariosPage() {
                     <Link
                       href={`/admin/formularios/${form.id}`}
                       className={buttonVariants({ variant: "outline", size: "sm" })}
+                      aria-label="Editar formulário"
                     >
                       <Pencil className="h-4 w-4" />
                     </Link>
@@ -257,12 +258,6 @@ export default function FormulariosPage() {
                     {form.uses_sections ? "Com etapas" : "Sem etapas"}
                   </Badge>
                 </div>
-                <Link
-                  href={`/admin/formularios/${form.id}`}
-                  className={buttonVariants({ variant: "secondary", size: "sm" })}
-                >
-                  Editar formulário
-                </Link>
               </CardContent>
             </Card>
           ))}
