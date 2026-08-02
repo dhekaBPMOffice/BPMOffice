@@ -63,6 +63,7 @@ export async function saveAiConfig(data: {
   default_api_key?: string;
   prompts: Record<string, string>;
 }) {
+  await requireRole(["admin_master"]);
   const supabase = await createServiceClient();
 
   const payload: Record<string, unknown> = {

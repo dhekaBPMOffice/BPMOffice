@@ -19,6 +19,7 @@ import {
   Building2,
   FolderKanban,
   ClipboardList,
+  Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,7 @@ const sections: Section[] = [
     icon: Building2,
     variant: "teal",
     links: [
+      { label: "Dados da Empresa", href: "/escritorio/estrategia/dados-empresa", icon: Landmark },
       { label: "Objetivos Estratégicos", href: "/escritorio/estrategia/objetivos-estrategicos", icon: Target },
       { label: "Cadeia de Valor", href: "/escritorio/estrategia/cadeia-valor?aba=configuracao", icon: Workflow },
       { label: "Processos", href: "/escritorio/estrategia/cadeia-valor?aba=gestao", icon: ClipboardList },
@@ -78,7 +80,18 @@ const linkButtonClass = cn(
   "min-h-10 w-full justify-start gap-2.5 px-5 transition-colors"
 );
 
+const LG_ROW_SPAN_BY_MAX_LINKS: Record<number, string> = {
+  2: "lg:row-span-3",
+  3: "lg:row-span-4",
+  4: "lg:row-span-5",
+  5: "lg:row-span-6",
+  6: "lg:row-span-7",
+};
+
 export default function EstrategiaPage() {
+  const maxLinks = Math.max(...sections.map((section) => section.links.length));
+  const rowSpanClass = LG_ROW_SPAN_BY_MAX_LINKS[maxLinks] ?? "lg:row-span-6";
+
   return (
     <PageLayout
       title="Estratégia"
@@ -86,17 +99,18 @@ export default function EstrategiaPage() {
       iconName="Target"
     >
       <div
-        className={cn(
-          "grid gap-6 lg:grid-cols-3 lg:items-stretch lg:gap-x-6 lg:gap-y-1.5",
-          "lg:[grid-template-rows:auto_repeat(4,minmax(2.5rem,auto))]"
-        )}
+        className="grid gap-6 lg:grid-cols-3 lg:items-stretch lg:gap-x-6 lg:gap-y-1.5"
+        style={{
+          gridTemplateRows: `auto repeat(${maxLinks}, minmax(2.5rem, auto))`,
+        }}
       >
         {sections.map((section) => (
           <Card
             key={section.title}
             className={cn(
               "flex flex-col pb-5 card-hover-shadow hover:-translate-y-0.5",
-              "lg:grid lg:row-span-5 lg:[grid-template-rows:subgrid] lg:min-h-0"
+              "lg:grid lg:[grid-template-rows:subgrid] lg:min-h-0",
+              rowSpanClass
             )}
           >
             <CardHeader className="pb-2">
@@ -119,7 +133,7 @@ export default function EstrategiaPage() {
                   {link.label}
                 </Link>
               ))}
-              {Array.from({ length: 4 - section.links.length }, (_, i) => (
+              {Array.from({ length: maxLinks - section.links.length }, (_, i) => (
                 <div key={`spacer-${i}`} aria-hidden className="hidden min-h-10 shrink-0 lg:block" />
               ))}
             </div>

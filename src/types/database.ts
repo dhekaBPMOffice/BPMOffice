@@ -93,6 +93,32 @@ export interface OfficeConfig {
   updated_at: string;
 }
 
+export interface OfficeCompanyProfile {
+  id: string;
+  office_id: string;
+  company_name: string;
+  website_url: string | null;
+  main_industry: string | null;
+  business_models: string[];
+  company_size: string | null;
+  employee_count: number | null;
+  units_count: number | null;
+  revenue_note: string | null;
+  operation_scopes: string[];
+  scope_locations: string | null;
+  products_services: string | null;
+  customer_types: string[];
+  customers_description: string | null;
+  has_business_units: string | null;
+  business_units_detail: string | null;
+  mission: string | null;
+  has_regulation: string | null;
+  regulation_detail: string | null;
+  other_info: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SupportTicket {
   id: string;
   title: string;
