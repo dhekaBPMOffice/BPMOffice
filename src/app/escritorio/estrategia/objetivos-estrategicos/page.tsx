@@ -386,7 +386,7 @@ export default function ObjetivosEstrategicosPage() {
             </DialogHeader>
             <form onSubmit={handleManualSubmit} className="space-y-4 py-2">
               <div>
-                <Label htmlFor="create-title">Título *</Label>
+                <Label htmlFor="create-title" required>Título</Label>
                 <Input
                   id="create-title"
                   value={newTitle}
@@ -525,7 +525,7 @@ export default function ObjetivosEstrategicosPage() {
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div>
-                <Label htmlFor="edit-title">Título *</Label>
+                <Label htmlFor="edit-title" required>Título</Label>
                 <Input
                   id="edit-title"
                   value={editTitle}

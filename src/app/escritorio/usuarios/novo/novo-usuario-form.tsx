@@ -17,17 +17,21 @@ import {
 } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
+import { SYSTEM_DEFAULT_ROLE_DESCRIPTION } from "@/lib/custom-roles/default-office-role";
 
 interface CustomRole {
   id: string;
   name: string;
+  is_system_default?: boolean;
+  description?: string | null;
 }
 
 interface NovoUsuarioFormProps {
   customRoles: CustomRole[];
+  defaultRoleId: string;
 }
 
-export function NovoUsuarioForm({ customRoles }: NovoUsuarioFormProps) {
+export function NovoUsuarioForm({ customRoles, defaultRoleId }: NovoUsuarioFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +92,9 @@ export function NovoUsuarioForm({ customRoles }: NovoUsuarioFormProps) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="full_name">Nome completo</Label>
+              <Label htmlFor="full_name" required={true}>
+                Nome completo
+              </Label>
               <Input
                 id="full_name"
                 name="full_name"
@@ -97,7 +103,9 @@ export function NovoUsuarioForm({ customRoles }: NovoUsuarioFormProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email" required={true}>
+                E-mail
+              </Label>
               <Input
                 id="email"
                 name="email"
@@ -137,21 +145,42 @@ export function NovoUsuarioForm({ customRoles }: NovoUsuarioFormProps) {
                 placeholder="Analista, Coordenador, etc."
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="custom_role_id">Perfil customizado</Label>
-              <Select id="custom_role_id" name="custom_role_id">
-                <option value="">Nenhum (usuário padrão)</option>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="custom_role_id" required={true}>
+                Perfil de acesso
+              </Label>
+              <Select
+                id="custom_role_id"
+                name="custom_role_id"
+                defaultValue={defaultRoleId}
+                required
+              >
                 {customRoles.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.name}
+                    {r.is_system_default ? `${r.name} (sistema)` : r.name}
                   </option>
                 ))}
               </Select>
+              <p className="text-xs text-muted-foreground">
+                {SYSTEM_DEFAULT_ROLE_DESCRIPTION}{" "}
+                <Link
+                  href="/escritorio/usuarios/perfis"
+                  className="text-foreground underline underline-offset-2 hover:text-primary"
+                >
+                  Gerenciar perfis customizados
+                </Link>
+                .
+              </p>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="initial_password">Senha inicial</Label>
+            <Label htmlFor="initial_password" required={true}>
+              Senha inicial
+            </Label>
             <Input
               id="initial_password"
               name="initial_password"

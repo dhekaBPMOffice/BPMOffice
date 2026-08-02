@@ -326,7 +326,7 @@ export default function ModelosDocumentoPage() {
               <div className="flex-1 overflow-y-auto space-y-4 px-1 pb-2">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Nome *</Label>
+                    <Label required>Nome</Label>
                     <Input value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="Ex: Padrão" />
                   </div>
                   <div className="space-y-2">

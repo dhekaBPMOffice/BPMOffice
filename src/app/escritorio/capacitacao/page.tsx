@@ -374,7 +374,7 @@ export default function CapacitacaoPage() {
           </DialogHeader>
           <form onSubmit={handleSavePlan} className="space-y-4">
             <div className="space-y-2">
-              <Label>Público-alvo (perfil)</Label>
+              <Label required>Público-alvo (perfil)</Label>
               <Input
                 value={planRoleTarget}
                 onChange={(e) => setPlanRoleTarget(e.target.value)}
@@ -383,7 +383,7 @@ export default function CapacitacaoPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Título</Label>
+              <Label required>Título</Label>
               <Input
                 value={planTitle}
                 onChange={(e) => setPlanTitle(e.target.value)}
@@ -433,7 +433,7 @@ export default function CapacitacaoPage() {
             {!editingRecordId && (
               <>
                 <div className="space-y-2">
-                  <Label>Usuário</Label>
+                  <Label required>Usuário</Label>
                   <Select
                     value={recordUserId}
                     onChange={(e) => setRecordUserId(e.target.value)}
@@ -448,7 +448,7 @@ export default function CapacitacaoPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Plano</Label>
+                  <Label required>Plano</Label>
                   <Select
                     value={recordPlanId}
                     onChange={(e) => setRecordPlanId(e.target.value)}

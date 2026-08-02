@@ -89,7 +89,7 @@ export function RedefinirSenhaAdminForm({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="admin_new_password">Nova senha</Label>
+            <Label htmlFor="admin_new_password" required>Nova senha</Label>
             <Input
               id="admin_new_password"
               name="new_password"
@@ -103,7 +103,7 @@ export function RedefinirSenhaAdminForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="admin_confirm_password">Confirmar senha</Label>
+            <Label htmlFor="admin_confirm_password" required>Confirmar senha</Label>
             <Input
               id="admin_confirm_password"
               name="confirm_password"

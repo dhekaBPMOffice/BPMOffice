@@ -366,7 +366,7 @@ export default function AdminObjetivosEscritorioPage() {
           <CardContent>
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="new_title">Título</Label>
+                <Label htmlFor="new_title" required>Título</Label>
                 <Input
                   id="new_title"
                   value={newTitle}
@@ -376,7 +376,7 @@ export default function AdminObjetivosEscritorioPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new_theme">Tema central</Label>
+                <Label htmlFor="new_theme" required>Tema central</Label>
                 <Select
                   id="new_theme"
                   value={newThemeId}
@@ -494,7 +494,7 @@ export default function AdminObjetivosEscritorioPage() {
                           className="flex flex-col gap-3 py-2"
                         >
                           <div className="space-y-1">
-                            <Label>Título</Label>
+                            <Label required>Título</Label>
                             <Input
                               value={editTitle}
                               onChange={(e) => setEditTitle(e.target.value)}
@@ -502,7 +502,7 @@ export default function AdminObjetivosEscritorioPage() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label>Tema central</Label>
+                            <Label required>Tema central</Label>
                             <Select
                               value={editThemeId}
                               onChange={(e) => setEditThemeId(e.target.value)}

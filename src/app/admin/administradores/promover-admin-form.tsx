@@ -49,7 +49,7 @@ export function PromoverAdminForm() {
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <div className="flex-1 space-y-2">
-          <Label htmlFor="email">E-mail do usuário</Label>
+          <Label htmlFor="email" required>E-mail do usuário</Label>
           <Input
             id="email"
             name="email"

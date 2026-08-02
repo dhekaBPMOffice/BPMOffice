@@ -41,7 +41,7 @@ export function StepConfig({ config, onChange, onNext }: StepConfigProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="title">Título do Plano *</Label>
+            <Label htmlFor="title" required>Título do Plano</Label>
             <Input
               id="title"
               value={config.title}
@@ -52,7 +52,7 @@ export function StepConfig({ config, onChange, onNext }: StepConfigProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="period_start">Início do Período *</Label>
+              <Label htmlFor="period_start" required>Início do Período</Label>
               <Input
                 id="period_start"
                 type="date"
@@ -61,7 +61,7 @@ export function StepConfig({ config, onChange, onNext }: StepConfigProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="period_end">Fim do Período *</Label>
+              <Label htmlFor="period_end" required>Fim do Período</Label>
               <Input
                 id="period_end"
                 type="date"

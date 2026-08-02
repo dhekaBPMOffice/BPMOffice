@@ -64,7 +64,7 @@ export function CadastrarLiderForm({
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="full_name">Nome completo</Label>
+        <Label htmlFor="full_name" required>Nome completo</Label>
         <Input
           id="full_name"
           name="full_name"
@@ -74,7 +74,7 @@ export function CadastrarLiderForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email">E-mail</Label>
+        <Label htmlFor="email" required>E-mail</Label>
         <Input
           id="email"
           name="email"
@@ -85,7 +85,7 @@ export function CadastrarLiderForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="initial_password">Senha inicial</Label>
+        <Label htmlFor="initial_password" required>Senha inicial</Label>
         <Input
           id="initial_password"
           name="initial_password"

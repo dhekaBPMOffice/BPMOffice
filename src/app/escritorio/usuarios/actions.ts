@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { getProfile } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { validatePassword } from "@/lib/password";
+import {
+  ensureDefaultOfficeRole,
+  resolveUserCustomRoleId,
+} from "@/lib/custom-roles/default-office-role";
 
 export type CreateUserInput = {
   full_name: string;
@@ -28,6 +32,12 @@ export async function createUser(input: CreateUserInput) {
 
   const supabase = await createServiceClient();
 
+  const customRoleId = await resolveUserCustomRoleId(
+    supabase,
+    profile.office_id,
+    input.custom_role_id
+  );
+
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: input.email,
     password: input.initial_password,
@@ -48,7 +58,7 @@ export async function createUser(input: CreateUserInput) {
       auth_user_id: authUser.user.id,
       office_id: profile.office_id,
       role: "user",
-      custom_role_id: input.custom_role_id || null,
+      custom_role_id: customRoleId,
       full_name: input.full_name,
       email: input.email,
       phone: input.phone || null,
@@ -88,9 +98,18 @@ export async function updateUser(
 
   const supabase = await createServiceClient();
 
+  const updatePayload = { ...data };
+  if (data.custom_role_id !== undefined) {
+    updatePayload.custom_role_id = await resolveUserCustomRoleId(
+      supabase,
+      profile.office_id,
+      data.custom_role_id
+    );
+  }
+
   const { error } = await supabase
     .from("profiles")
-    .update(data)
+    .update(updatePayload)
     .eq("id", profileId)
     .eq("office_id", profile.office_id);
 

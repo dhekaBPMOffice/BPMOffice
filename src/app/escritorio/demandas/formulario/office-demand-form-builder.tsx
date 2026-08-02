@@ -20,7 +20,7 @@ import {
 import type { FormQuestionType, OfficeDemandForm } from "@/types/database";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Label, RequiredMark } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -726,7 +726,7 @@ function QuestionEditor({
           )}
           <span className="text-sm text-muted-foreground">
             {questionIndex + 1}. {questionTypeLabel(questionType)}
-            {isRequired ? " *" : ""}
+            {isRequired ? <RequiredMark /> : null}
           </span>
           <span className="truncate font-medium">{prompt}</span>
           {saveStatus === "saving" && <Badge variant="outline">Salvando...</Badge>}

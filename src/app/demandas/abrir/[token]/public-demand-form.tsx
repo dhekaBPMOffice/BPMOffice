@@ -166,9 +166,8 @@ function QuestionField({ question }: { question: QuestionRow }) {
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={name}>
+      <Label htmlFor={name} required={question.is_required}>
         {question.prompt}
-        {question.is_required ? " *" : ""}
       </Label>
       {question.helper_text && (
         <p className="text-sm text-muted-foreground">{question.helper_text}</p>

@@ -87,7 +87,7 @@ export function RedefinirSenhaForm({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="new_password">Nova senha</Label>
+            <Label htmlFor="new_password" required>Nova senha</Label>
             <Input
               id="new_password"
               name="new_password"
@@ -100,7 +100,7 @@ export function RedefinirSenhaForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirm_password">Confirmar senha</Label>
+            <Label htmlFor="confirm_password" required>Confirmar senha</Label>
             <Input
               id="confirm_password"
               name="confirm_password"

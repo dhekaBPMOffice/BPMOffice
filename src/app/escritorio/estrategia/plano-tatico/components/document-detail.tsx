@@ -480,7 +480,7 @@ export function DocumentDetail({
           </DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
             <div className="space-y-2">
-              <Label>Ação *</Label>
+              <Label required>Ação</Label>
               <Input
                 value={actionForm.action}
                 onChange={(e) => setActionForm({ ...actionForm, action: e.target.value })}
@@ -497,7 +497,7 @@ export function DocumentDetail({
               />
             </div>
             <div className="space-y-2">
-              <Label>Objetivo do Escritório *</Label>
+              <Label required>Objetivo do Escritório</Label>
               <Select
                 value={actionForm.office_objective_id}
                 onChange={(e) => setActionForm({ ...actionForm, office_objective_id: e.target.value })}

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { PageLayout } from "@/components/layout/page-layout";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
+import { ensureDefaultOfficeRole } from "@/lib/custom-roles/default-office-role";
 import { requireRole } from "@/lib/auth";
 import {
   Card,
@@ -39,6 +41,9 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
     );
   }
 
+  const service = await createServiceClient();
+  const defaultRole = await ensureDefaultOfficeRole(service, profile.office_id);
+
   const timeZone = await getEffectiveOfficeTimeZone(profile.office_id);
 
   const [
@@ -59,15 +64,17 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
         is_active,
         last_login_at,
         custom_roles:custom_role_id (
-          name
+          name,
+          is_system_default
         )
       `)
       .eq("office_id", profile.office_id)
       .order("full_name"),
     supabase
       .from("custom_roles")
-      .select("id, name")
+      .select("id, name, is_system_default")
       .eq("office_id", profile.office_id)
+      .order("is_system_default", { ascending: false })
       .order("name"),
   ]);
 
@@ -99,11 +106,14 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
       ? "/escritorio/usuarios"
       : `/escritorio/usuarios?visualizacao=${nextVisualizacao}`;
   const getRoleName = (u: (typeof users)[number]) => {
+    if (u.role === "leader") return getRoleLabel(u.role);
     const cr = u.custom_roles as unknown;
     if (cr && typeof cr === "object" && cr !== null && "name" in cr) {
-      return (cr as { name: string }).name ?? getRoleLabel(u.role);
+      const name = (cr as { name: string; is_system_default?: boolean }).name;
+      const system = (cr as { is_system_default?: boolean }).is_system_default;
+      return system ? `${name} (sistema)` : name ?? getRoleLabel(u.role);
     }
-    return getRoleLabel(u.role);
+    return `${defaultRole.name} (sistema)`;
   };
 
   return (
@@ -202,6 +212,7 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
                             role: u.role,
                           }}
                           customRoles={customRoles ?? []}
+                          defaultRoleId={defaultRole.id}
                           currentUserId={profile.id}
                           activeLeaderCount={activeLeaderCount}
                         />
@@ -232,6 +243,7 @@ export default async function UsuariosPage({ searchParams: searchParamsPromise }
                           role: u.role,
                         }}
                         customRoles={customRoles ?? []}
+                        defaultRoleId={defaultRole.id}
                         currentUserId={profile.id}
                         activeLeaderCount={activeLeaderCount}
                       />

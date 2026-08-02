@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { submitProcessOnboarding } from "@/app/escritorio/processos/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { OnboardingCompletionScreen } from "./onboarding-completion-screen";
@@ -648,11 +649,7 @@ export function ProcessOnboardingForm({
           <div className="mb-5 space-y-2">
             <h2 className="text-xl font-semibold leading-snug tracking-tight">
               {currentQuestion.prompt}
-              {currentQuestion.is_required && (
-                <span className="ml-1 text-primary" aria-hidden="true">
-                  *
-                </span>
-              )}
+              {currentQuestion.is_required ? <RequiredMark /> : null}
             </h2>
             {currentQuestion.helper_text && (
               <p className="text-sm text-muted-foreground">{currentQuestion.helper_text}</p>

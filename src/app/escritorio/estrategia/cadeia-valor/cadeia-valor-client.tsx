@@ -1893,7 +1893,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                   </div>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
                     <div className="space-y-2 min-w-0">
-                      <Label htmlFor="form-tipo-cadeia">Tipo *</Label>
+                      <Label htmlFor="form-tipo-cadeia" required>Tipo</Label>
                       <Input
                         id="form-tipo-cadeia"
                         list="cadeia-valor-tipos-sugestao"
@@ -1911,7 +1911,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                     </div>
 
                     <div className="space-y-2 min-w-0">
-                      <Label htmlFor="form-macro-cadeia">Macroprocesso *</Label>
+                      <Label htmlFor="form-macro-cadeia" required>Macroprocesso</Label>
                       <Input
                         id="form-macro-cadeia"
                         value={formData.macroprocesso}
@@ -2002,7 +2002,9 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                     </div>
 
                     <div className="space-y-2 min-w-0">
-                      <Label htmlFor="form-atualizacao-cadeia">Última atualização *</Label>
+                      <Label htmlFor="form-atualizacao-cadeia" required>
+                        Última atualização
+                      </Label>
                       <Input
                         id="form-atualizacao-cadeia"
                         type="datetime-local"
@@ -2128,7 +2130,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                 <div className="grid gap-4">
                   {AI_QUESTIONS.map((question) => (
                     <div key={question.id} className="space-y-2">
-                      <Label>{question.label}</Label>
+                      <Label required>{question.label}</Label>
                       <Textarea
                         value={aiAnswers[question.id]}
                         onChange={(event) =>

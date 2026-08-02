@@ -169,7 +169,7 @@ export default function LoginPage() {
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-foreground">E-mail</Label>
+                  <Label htmlFor="email" className="text-foreground" required>E-mail</Label>
                   <Input
                     id="email"
                     type="email"
@@ -181,7 +181,7 @@ export default function LoginPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-foreground">Senha</Label>
+                  <Label htmlFor="password" className="text-foreground" required>Senha</Label>
                   <Input
                     id="password"
                     type="password"

@@ -218,7 +218,7 @@ export default function ConhecimentoPage() {
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-4">
             <div className="space-y-2">
-              <Label>Título</Label>
+              <Label required>Título</Label>
               <Input
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}

@@ -395,7 +395,9 @@ export default function SwotPage() {
           <CardContent className="space-y-4">
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="swot-reference-date">Data de referência *</Label>
+                <Label htmlFor="swot-reference-date" required>
+                  Data de referência
+                </Label>
                 <Input
                   id="swot-reference-date"
                   type="date"

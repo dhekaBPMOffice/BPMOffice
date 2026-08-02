@@ -774,7 +774,7 @@ export default function PortfolioPage() {
               </p>
             )}
             <div className="space-y-2">
-              <Label>Nome *</Label>
+              <Label required>Nome</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}

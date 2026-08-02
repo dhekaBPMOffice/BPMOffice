@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
 import { validatePassword } from "@/lib/password";
 import { SYSTEM_AREAS, type AreaOverrides } from "@/lib/system-areas";
+import { ensureDefaultOfficeRole } from "@/lib/custom-roles/default-office-role";
 import { revalidatePath } from "next/cache";
 
 function generateSlug(name: string): string {
@@ -64,6 +65,19 @@ export async function createOffice(formData: FormData) {
       // Rollback: delete office if branding fails
       await supabase.from("offices").delete().eq("id", office.id);
       return { error: "Erro ao criar identidade visual do escritório." };
+    }
+
+    try {
+      await ensureDefaultOfficeRole(supabase, office.id);
+    } catch (roleError) {
+      await supabase.from("branding").delete().eq("office_id", office.id);
+      await supabase.from("offices").delete().eq("id", office.id);
+      return {
+        error:
+          roleError instanceof Error
+            ? roleError.message
+            : "Erro ao criar perfil padrão do escritório.",
+      };
     }
   }
 

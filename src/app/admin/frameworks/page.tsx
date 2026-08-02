@@ -162,7 +162,7 @@ export default function FrameworksPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="new_name">Nome</Label>
+                  <Label htmlFor="new_name" required>Nome</Label>
                   <Input
                     id="new_name"
                     value={newName}
@@ -284,7 +284,7 @@ export default function FrameworksPage() {
                           >
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div className="space-y-1">
-                                <Label>Nome</Label>
+                                <Label required>Nome</Label>
                                 <Input
                                   value={editName}
                                   onChange={(e) => setEditName(e.target.value)}

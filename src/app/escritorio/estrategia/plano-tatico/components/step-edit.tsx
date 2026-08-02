@@ -301,7 +301,7 @@ export function StepEdit({
           </DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
             <div className="space-y-2">
-              <Label>Ação *</Label>
+              <Label required>Ação</Label>
               <Input
                 value={form.action}
                 onChange={(e) => setForm({ ...form, action: e.target.value })}

@@ -500,8 +500,8 @@ export default function ObjetivosEscritorioPage() {
             <form onSubmit={handleManualSubmit} className="space-y-4 py-2">
               <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
                 <div>
-                  <Label htmlFor="manual_title" className="text-muted-foreground">
-                    Título *
+                  <Label htmlFor="manual_title" className="text-muted-foreground" required>
+                    Título
                   </Label>
                   <Input
                     id="manual_title"
@@ -653,7 +653,7 @@ export default function ObjetivosEscritorioPage() {
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div>
-                <Label htmlFor="edit-title">Título *</Label>
+                <Label htmlFor="edit-title" required>Título</Label>
                 <Input
                   id="edit-title"
                   value={editTitle}

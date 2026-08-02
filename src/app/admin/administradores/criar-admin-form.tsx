@@ -60,7 +60,7 @@ export function CriarAdminForm() {
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="criar_full_name">Nome completo</Label>
+        <Label htmlFor="criar_full_name" required>Nome completo</Label>
         <Input
           id="criar_full_name"
           name="full_name"
@@ -71,7 +71,7 @@ export function CriarAdminForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="criar_email">E-mail</Label>
+        <Label htmlFor="criar_email" required>E-mail</Label>
         <Input
           id="criar_email"
           name="email"
@@ -83,7 +83,7 @@ export function CriarAdminForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="criar_initial_password">Senha inicial</Label>
+        <Label htmlFor="criar_initial_password" required>Senha inicial</Label>
         <Input
           id="criar_initial_password"
           name="initial_password"

@@ -100,7 +100,7 @@ export function EscritorioEditForm({ office, plans }: EscritorioEditFormProps) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="edit-name">Nome</Label>
+          <Label htmlFor="edit-name" required>Nome</Label>
           <Input
             id="edit-name"
             name="name"

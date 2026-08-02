@@ -166,7 +166,7 @@ export default function NotificacoesPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="title">Título</Label>
+              <Label htmlFor="title" required>Título</Label>
               <Input
                 id="title"
                 value={title}
@@ -176,7 +176,7 @@ export default function NotificacoesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="message">Mensagem</Label>
+              <Label htmlFor="message" required>Mensagem</Label>
               <Textarea
                 id="message"
                 value={message}
@@ -202,7 +202,9 @@ export default function NotificacoesPage() {
                 </div>
                 {targetType === "office" && (
                   <div className="space-y-2">
-                    <Label htmlFor="office_id">Escritório</Label>
+                    <Label htmlFor="office_id" required={targetType === "office"}>
+                      Escritório
+                    </Label>
                     <Select
                       id="office_id"
                       value={targetOfficeId}

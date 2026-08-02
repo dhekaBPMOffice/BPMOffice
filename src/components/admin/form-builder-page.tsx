@@ -26,7 +26,7 @@ import {
 } from "@/lib/forms/admin-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Label, RequiredMark } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -541,7 +541,7 @@ export function FormBuilderPage({
             {showConfig && (
               <div className="mt-4 space-y-4 border-t pt-4">
                 <div className="space-y-2">
-                  <Label>Título</Label>
+                  <Label required>Título</Label>
                   <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
@@ -1314,7 +1314,7 @@ function QuestionCard({
           )}
           <span className="text-sm text-muted-foreground">
             {questionIndex + 1}. {questionTypeLabel}
-            {isRequired ? " *" : ""}
+            {isRequired ? <RequiredMark /> : null}
           </span>
           <span className="truncate font-medium">{prompt}</span>
           {saveStatus === "saving" && <Badge variant="outline">Salvando...</Badge>}

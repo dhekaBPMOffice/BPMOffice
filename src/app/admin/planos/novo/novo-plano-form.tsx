@@ -98,7 +98,7 @@ export function NovoPlanoForm() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Nome</Label>
+              <Label htmlFor="name" required>Nome</Label>
               <Input
                 id="name"
                 name="name"
@@ -119,7 +119,7 @@ export function NovoPlanoForm() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="max_users">Máximo de usuários</Label>
+                <Label htmlFor="max_users" required>Máximo de usuários</Label>
                 <Input
                   id="max_users"
                   name="max_users"
@@ -130,7 +130,7 @@ export function NovoPlanoForm() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="max_processes">Máximo de processos</Label>
+                <Label htmlFor="max_processes" required>Máximo de processos</Label>
                 <Input
                   id="max_processes"
                   name="max_processes"
@@ -143,7 +143,7 @@ export function NovoPlanoForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price_monthly">Preço mensal (R$)</Label>
+              <Label htmlFor="price_monthly" required>Preço mensal (R$)</Label>
               <Input
                 id="price_monthly"
                 name="price_monthly"

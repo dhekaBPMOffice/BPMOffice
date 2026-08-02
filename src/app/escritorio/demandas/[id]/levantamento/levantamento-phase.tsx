@@ -200,7 +200,7 @@ export function LevantamentoPhase({ demandId }: LevantamentoPhaseProps) {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="script_title">Título</Label>
+                <Label htmlFor="script_title" required>Título</Label>
                 <Input
                   id="script_title"
                   value={newTitle}

@@ -159,7 +159,7 @@ export default function RedefinirSenhaPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="new-password">Nova senha</Label>
+              <Label htmlFor="new-password" required>Nova senha</Label>
               <Input
                 id="new-password"
                 type="password"
@@ -173,7 +173,7 @@ export default function RedefinirSenhaPage() {
               <p className="text-xs text-muted-foreground">{PASSWORD_HINT}</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirmar senha</Label>
+              <Label htmlFor="confirm-password" required>Confirmar senha</Label>
               <Input
                 id="confirm-password"
                 type="password"

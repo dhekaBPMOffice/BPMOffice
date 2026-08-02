@@ -113,7 +113,7 @@ export default function QuestionarioProcessosPage() {
           <CardContent>
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Título</Label>
+                <Label htmlFor="title" required>Título</Label>
                 <Input
                   id="title"
                   value={title}

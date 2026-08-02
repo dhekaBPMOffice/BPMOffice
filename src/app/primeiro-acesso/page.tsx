@@ -105,7 +105,7 @@ export default function FirstAccessPage() {
         <CardContent>
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="new-password">Nova Senha</Label>
+              <Label htmlFor="new-password" required>Nova Senha</Label>
               <Input
                 id="new-password"
                 type="password"
@@ -118,7 +118,7 @@ export default function FirstAccessPage() {
               <p className="text-xs text-muted-foreground">{PASSWORD_HINT}</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirmar Senha</Label>
+              <Label htmlFor="confirm-password" required>Confirmar Senha</Label>
               <Input
                 id="confirm-password"
                 type="password"

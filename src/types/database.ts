@@ -50,6 +50,7 @@ export interface CustomRole {
   office_id: string;
   name: string;
   description: string | null;
+  is_system_default?: boolean;
   created_at: string;
 }
 

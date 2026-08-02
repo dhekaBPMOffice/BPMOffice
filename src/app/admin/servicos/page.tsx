@@ -178,7 +178,7 @@ export default function ServicosPage() {
           <CardContent>
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="new_name">Nome</Label>
+                <Label htmlFor="new_name" required>Nome</Label>
                 <Input
                   id="new_name"
                   value={newName}
@@ -308,7 +308,7 @@ export default function ServicosPage() {
                             className="flex flex-col gap-3 py-2"
                           >
                             <div className="space-y-1">
-                              <Label>Nome</Label>
+                              <Label required>Nome</Label>
                               <Input
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}

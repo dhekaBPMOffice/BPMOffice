@@ -75,7 +75,7 @@ export function EditarLiderForm({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="edit_full_name">Nome completo</Label>
+            <Label htmlFor="edit_full_name" required>Nome completo</Label>
             <Input
               id="edit_full_name"
               name="full_name"
@@ -86,7 +86,7 @@ export function EditarLiderForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit_email">E-mail</Label>
+            <Label htmlFor="edit_email" required>E-mail</Label>
             <Input
               id="edit_email"
               name="email"

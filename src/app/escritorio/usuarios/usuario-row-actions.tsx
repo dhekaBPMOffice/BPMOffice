@@ -31,11 +31,13 @@ export interface UsuarioParaEdicao {
 interface CustomRole {
   id: string;
   name: string;
+  is_system_default?: boolean;
 }
 
 interface UsuarioRowActionsProps {
   usuario: UsuarioParaEdicao;
   customRoles: CustomRole[];
+  defaultRoleId: string;
   currentUserId: string;
   activeLeaderCount: number;
 }
@@ -43,6 +45,7 @@ interface UsuarioRowActionsProps {
 export function UsuarioRowActions({
   usuario,
   customRoles,
+  defaultRoleId,
   currentUserId,
   activeLeaderCount,
 }: UsuarioRowActionsProps) {
@@ -62,16 +65,17 @@ export function UsuarioRowActions({
     setLoading(true);
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const result = await updateUser(usuario.id, {
+    const payload: Parameters<typeof updateUser>[1] = {
       full_name: formData.get("full_name") as string,
       email: formData.get("email") as string,
       phone: (formData.get("phone") as string) || null,
       department: (formData.get("department") as string) || null,
       job_title: (formData.get("job_title") as string) || null,
-      custom_role_id: formData.get("custom_role_id")
-        ? (formData.get("custom_role_id") as string)
-        : null,
-    });
+    };
+    if (usuario.role === "user") {
+      payload.custom_role_id = (formData.get("custom_role_id") as string) || defaultRoleId;
+    }
+    const result = await updateUser(usuario.id, payload);
     setLoading(false);
     if (result.success) {
       setEditOpen(false);
@@ -141,7 +145,7 @@ export function UsuarioRowActions({
             )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="edit-full_name">Nome completo</Label>
+                <Label htmlFor="edit-full_name" required>Nome completo</Label>
                 <Input
                   id="edit-full_name"
                   name="full_name"
@@ -150,7 +154,7 @@ export function UsuarioRowActions({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-email">E-mail</Label>
+                <Label htmlFor="edit-email" required>E-mail</Label>
                 <Input
                   id="edit-email"
                   name="email"
@@ -188,22 +192,31 @@ export function UsuarioRowActions({
                   defaultValue={usuario.job_title ?? ""}
                 />
               </div>
+            </div>
+            {usuario.role === "user" ? (
               <div className="space-y-2">
-                <Label htmlFor="edit-custom_role_id">Perfil customizado</Label>
+                <Label htmlFor="edit-custom_role_id" required={true}>
+                  Perfil de acesso
+                </Label>
                 <Select
                   id="edit-custom_role_id"
                   name="custom_role_id"
-                  defaultValue={usuario.custom_role_id ?? ""}
+                  defaultValue={usuario.custom_role_id ?? defaultRoleId}
+                  required
                 >
-                  <option value="">Nenhum (usuário padrão)</option>
                   {customRoles.map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.name}
+                      {r.is_system_default ? `${r.name} (sistema)` : r.name}
                     </option>
                   ))}
                 </Select>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Papel no escritório</Label>
+                <Input value="Líder" disabled />
+              </div>
+            )}
             <DialogFooter>
               <Button
                 type="button"

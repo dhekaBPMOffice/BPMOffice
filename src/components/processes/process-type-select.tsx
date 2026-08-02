@@ -28,7 +28,9 @@ export function ProcessTypeSelect({
 }: ProcessTypeSelectProps) {
   return (
     <div className={cn("space-y-2", className)}>
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} required={required}>
+        {label}
+      </Label>
       <Select
         id={id}
         value={value}

@@ -7,6 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Label } from "@/components/ui/label";
 import { PageLayout } from "@/components/layout/page-layout";
 import { ClipboardList, Plus, Pencil, Rocket } from "lucide-react";
 import {
@@ -130,7 +131,7 @@ export default function FormulariosPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Título</label>
+                  <Label required>Título</Label>
                   <input
                     className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                     value={newTitle}
