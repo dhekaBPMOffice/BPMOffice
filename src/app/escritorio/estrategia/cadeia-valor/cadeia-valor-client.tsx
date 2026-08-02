@@ -1042,10 +1042,9 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
     clearMessages();
 
     const requiredFields: Array<[string, string]> = [
+      ["Tipo", formData.tipo],
       ["Macroprocesso", formData.macroprocesso],
-      ["Gestor do processo", formData.gestorProcesso],
       ["Última atualização", formData.ultimaAtualizacao],
-      ["Responsável pela atualização", formData.responsavelAtualizacao],
     ];
 
     const emptyField = requiredFields.find(([, value]) => !value.trim());
@@ -1894,7 +1893,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                   </div>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
                     <div className="space-y-2 min-w-0">
-                      <Label htmlFor="form-tipo-cadeia">Tipo</Label>
+                      <Label htmlFor="form-tipo-cadeia">Tipo *</Label>
                       <Input
                         id="form-tipo-cadeia"
                         list="cadeia-valor-tipos-sugestao"
@@ -1912,7 +1911,7 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                     </div>
 
                     <div className="space-y-2 min-w-0">
-                      <Label htmlFor="form-macro-cadeia">Macroprocesso</Label>
+                      <Label htmlFor="form-macro-cadeia">Macroprocesso *</Label>
                       <Input
                         id="form-macro-cadeia"
                         value={formData.macroprocesso}
@@ -1998,13 +1997,12 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                         id="form-gestor-cadeia"
                         value={formData.gestorProcesso}
                         onChange={(event) => handleBasicFieldChange("gestorProcesso", event.target.value)}
-                        required
                         className="w-full"
                       />
                     </div>
 
                     <div className="space-y-2 min-w-0">
-                      <Label htmlFor="form-atualizacao-cadeia">Última atualização</Label>
+                      <Label htmlFor="form-atualizacao-cadeia">Última atualização *</Label>
                       <Input
                         id="form-atualizacao-cadeia"
                         type="datetime-local"
@@ -2023,7 +2021,6 @@ export function CadeiaValorClient({ initialProcesses }: { initialProcesses: Proc
                         onChange={(event) =>
                           handleBasicFieldChange("responsavelAtualizacao", event.target.value)
                         }
-                        required
                         className="w-full"
                       />
                     </div>
