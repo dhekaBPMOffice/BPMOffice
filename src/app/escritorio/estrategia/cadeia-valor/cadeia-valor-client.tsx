@@ -57,6 +57,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { PageLayout } from "@/components/layout/page-layout";
+import { UTF8_BOM_STRING } from "@/lib/decode-text-file";
 import {
   extractValueChainImport,
   isAcceptedValueChainImportFilename,
@@ -781,12 +782,18 @@ function initialAiAnswers(profile: OfficeCompanyProfile | null): Record<AIQuesti
   return { ...AI_QUESTION_DEFAULTS, ...deriveAiQuestionPrefill(profile) };
 }
 
+function messageFromUnknown(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+  return "Ocorreu um erro inesperado. Tente novamente.";
+}
+
 export function CadeiaValorClient({
   initialProcesses,
-  companyProfile,
+  companyProfile = null,
 }: {
   initialProcesses: ProcessItem[];
-  companyProfile: OfficeCompanyProfile | null;
+  companyProfile?: OfficeCompanyProfile | null;
 }) {
   const timeZone = useTimeZone();
   const formatDateTime = (value: string) => {
@@ -1276,60 +1283,64 @@ export function CadeiaValorClient({
   async function handleGenerateByAI(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     clearMessages();
-
-    const visibleQuestions = AI_QUESTIONS.filter(
-      (question) => !question.showWhen || question.showWhen(aiAnswers)
-    );
     setAiGenerating(true);
 
-    const questionnaire = visibleQuestions
-      .filter((question) => aiAnswers[question.id].trim())
-      .map((question) => `${question.label}\n${aiAnswers[question.id].trim()}`)
-      .join("\n\n");
-    const companyBlock = formatCompanyProfileForAI(companyProfile);
-    const inputParts: string[] = [];
-    if (companyBlock) inputParts.push(companyBlock);
-    inputParts.push("=== Questionário complementar ===", questionnaire);
-    const input = inputParts.join("\n\n");
-
-    let suggestions = buildAISuggestions(aiAnswers);
-    let usedFallback = true;
-
     try {
-      const res = await fetch("/api/ai/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phase: "cadeia_valor", input }),
-      });
-      const data = (await res.json()) as { text?: string; error?: string };
+      const visibleQuestions = AI_QUESTIONS.filter(
+        (question) => !question.showWhen || question.showWhen(aiAnswers)
+      );
 
-      if (res.ok && data.text) {
-        const parsed = parseValueChainAiResponse(data.text);
-        if (parsed.length > 0) {
-          suggestions = suggestionsFromParsedRows(parsed);
-          usedFallback = false;
+      const questionnaire = visibleQuestions
+        .filter((question) => aiAnswers[question.id].trim())
+        .map((question) => `${question.label}\n${aiAnswers[question.id].trim()}`)
+        .join("\n\n");
+      const companyBlock = formatCompanyProfileForAI(companyProfile);
+      const inputParts: string[] = [];
+      if (companyBlock) inputParts.push(companyBlock);
+      inputParts.push("=== Questionário complementar ===", questionnaire);
+      const input = inputParts.join("\n\n");
+
+      let suggestions = buildAISuggestions(aiAnswers);
+      let usedFallback = true;
+
+      try {
+        const res = await fetch("/api/ai/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phase: "cadeia_valor", input }),
+        });
+        const data = (await res.json()) as { text?: string; error?: string };
+
+        if (res.ok && data.text) {
+          const parsed = parseValueChainAiResponse(data.text);
+          if (parsed.length > 0) {
+            suggestions = suggestionsFromParsedRows(parsed);
+            usedFallback = false;
+          }
+        } else if (data.error) {
+          setError(`IA: ${data.error}. Foi aplicada uma sugestão simplificada.`);
         }
-      } else if (data.error) {
-        setError(`IA: ${data.error}. Foi aplicada uma sugestão simplificada.`);
+      } catch {
+        setError("Não foi possível contactar a IA. Foi aplicada uma sugestão simplificada.");
       }
-    } catch {
-      setError("Não foi possível contactar a IA. Foi aplicada uma sugestão simplificada.");
+
+      const generated = suggestions.map((item) => ({
+        id: crypto.randomUUID(),
+        ...item,
+        niveis: compactLevelsForPersist(item.niveis.length ? item.niveis : [""]),
+      }));
+      setProcesses((prev) => [...generated, ...prev]);
+      setSuccess(
+        usedFallback
+          ? `${generated.length} processos sugeridos (modo simplificado). Revise antes de consolidar.`
+          : `${generated.length} processos sugeridos por IA. Revise e ajuste como quiser.`
+      );
+      setManageDialogOpen(false);
+    } catch (error) {
+      setError(messageFromUnknown(error));
     } finally {
       setAiGenerating(false);
     }
-
-    const generated = suggestions.map((item) => ({
-      id: crypto.randomUUID(),
-      ...item,
-      niveis: compactLevelsForPersist(item.niveis.length ? item.niveis : [""]),
-    }));
-    setProcesses((prev) => [...generated, ...prev]);
-    setSuccess(
-      usedFallback
-        ? `${generated.length} processos sugeridos (modo simplificado). Revise antes de consolidar.`
-        : `${generated.length} processos sugeridos por IA. Revise e ajuste como quiser.`
-    );
-    setManageDialogOpen(false);
   }
 
   function exportProcessListCSV() {
@@ -1364,7 +1375,7 @@ export function CadeiaValorClient({
       ...rows.map((row) => row.map((value) => toCSVCell(value)).join(";")),
     ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([UTF8_BOM_STRING + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -2054,7 +2065,8 @@ export function CadeiaValorClient({
                 <p className="text-sm text-muted-foreground leading-snug">
                   Importação estruturada em lote: cada linha de dados após o cabeçalho materializa uma instância de
                   processo na lista. Formatos suportados: .xls, .xlsx, .csv ou .txt. Utilize o modelo (primeira linha =
-                  cabeçalhos).
+                  cabeçalhos). Arquivos CSV gravados pelo Excel em português (ANSI/Windows-1252) e UTF-8 são reconhecidos
+                  automaticamente.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <a
@@ -2354,7 +2366,7 @@ export function CadeiaValorClient({
             </TabsContent>
 
             <TabsContent value="ia" className="mt-4">
-              <form onSubmit={handleGenerateByAI} className="space-y-4">
+              <form onSubmit={(event) => void handleGenerateByAI(event)} noValidate className="space-y-4">
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Geração assistida de um conjunto de processos a partir dos Dados da Empresa e do questionário;
                   exige revisão antes de consolidar as entradas na lista da cadeia de valor.

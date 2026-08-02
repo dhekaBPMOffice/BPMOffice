@@ -4,6 +4,7 @@
  */
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
+import { decodeTextFileBytes } from "@/lib/decode-text-file";
 
 const ACCEPTED_TYPES = [
   "text/plain",
@@ -74,7 +75,7 @@ export async function extractTextFromDocument(
   }
 
   if (mimeType === "text/plain" || lower.endsWith(".txt")) {
-    return buffer.toString("utf-8");
+    return decodeTextFileBytes(new Uint8Array(buffer));
   }
 
   throw new Error("Tipo de arquivo não suportado. Use TXT, DOCX ou Excel (.xlsx, .xls).");

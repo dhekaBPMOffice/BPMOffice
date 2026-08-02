@@ -3,6 +3,7 @@
  * Modo estruturado: 5 colunas (Tipo, Macroprocesso, Níveis 1–3), uma linha = um processo.
  */
 import * as XLSX from "xlsx";
+import { readFileAsDecodedText } from "@/lib/decode-text-file";
 
 const ACCEPTED_EXT = [".xls", ".xlsx", ".csv", ".txt"] as const;
 
@@ -244,7 +245,7 @@ export async function extractValueChainImport(file: File): Promise<ValueChainImp
   }
 
   if (name.endsWith(".csv")) {
-    const text = await file.text();
+    const text = await readFileAsDecodedText(file);
     const matrix = csvTextToMatrix(text);
     const structured = extractStructuredRowsFromMatrix(matrix);
     if (structured !== null) return { mode: "structured", rows: structured };
@@ -252,7 +253,7 @@ export async function extractValueChainImport(file: File): Promise<ValueChainImp
   }
 
   if (name.endsWith(".txt")) {
-    const text = await file.text();
+    const text = await readFileAsDecodedText(file);
     const tsvMatrix = tryStructuredFromTsv(text);
     if (tsvMatrix !== null) return { mode: "structured", rows: tsvMatrix };
     return { mode: "legacy", lines: linesFromTxt(text) };
@@ -271,11 +272,11 @@ export async function extractLinesFromValueChainFile(file: File): Promise<string
     return linesFromXlsxLegacy(buffer);
   }
   if (name.endsWith(".csv")) {
-    const text = await file.text();
+    const text = await readFileAsDecodedText(file);
     return linesFromCsvLegacy(text);
   }
   if (name.endsWith(".txt")) {
-    const text = await file.text();
+    const text = await readFileAsDecodedText(file);
     return linesFromTxt(text);
   }
   return [];
