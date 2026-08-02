@@ -9,6 +9,7 @@ import {
   type CompanyProfileFormInput,
   validateCompanyProfileForm,
 } from "@/lib/estrategia/company-profile";
+import { fetchOfficeCompanyProfile } from "@/lib/estrategia/office-company-profile-server";
 
 const REVALIDATE_PATHS = [
   "/escritorio/estrategia/dados-empresa",
@@ -52,30 +53,7 @@ export async function getOfficeCompanyProfile(): Promise<{
   officeName: string;
   error: string | null;
 }> {
-  const supabase = await createClient();
-  const profile = await getProfile();
-  if (!profile.office_id) {
-    return { profile: null, officeName: "", error: "Escritório não encontrado." };
-  }
-
-  const [{ data: office }, { data: row, error }] = await Promise.all([
-    supabase.from("offices").select("name").eq("id", profile.office_id).maybeSingle(),
-    supabase
-      .from("office_company_profiles")
-      .select("*")
-      .eq("office_id", profile.office_id)
-      .maybeSingle(),
-  ]);
-
-  if (error) {
-    return { profile: null, officeName: office?.name ?? "", error: error.message };
-  }
-
-  return {
-    profile: (row as OfficeCompanyProfile | null) ?? null,
-    officeName: office?.name ?? "",
-    error: null,
-  };
+  return fetchOfficeCompanyProfile();
 }
 
 export async function saveOfficeCompanyProfile(
@@ -121,17 +99,30 @@ export async function saveOfficeCompanyProfile(
   }
 
   if (errorMessage || !data) {
-    return { profile: null, error: errorMessage ?? "Não foi possível salvar." };
+    const hint =
+      errorMessage &&
+      (errorMessage.includes("office_company_profiles") ||
+        errorMessage.toLowerCase().includes("does not exist"))
+        ? " Execute a migration 047_office_company_profile.sql no Supabase."
+        : "";
+    return {
+      profile: null,
+      error: `${errorMessage ?? "Não foi possível salvar."}${hint}`,
+    };
   }
 
-  await logAudit({
-    office_id: authProfile.office_id,
-    user_id: authProfile.id,
-    action: existing?.id ? "update" : "create",
-    resource_type: "office_company_profile",
-    resource_id: data.id,
-    details: { company_name: data.company_name },
-  });
+  try {
+    await logAudit({
+      office_id: authProfile.office_id,
+      user_id: authProfile.id,
+      action: existing?.id ? "update" : "create",
+      resource_type: "office_company_profile",
+      resource_id: data.id,
+      details: { company_name: data.company_name },
+    });
+  } catch {
+    // Persistência principal já concluída; falha de auditoria não deve derrubar a UI.
+  }
 
   for (const path of REVALIDATE_PATHS) {
     revalidatePath(path);

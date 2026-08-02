@@ -74,22 +74,25 @@ function CheckboxGroup({
 export function DadosEmpresaClient({
   initialProfile,
   initialOfficeName,
+  initialLoadError = null,
 }: {
   initialProfile: OfficeCompanyProfile | null;
   initialOfficeName: string;
+  initialLoadError?: string | null;
 }) {
   const [form, setForm] = useState<CompanyProfileFormInput>(() =>
     profileToForm(initialProfile, initialOfficeName)
   );
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialLoadError);
   const [success, setSuccess] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState(initialProfile?.updated_at ?? null);
 
   useEffect(() => {
     setForm(profileToForm(initialProfile, initialOfficeName));
     setUpdatedAt(initialProfile?.updated_at ?? null);
-  }, [initialProfile, initialOfficeName]);
+    setError(initialLoadError);
+  }, [initialProfile, initialOfficeName, initialLoadError]);
 
   function patch(partial: Partial<CompanyProfileFormInput>) {
     setForm((current) => ({ ...current, ...partial }));
@@ -103,19 +106,27 @@ export function DadosEmpresaClient({
     setError(null);
     setSuccess(null);
 
-    const { profile, error: saveError } = await saveOfficeCompanyProfile(form);
-    setSaving(false);
+    try {
+      const { profile, error: saveError } = await saveOfficeCompanyProfile(form);
+      if (saveError) {
+        setError(saveError);
+        return;
+      }
 
-    if (saveError) {
-      setError(saveError);
-      return;
+      if (profile) {
+        setForm(profileToForm(profile, initialOfficeName));
+        setUpdatedAt(profile.updated_at);
+      }
+      setSuccess("Dados da empresa salvos com sucesso.");
+    } catch (unknown) {
+      setError(
+        unknown instanceof Error
+          ? unknown.message
+          : "Não foi possível salvar. Verifique a conexão e se a base de dados está atualizada."
+      );
+    } finally {
+      setSaving(false);
     }
-
-    if (profile) {
-      setForm(profileToForm(profile, initialOfficeName));
-      setUpdatedAt(profile.updated_at);
-    }
-    setSuccess("Dados da empresa salvos com sucesso.");
   }
 
   return (
@@ -124,7 +135,7 @@ export function DadosEmpresaClient({
       description="Cadastro institucional reutilizado na estratégia, na cadeia de valor e em fluxos com IA."
       iconName="Building2"
     >
-      <form onSubmit={handleSubmit} className="mx-auto max-w-3xl space-y-6 pb-8">
+      <form onSubmit={(event) => void handleSubmit(event)} noValidate className="mx-auto max-w-3xl space-y-6 pb-8">
         {error && (
           <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
             {error}

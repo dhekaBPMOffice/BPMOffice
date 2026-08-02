@@ -1,2 +1,4 @@
 Tipo,Macroprocesso,Processo Nível 1,Processo Nível 2,Processo Nível 3
-Gestão,Operações,Exemplo de processo,,
+Primário,Operações de Negócio,Exemplo de processo,,
+Gerencial,Gestão Estratégica,Planejamento e controle,,
+Apoio,Administrativo e Finanças,Contas a pagar,,

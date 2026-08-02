@@ -13,6 +13,10 @@ export default async function DadosEmpresaPage() {
   }
 
   return (
-    <DadosEmpresaClient initialProfile={profile} initialOfficeName={officeName} />
+    <DadosEmpresaClient
+      initialProfile={profile}
+      initialOfficeName={officeName}
+      initialLoadError={error}
+    />
   );
 }
